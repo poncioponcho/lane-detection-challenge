@@ -33,12 +33,17 @@ eval:
   densify_step: 5.0            # 样条稠密化采样步长（px）
   tp_lateral_boundary_px: 10.3 # 实测 IoU=0.5 横向误差边界（理想模型 10px，cv2 实测 10.3px）
 
-# ---- 数据与输入（DECISIONS.md §15.2/§15.4 收口；权重事实源 docs/weight_scout_report.md） ----
-data:
-  input_size: [800, 320]       # 网络输入 (W,H)，与 ARCHITECTURE §4 ModelConfig 同源；T55 另有 960×480 等 preset 对比
+# ---- 模型与主干（DECISIONS.md §15.2 收口，§16.4 归位；权重事实源 docs/weight_scout_report.md） ----
+model:
+  name: clrnet_r50             # 默认主干（筛选先验）；T2.3 双路筛选实证后改记赢家（DECISIONS §15.2）
+  fallback_chain: [clrnet_r50, adnet_r34, clrnet_convnext_t]  # 与 ARCHITECTURE §4.5 ModelConfig 同源
   pretrained: required         # baseline 一律从公开预训练权重（CULane）fine-tune，禁 from-scratch（DECISIONS §15.2）
   backbone_screen: [clrnet_r50, adnet_r34]  # 双路 15ep 筛选（§15.2，9/3 晚–9/4 晨 AutoDL）；判定：|ΔF1|<1.5pp 取 clrnet_r50
   backbone_upgrade: clrnet_convnext_t       # 9/10（T60 定模型）升级备选（UnLanedet CULane 80.21）；DLA-34 无权重勿配置
+
+# ---- 数据与输入（DECISIONS.md §15.4 收口） ----
+data:
+  input_size: [800, 320]       # 网络输入 (W,H)，与 ARCHITECTURE §4 DataConfig 同源；T55 另有 960×480 等 preset 对比
 
 # ---- 验证与统计纪律 ----
 validation:

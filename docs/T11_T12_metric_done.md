@@ -13,7 +13,7 @@
 | `src/eval/rasterize.py` | B 样条 k=3 稠密化（step=5px）+ `cv2.polylines(thickness=30, lineType=8)` → 1366×720 二值掩码 |
 | `src/eval/matching.py` | `pair_iou` / `iou_matrix` / `match_image`（Hungarian 一对一，IoU>0.5 判 TP）/ `compute_f1` |
 | `src/eval/official_metric.py` | 重导出 + `evaluate_dir(loader=...)` 目录级封装（loader 留待 T20 格式解析） |
-| `tests/test_metric_selfcheck.py` | 8 项自检，全绿 |
+| `tests/test_metric_selfcheck.py` | 8 条断言自检（5 个 pytest 函数），全绿 |
 
 运行：`python tests/test_metric_selfcheck.py`（隔离 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane/bin/python`）
 
@@ -45,8 +45,9 @@
 
 ---
 
-## 4. 下一步（§6.5 单人关键路径）
+## 4. 下一步（§6.5 单人关键路径，v1.2 口径）
 
-T20 三格式解析 → T21 一致性 → T22 EDA → T23 按段切分 → T31 dataloader →
-T40 trainer → T42 baseline 36ep（9/5 出分）→ T50 后处理 → T51 阈值扫描 →
-T55 分辨率 2 档 → T53 退化增强 → T60 定模型（9/10）→ T61 重训 → T65 冻结（9/14）→ T70/T72 B 榜。
+T20 三格式解析 → T21 一致性 → T22 EDA → T23 按段切分 → T31 dataloader+双套 config →
+T40 trainer → **双路 15ep 筛选（CLRNet-R50 vs ADNet-R34，DECISIONS §15.2）→ 赢家 36ep**（9/5 出分）→
+T50 后处理 → T51 阈值扫描（J4 三件套）→ T55 分辨率 2 档 → T53 退化增强 →
+T60 定模型（9/10）→ T61 重训 → T65 冻结（9/14）→ T70/T72 B 榜。

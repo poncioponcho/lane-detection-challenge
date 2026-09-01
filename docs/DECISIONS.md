@@ -12,7 +12,7 @@
 | 视角 | 数值 | 方法 | 用途 |
 |---|---|---|---|
 | 竞争门槛（top-down） | **84.0** | 论文 SOTA 83.2 + 真增量 1.0 − 安全垫 0.2 | 决定"要不要做"某项投入（集成、分辨率 ablation、付费算力） |
-| 能力预测（bottom-up） | **82.2**（中位，区间 80–84） | 复现 SOTA 80.6 + 真增量 1.6 | 决定"能不能做到"，用于风险沟通 |
+| 能力预测（bottom-up） | **82.2**（中位，区间 80–84）⚠️ §15.1 已重估为 **≈80.3** | 复现 SOTA 80.6 + 真增量 1.6 | 决定"能不能做到"，用于风险沟通 |
 | **执行缺口** | **1.8 pp** | — | 缺口必须靠**工程质量与迭代次数**补，不是靠调低目标 |
 
 **为什么不按能力预测把目标下调到 82**：目标会自我实现。按能力定 82，就会砍掉集成、分辨率 ablation、付费算力这三项"补齐 1.8pp 缺口"的手段，然后真的停在 82。目标的作用是**拉伸执行**，不是描述预测。
@@ -319,8 +319,8 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 
 | 文档 | 版本 | 状态 | 职责 | 被谁取代/覆盖 |
 |---|---|---|---|---|
-| `docs/DECISIONS.md` | 15 节 | **active** | 唯一争议仲裁源 + 常量裁决层 | — |
-| `docs/ARCHITECTURE.md` | v1.1 | **active** | 系统设计（6 层 / T00–T72） | 目标/预算/范围随 DECISIONS |
+| `docs/DECISIONS.md` | 16 节 | **active** | 唯一争议仲裁源 + 常量裁决层 | — |
+| `docs/ARCHITECTURE.md` | v1.2 | **active** | 系统设计（6 层 / T00–T72；v1.2 传导 §15.2 主干裁决，见 §16.1） | 目标/预算/范围随 DECISIONS |
 | `TASKS.md` | v2 | **active** | 单人执行跟踪（W0–W6 + 勾选列） | v1（多团队版）已 archived |
 | `docs/PRD.md` | v2 | **superseded（部分）** | 需求全集仍有效；目标 83.0/预算 300 元已被 DECISIONS §1/§12 覆盖 | 目标与预算以 DECISIONS 为准 |
 | `docs/PRD_v1_目标84.md` | v1 | **superseded** | 历史版本，洞察已被 ARCHITECTURE §0 吸收 | 同上 |
@@ -361,7 +361,7 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 
 **裁决：baseline 一律从公开预训练权重（CULane）fine-tune 起步；from-scratch 仅允许作为消融对照，不进关键路径。**
 
-理由：① 训练集仅 71 个独立场景（段内 100 帧高度相似，有效多样性 ≪ 7100），from-scratch 过拟合风险大；② CULane 预训练 fine-tune 是零训练成本的标准做法；③ ARCHITECTURE §4 `ModelConfig.pretrained` 钩子已留（default=None）但 baseline 配方未写明——本次收口为 `configs/default.yaml::data.pretrained: required`；④ 它恰好对冲 PRD §1.2 第 3 步估的 −0.5~1.5pp 数据折损。
+理由：① 训练集仅 71 个独立场景（段内 100 帧高度相似，有效多样性 ≪ 7100），from-scratch 过拟合风险大；② CULane 预训练 fine-tune 是零训练成本的标准做法；③ ARCHITECTURE §4 `ModelConfig.pretrained` 钩子已留（default=None）但 baseline 配方未写明——本次收口为 `configs/default.yaml::model.pretrained: required`（§16.4 归位）；④ 它恰好对冲 PRD §1.2 第 3 步估的 −0.5~1.5pp 数据折损。
 
 **裁决（据 `docs/weight_scout_report.md` 全文，2026-09-01 17:00 落盘；本节同小时内两次修正，过程留档见末条）**
 
@@ -413,3 +413,31 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 
 - **git 备份**：本机无版本控制（2026-09-01 核实）——本机 Mac 是唯一开发机，丢代码比缺算力致命。**已 git init + 首次 commit（本地）**；远程备份建议 GitHub 私有仓库（账号 daniel1547），**待用户确认后推送**（外部动作不自动做）。
 - **配置文件落差**：ARCHITECTURE §3.1 列 19 个配置文件（model/preset/exp 族），磁盘只有 default.yaml——这是 T00/T01 的活，未到时间点。登记落差，不预建空文件（空文件无信息量）。
+
+---
+
+## 十六、三轮传导修复（2026-09-01 晚，用户三轮审计驱动）
+
+> 审计结论：§15 五项修复属实且已落地（default.yaml v2 常量正确、J4 已入 §9 判据表与 TASKS T4.1、TASKS 传导完整、新代码 pytest 15/15 实测全绿）。遗留：ARCHITECTURE 未传导 §15.2（违反 §14.4）、overview §二 与 §六 自相矛盾、fine-tune 配方无预案、若干口径小项。本节为裁决与落地点。
+
+### 16.1 ARCHITECTURE v1.2 传导（修复「§15.2 裁决未传导」）
+
+**问题**：§15.2 关闭了 α-SimADNet/RVLD 接入线并证实 DLA-34 在 UnLanedet 生态内不存在，但 ARCHITECTURE v1.1 全文仍是旧主干世界（§1.3 保底表、fallback_chain、mermaid M2、文件清单、exp 配置、T33/T41/T42/T52、§6.5 路径、§9.1 Q-A1），且版本头未动——与当天上午版本治理事故同构，方向相反：这次是裁决变了、文档没动。按 §14.4 标准，§15.2 裁决在此前视为「未完成」。
+
+**落地**：ARCHITECTURE 升 v1.2，主干线全改（改动清单见该文档 v1.2 变更记录）；`fallback_chain` 收口为 `(clrnet_r50, adnet_r34, clrnet_convnext_t)`；§6.5 单人路径插入双路 15ep 筛选节点。版本头同步升级，执行 §14.1。
+
+### 16.2 overview §二 / PRD 附录 A 修正
+
+overview §二 仍写 84.0/82.2/1.8pp，与同文档 §六（82.0/84.0/80.3/3.7pp）及 default.yaml 矛盾——「只引用不复制」原则被自身违反。已改为 §15.1 口径并标注以 `configs/default.yaml::target` 为准。PRD 附录 A 状态头与速查表同步指向 §15.1。
+
+### 16.3 fine-tune 配方预案（小裁决）
+
+**背景**：§15.2 后 baseline 从 from-scratch 36ep 变为「CULane 收敛权重 fine-tune 36ep」，但 LR=1e-3 / 36ep 配方继承自 from-scratch 训练。对已收敛权重用满 LR 满 schedule，在 6300 张 / 63 段上有灾难性遗忘风险。
+
+**裁决**：双路筛选与基线若出现过拟合形态（train loss 降而 val F1 降，或 train/val gap 持续扩大），**第一调节项 = LR 降档（1/5–1/10）+ 缩短 schedule**；排除此项后再查数据与 bug。筛选跑本身兼任 LR 探针，不另花 GPU。传导：TASKS T2.3 验收标准。
+
+### 16.4 小项
+
+- **default.yaml 结构归位**：`pretrained` / `backbone_screen` / `backbone_upgrade` 从 `data:` 段移入新建 `model:` 段（值不变；§15.2 中 `data.pretrained` 引用同步改为 `model.pretrained`）。
+- **「8/8 全绿」口径注明**：= 8 条断言 / 5 个 pytest 函数（全套 15 项含 parse 6 + submit 4）。落点：`docs/T11_T12_metric_done.md`、TASKS T1.2。
+- **执行面两件不过夜事项（提醒，不代办）**：① 数据下载 + 挂夜传（`data/raw/` 仍为 0B，是 9/3 晚筛选的全部前提）；② git 远程备份确认推送（本地 commit 已有，远程尚无）。

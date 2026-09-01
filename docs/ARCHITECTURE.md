@@ -2,18 +2,19 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v1.1** |
+| 文档版本 | **v1.2** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0（1146 行，5 层，W0–W7 编号）→ **v1.1**（重写为 6 层 + T00–T72 编号 + 推测→开关→证伪矩阵 + 三线并行 Gantt；随后落地 AR-1..AR-5 修正与 §6.5 单人版） |
+| 版本链 | v1.0（1146 行，5 层，W0–W7 编号）→ **v1.1**（重写为 6 层 + T00–T72 编号 + 推测→开关→证伪矩阵 + 三线并行 Gantt；随后落地 AR-1..AR-5 修正与 §6.5 单人版）→ **v1.2**（DECISIONS §15.2 主干裁决传导：clrnet_dla34/rvld/alpha_simadnet 除名，双路 15ep 筛选入主线路径） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1 修订落盘） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1 修订落盘）｜2026-09-01（v1.2 传导 §15.2） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
+> **v1.2 变更记录**（2026-09-01 晚，DECISIONS §15.2/§16 传导）：① 主干线全改——`clrnet_dla34`（UnLanedet 无权重无 config）与 `rvld`/`alpha_simadnet`（未收录）除名，主干改由**双路 15ep 筛选（CLRNet-R50 vs ADNet-R34，CULane 预训练 fine-tune）**实测定，`clrnet_convnext_t` 为 9/10 升级备选；涉及 §0.2/§0.3、§1.1–1.3、§2 mermaid、§3 文件清单、§4.5 ModelConfig、§6.2 任务表、§6.5 单人路径、§8.4/8.5 示例、§9.1 Q-A1；② `fallback_chain` 收口为 `(clrnet_r50, adnet_r34, clrnet_convnext_t)`；③ 版本头同步升级（执行 DECISIONS §14.1）。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，但登记裁决结果。** 目标 83.0 / 84.0 之争已由 `docs/DECISIONS.md` §1 裁决为**双轨**：竞争门槛（top-down）**84.0** 为本项目工作性目标，能力预测中位 **82.2**，执行缺口 **1.8pp**。代码常量、台账、过程指标一律以 **0.84** 为基准，**不下调**（理由：目标会自我实现——按能力定 82 会砍掉集成/分辨率 ablation/付费算力，然后真的停在 82）。本架构的唯一使命是：
@@ -45,7 +46,7 @@
 |---|---|
 | 每图多/漏 0.1 条 ≈ F1 掉 1.0pp | `src/postprocess/count_calib.py` 以 F1 为直接优化目标做阈值 / NMS / max_lanes 网格扫描 |
 | P50 横向误差需 ≤ 5px | `src/eval/lateral_error.py` 输出 P50/P90/达标率（v1 的「平均 ≤6.0px」同时保留，两个都出） |
-| 主干排序 α-SimADNet > RVLD > CLRNet-DLA34 | `src/models/registry.py` 三主干全部注册，按序 fallback |
+| 主干排序 α-SimADNet > RVLD > CLRNet-DLA34 | **已作废（v1.2）**：weight scout 核实 UnLanedet 未收录 α-SimADNet/RVLD、无 DLA-34 权重（DECISIONS §15.2）；registry 改注册 `clrnet_r50` / `adnet_r34` / `clrnet_convnext_t`，主干由双路 15ep 筛选实测定 |
 | A 榜段级 bootstrap 标准误 1.67pp，差异 <2pp 视为噪声 | `src/eval/bootstrap.py` + `src/exp/ablation.py::is_significant`（CI 下界提升 > 2.0pp 才可提交 A 榜） |
 | 跨帧时序收益 <1pp，明确放弃 | **架构上不提供该扩展点**（避免诱惑），仅在 `docs/decisions.md` 记录决策与理由 |
 
@@ -53,7 +54,7 @@
 
 | 冲突点 | v1 | v2 | 架构处置 |
 |---|---|---|---|
-| 起步框架 | UnLanedet（全家桶） | 论文原版 α-SimADNet/RVLD/ADNet | **双注册**：`src/models/` 同时桥接两者，配置一行切换。选型理由见 §1 |
+| 起步框架 | UnLanedet（全家桶） | 论文原版 α-SimADNet/RVLD/ADNet | **冲突消解（v1.2）**：论文原版经核实不可得（DECISIONS §15.2），改为 UnLanedet 内置双主干 15ep 筛选（CLRNet-R50 vs ADNet-R34），配置一行切换不变 |
 | 验证集规模 | 固定 8 段 | 8–10 段 | 配置 `split.val_size: 8`，可改；断言区间 [8, 10] |
 | 冻结截止 | 9/14 前 | 9/15 24:00 前 | **取严者：9/14 24:00 完成冻结**，9/15 全天做复现演练 |
 | B 榜流程耗时 | ≤ 90 分钟 | ≤ 6 小时 | 内部验收 90 分钟，对外承诺 6 小时 |
@@ -65,17 +66,17 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座（Runner / Dataset / 后处理 / 评测复用），以 ADNet（HardLane 家族，UnLanedet 内置）作为「T0 冒烟主干」抢第一个数据点，同时并行桥接 α-SimADNet / RVLD 原版实现作为「T1 主力候选」；9/5 基线出分、9/10 前完成主干定档。**
+> **以 UnLanedet 作为工程底座（Runner / Dataset / 后处理 / 评测复用）；主干不由预判选定，由双路 15ep 廉价筛选实测定（CLRNet-R50 vs ADNet-R34，均 CULane 预训练 fine-tune，DECISIONS §15.2）——9/3 晚–9/4 晨 AutoDL 顺序跑（兼任管线 shakedown），9/4 晨裁决，赢家 36ep 9/4 开跑，9/5 基线出分（M2）不变；CLRNet-ConvNeXt-T（CULane 80.21）留作 9/10（T60）升级备选。**
 
-即：**工程上用 UnLanedet，算法上追论文原版，二者通过 `BaseLaneDetector` 抽象层解耦。**
+即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
 ### 1.2 理由
 
 | # | 理由 | 类型 |
 |---|---|---|
 | 1 | **赛程不允许「先完美选型再动手」。** 今天 9/1，9/3 要数据与评测就绪、9/5 要基线出分。UnLanedet 已内置 CLRNet / CLRerNet / ADNet / CondLaneNet / UFLD / RESA / GANet 且单卡验证过，**clone 到跑通 1 epoch 预计 6 小时内**，是唯一能在 9/4 前拿到真实数据点的路径 | 【事实】 |
-| 2 | **UnLanedet 内置 ADNet，而 ADNet 正是 HardLane 家族（ADNet 80.5 → RVLD 82.0 → α-SimADNet 83.2）的第一级台阶。** 用它起步，后续升级主干时数据管线、评测管线、后处理、台账**全部可复用**，只有 `src/models/*.py` 一个文件要换 | 【事实】+【推测】 |
-| 3 | **α-SimADNet / RVLD 的开源可得性未确认（v2 Q1，阻塞项）。** 在 9/2 调研结论出来前把全部筹码押在「可能拿不到代码」的主干上是项目级风险。架构必须先保证**有一条 100% 可跑通的下限路径**（CLRNet-DLA34 / ADNet via UnLanedet，CULane 80.47） | 【事实】 |
+| 2 | **UnLanedet 内置 ADNet 与 CLRNet（R50/R34/ConvNeXt-T 权重均可得），正是双路筛选的两个候选与升级备选。** 无论赢家是谁，数据管线、评测管线、后处理、台账**全部可复用**，只有 `src/models/*.py` 一个文件要换 | 【事实】+【推测】 |
+| 3 | **α-SimADNet / RVLD 可得性已于 9/1 晚核实（DECISIONS §15.2）：UnLanedet 未收录，原版接入线关闭。** 「CLRNet-DLA34 CULane 80.47」为原版仓库数字，UnLanedet 无 DLA-34 权重与 config——**100% 可跑通的下限路径 = CLRNet-R50 / ADNet-R34（CULane 权重均可得，见 `docs/weight_scout_report.md`）** | 【事实】 |
 | 4 | **评测与后处理才是本赛题的主要增量来源，且与主干完全正交。** 零训练成本项合计 +1.5~3.5pp，主干从 CLRNet 换到 α-SimADNet 是 +2.7pp。**评测/后处理代码与主干无关** —— 选成熟工程底座不会损失任何主干升级空间 | 【测算】 |
 | 5 | **复现要求（TOP3 必查）偏好成熟框架。** UnLanedet 有标准 `requirements.txt` 与社区验证；论文原版 repo 常有隐式依赖与脏提交。底座越标准，R3/R5 风险越低 | 【事实】 |
 | 6 | **反对「纯论文原版起步」**：原版 repo 常绑定特定 torch 版本与自研 CUDA 算子，在 Kaggle T4 与 AutoDL 4090 双环境编译通过概率不高，调试时间不可控。我们只有 16 天，**不可控时间是最大的敌人** | 【推测】 |
@@ -87,7 +88,7 @@
 ```python
 # src/models/base.py
 class BaseLaneDetector(Protocol):
-    """主干统一契约。所有主干（CLRNet / ADNet / RVLD / α-SimADNet）必须满足。
+    """主干统一契约。所有注册主干（CLRNet / ADNet 等，见 registry.py）必须满足。
 
     坐标约定：predict() 返回的 Lane 一律在【1366×720 原图绝对像素坐标系】，
     网络内部的下采样 / 归一化在主干实现内部闭环，不得外泄。
@@ -127,7 +128,7 @@ def build_model(cfg: ModelConfig, input_size: tuple[int, int]) -> BaseLaneDetect
     cls = REGISTRY.get(cfg.name)
     if cls is None:
         # ★ 降级链：配置里的主干不可用时按序 fallback，保证链路永不中断
-        for fb in cfg.fallback_chain:      # e.g. ["alpha_simadnet", "rvld", "adnet", "clrnet_dla34"]
+        for fb in cfg.fallback_chain:      # e.g. ["clrnet_r50", "adnet_r34", "clrnet_convnext_t"]
             if fb in REGISTRY:
                 logger.warning(f"主干 {cfg.name} 不可用，降级为 {fb}")
                 cfg = replace(cfg, name=fb)
@@ -136,14 +137,14 @@ def build_model(cfg: ModelConfig, input_size: tuple[int, int]) -> BaseLaneDetect
     return cls(cfg).build(cfg, input_size)
 ```
 
-| 主干 | 桥接方式 | 定位 | 论文水位 | 时间点 |
+| 主干 | 桥接方式 | 定位 | 水位 | 时间点 |
 |---|---|---|---|---|
-| `clrnet_dla34` | UnLanedet 内置 | **下限保底**（永远可用） | CULane 80.47 | T0，9/4 冒烟 |
-| `adnet` | UnLanedet 内置 | HardLane 家族起点 | HardLane 80.5 | T0，9/5 基线 |
-| `rvld` | 原版 repo 桥接，否则 UnLanedet 迁移 | 主力候选① | HardLane 82.0 | T1，9/8 前接入 |
-| `alpha_simadnet` | 原版 repo 桥接，否则按论文复现 | **主力候选②（首选）** | HardLane **83.2** | T1，9/8 前接入 |
+| `clrnet_r50` | UnLanedet 内置 + CULane 权重 fine-tune | **筛选路 A**（先验：同框架 CULane 最强 ResNet 系） | CULane 复现 79.30 | 双路筛选 9/3 晚 |
+| `adnet_r34` | UnLanedet 内置 + CULane 权重 fine-tune | **筛选路 B**（恶劣场景架构假设待 HardLane 实证） | CULane 复现 77.88（HardLane 论文 80.5 为原版实现，非本生态水位） | 双路筛选 9/3 晚 |
+| `clrnet_convnext_t` | UnLanedet 内置 + CULane 权重 | 9/10（T60）升级备选（训练更慢，不进筛选） | CULane 复现 80.21 | T60 后 |
+| ~~`clrnet_dla34` / `rvld` / `alpha_simadnet`~~ | — | **已除名（v1.2）**：DLA-34 无权重无 config；RVLD/α-SimADNet 未被 UnLanedet 收录（DECISIONS §15.2，`docs/weight_scout_report.md`） | — | — |
 
-> **9/2 门禁（v2 Q1）**：若 α-SimADNet / RVLD 代码不可得或 4 小时内跑不通 → 立即锁定 `adnet` 为主力，把省下的时间投入后处理与退化增强（零训练成本项）。**此门禁不阻塞任何其他工作线。**
+> **门禁状态（v1.2 更新）**：原 9/2 门禁（α-SimADNet/RVLD 可得性）已于 9/1 晚提前关闭（未收录）。**现门禁（9/3 前）= 双路权重下载核验（⚠️ model zoo 的 CLRNet-R34 行链接文件名带 r50 疑似错位，下载后必须加载核验 backbone）+ 两套 1366×720 config 迁移完成**（TASKS T2.1/T2.2，迁移清单见 DECISIONS §15.2 末条）。筛选判定：|ΔF1| < 1.5pp（8 段 val 噪声带内）→ 取 CLRNet-R50。此门禁不阻塞任何其他工作线。
 
 ### 1.4 技术栈与版本锁定策略
 
@@ -201,7 +202,7 @@ flowchart TB
     subgraph MODEL["2. 模型层 MODEL —— 可插拔主干 + 训练引擎"]
         direction TB
         M1["models/registry.py<br/>主干注册表 + 降级链"]
-        M2["clrnet_dla34 / adnet / rvld / alpha_simadnet"]
+        M2["clrnet_r50 / adnet_r34（双路筛选）<br/>clrnet_convnext_t（9/10 升级备选）"]
         M3["engine/trainer.py<br/>AMP + EMA + 梯度累积"]
         M4["engine/checkpoint.py<br/>每 epoch 存盘 + 云端同步 + 续跑"]
         M1 --> M2 --> M3 --> M4
@@ -334,10 +335,9 @@ lane-competition/
 │   ├── models/
 │   │   ├── base.py                          # BaseLaneDetector 抽象契约
 │   │   ├── registry.py                      # 主干注册表 + 自动降级链
-│   │   ├── clrnet_dla34.py                  # 下限保底主干（UnLanedet 桥接）
-│   │   ├── adnet.py                         # HardLane 家族起点（UnLanedet 桥接）
-│   │   ├── rvld.py                          # 主力候选 1（原版 repo 桥接）
-│   │   └── alpha_simadnet.py                # 主力候选 2 · 首选（原版 repo 桥接 / 论文复现）
+│   │   ├── clrnet_r50.py                    # 筛选路 A（UnLanedet 桥接 + CULane 权重）
+│   │   ├── adnet_r34.py                     # 筛选路 B（UnLanedet 桥接 + CULane 权重）
+│   │   └── clrnet_convnext_t.py             # 9/10 升级备选（T60 后启用）
 │   │
 │   ├── engine/
 │   │   ├── trainer.py                       # 训练循环：AMP + EMA + 梯度累积 + 定时优雅退出
@@ -384,16 +384,17 @@ lane-competition/
 │
 ├── configs/
 │   ├── default.yaml                         # 全量默认值（唯一事实源）
-│   ├── model/{clrnet_dla34,adnet,rvld,alpha_simadnet}.yaml
-│   ├── split/v1_seed42.yaml                 # 8 段验证集的显式段 ID 列表
+│   ├── model/{clrnet_r50,adnet_r34,clrnet_convnext_t}.yaml
+│   ├── splits/v1_seed42.yaml                # 8 段验证集的显式段 ID 列表
 │   ├── preset/
 │   │   ├── res_800x320.yaml                 # D6 基线档
 │   │   ├── res_960x480.yaml                 # D6 推荐折中档（宽>=960、高>=480）
 │   │   ├── res_1366x720.yaml                # D6 全分辨率档（显存上限测试）
 │   │   └── res_1600x320.yaml                # CLRNet 常规档，作对照
 │   ├── exp/
-│   │   ├── 000_smoke_clrnet_800x320.yaml    # T0 冒烟
-│   │   ├── 001_baseline_adnet_800x320.yaml  # 基线（所有 ablation 的对照组）
+│   │   ├── 000_smoke_clrnet_r50_800x320.yaml # T0 冒烟
+│   │   ├── 001_screen_dual_15ep.yaml        # 双路筛选（CLRNet-R50 vs ADNet-R34，兼任 shakedown）
+│   │   ├── 001b_baseline_winner_36ep.yaml   # 基线：筛选赢家 36ep（所有 ablation 的对照组）
 │   │   ├── 002_res_960x480.yaml             # 证伪：分辨率是隐性天花板？
 │   │   ├── 003_restore_clahe.yaml           # 证伪：CLAHE 有效？（分桶判定）
 │   │   ├── 004_degrade_rain_fog.yaml        # 证伪：退化增强 +0.5~1.5pp？
@@ -401,8 +402,7 @@ lane-competition/
 │   │   ├── 006_post_extrapolate.yaml        # 证伪：端点外推收益？
 │   │   ├── 007_post_nms.yaml                # 证伪：横向 NMS 收益？
 │   │   ├── 008_tta_flip.yaml                # 证伪：水平翻转 TTA 有益还是有害？
-│   │   ├── 009_main_rvld.yaml               # 主干升级 1
-│   │   ├── 010_main_alpha_simadnet.yaml     # 主干升级 2（首选）
+│   │   ├── 009_main_convnext_t.yaml         # 主干升级备选（T60 定模型后，DECISIONS §15.2）
 │   │   └── 0xx_*.yaml                       # 后续按序追加
 │   └── final/infer_b.yaml                   # B 榜冻结推理配置（冻结后只读）
 │
@@ -466,7 +466,7 @@ lane-competition/
 | DATA-P0-01 | P0-B07 | 按段 hold-out + 场景分层 + 断言 | `src/data/{split_by_clip,scene_bucket}.py` + `tests/test_split_assert.py` | `configs/splits/v1_seed42.yaml` |
 | DATA-P0-02 | P0-B08 | EDA / 数据体检报告 | `src/data/eda.py` | `docs/eda.md` |
 | DATA-P0-04 | — | 数据双备份 + 哈希存证 | `scripts/kaggle/kaggle_sync_dataset.py` + `data/raw/RAW_SHA256.txt` | 云端 Dataset + 本地副本 |
-| MODEL-P0-01 | P0-C09 | 基线模型跑通 | `src/models/{registry,adnet,alpha_simadnet}.py` | `outputs/runs/<exp>/best.pth` |
+| MODEL-P0-01 | P0-C09 | 基线模型跑通 | `src/models/{registry,clrnet_r50,adnet_r34}.py` | `outputs/runs/<exp>/best.pth` |
 | MODEL-P0-02 | P0-C09② | 赛题 dataloader（原图坐标） | `src/data/dataset.py` + `src/common/geo.py` | 1 epoch 日志 |
 | MODEL-P0-03 | P1-C18 | 恶劣场景专项（退化增强可开关） | `src/data/degrade.py` | `configs/exp/004_*.yaml` |
 | MODEL-P0-04 | P0-C10② | 条数预测校准 | `src/postprocess/count_calib.py` | 阈值扫描曲线 + 条数准确率 |
@@ -783,9 +783,9 @@ class RestoreConfig:
 
 @dataclass
 class ModelConfig:
-    name: str = "adnet"
-    fallback_chain: tuple[str, ...] = ("alpha_simadnet", "rvld", "adnet", "clrnet_dla34")
-    pretrained: str | None = None
+    name: str = "clrnet_r50"        # 筛选先验默认；T2.3 双路筛选实证后改记赢家
+    fallback_chain: tuple[str, ...] = ("clrnet_r50", "adnet_r34", "clrnet_convnext_t")
+    pretrained: str | None = None   # v1.2：baseline 一律 CULane 预训练起步（DECISIONS §15.2），禁 from-scratch
     fp16: bool = False
 
 @dataclass
@@ -903,8 +903,8 @@ sequenceDiagram
     participant CK as engine/checkpoint.py
     participant CLD as 云端 Kaggle Dataset / OSS
 
-    U->>SH: make train EXP=001_baseline_adnet_800x320
-    SH->>CFG: Config.load(configs/exp/001.yaml)
+    U->>SH: make train EXP=001b_baseline_winner_36ep
+    SH->>CFG: Config.load(configs/exp/001b.yaml)
     CFG-->>SH: Config + config.hash()
     SH->>SPL: Split.load(configs/splits/v1_seed42.yaml)
     SPL-->>SH: train 63 段 / val 8 段（断言交集为空 + 场景全覆盖）
@@ -1106,14 +1106,14 @@ gantt
 | **T30** | UnLanedet 环境搭建 + demo 推理可视化 | 8 | T01 | ✔ | | demo 通过 | 9/1–9/2 |
 | **T31** | 赛题 dataloader（读 `.lines.txt`，标注映射回 1366×720） | 10 | T10, T20, T30 | ✔ | ★ | 1 epoch 跑通 | 9/2–9/3 |
 | **T32** | `BaseLaneDetector` 抽象层 + registry + 降级链 | 8 | T30 | ✔ | | 主干可插拔 | 9/2–9/3 |
-| **T33** | α-SimADNet / RVLD 开源可得性调研（**9/2 门禁**） | 4 | — | ✔ | | `docs/decisions.md` | 9/1–9/2 |
+| **T33** | ~~α-SimADNet / RVLD 可得性调研~~ **已完成**（9/1 晚 weight scout：均未收录，DECISIONS §15.2）；门禁对象改为双路权重核验 + 双套 config 迁移 | 4 | — | ✔ | | `docs/weight_scout_report.md` | ✅ 9/1 |
 | **T40** | `trainer.py` + `checkpoint.py`（每 epoch 存盘 + 云端同步 + 续跑）+ EMA/AMP | 14 | T31, T32 | | ★ | 训练可断点续跑 | 9/3–9/4 |
-| **T41** | 冒烟训练：CLRNet-DLA34 3 epoch | 3（GPU 2h） | T40 | | ★ | 第一个 loss 曲线 | 9/4 |
+| **T41** | 冒烟训练：CLRNet-R50 3 epoch | 3（GPU 2h） | T40 | | ★ | 第一个 loss 曲线 | 9/4 |
 | **T42** | 基线正式训练：36 epoch，主干 = 双路 15ep 筛选赢家（CLRNet-R50 vs ADNet-R34，DECISIONS §15.2；CULane 预训练起步，禁 from-scratch）（4090 ≈ 9–12h / T4×2 ≈ 35.7h） | 6（GPU 12h） | T41, T23 | | ★ | `best.pth` | 9/4–9/5 |
 | **T43** | 基线首评：全量 `EvalBundle` + 横向误差分布报告 | 4 | T42, T14 | | ★ | M2 出分 | **9/5** |
 | **T50** | 后处理套件（resample / extrapolate / filter / nms，各独立开关） | 14 | T43 | ✔ | | 后处理可 A/B | 9/5–9/7 |
 | **T51** | 阈值 / max_lanes / NMS 网格扫描（直接以 F1 为目标） | 6 | T50, T14 | ✔ | | 阈值扫描曲线 | 9/6–9/7 |
-| **T52** | 主力候选接入：RVLD + α-SimADNet（T33 结论驱动） | 20 | T32, T33 | ✔ | | 主干升级可用 | 9/5–9/8 |
+| **T52** | ~~主力候选接入：RVLD + α-SimADNet~~ **已关闭（v1.2）**：UnLanedet 未收录两者（DECISIONS §15.2）；主干由 T42 双路筛选定，ConvNeXt-T 留 T60 备选 | — | — | — | | — | — |
 | **T53** | 退化增强各算子（gamma/雾/雨/反光/阴影/模糊/噪声） | 12 | T31 | ✔ | | `degrade.py` | 9/5–9/7 |
 | **T54** | 复原前置 CLAHE / 自适应 gamma / 暗通道去雾 | 5 | T31 | ✔ | | `restore.py` | 9/6 |
 | **T55** | 分辨率 ablation（960×480 vs 800×320，各 15 epoch） | 4（GPU 30h） | T42 | | | D6 证伪 | 9/6–9/9 |
@@ -1181,10 +1181,12 @@ T00 → T01 → T30 ────────────┘                     
 **单人版关键路径（保留项，按时间序）**
 
 ```
-T00 骨架(9/1) → T10 基础设施 → T11 metric复刻 → T12 三组自检(9/2全绿)
+T00 骨架(9/1) → T10 基础设施 → T11 metric复刻 → T12 三组自检(✅9/1全绿)
   → T20 三格式解析 → T21 一致性 → T22 EDA → T23 按段切分(9/3 M1)
-  → T31 dataloader → T40 trainer+续跑 → T42 baseline 36ep(9/5 M2出分)
-  → T50 后处理套件 → T51 阈值/NMS/max_lanes扫描 → T55 分辨率2档(960×480 vs 800×320)
+  → T31 dataloader+双套config → T40 trainer+续跑
+  → 双路 15ep 筛选(9/3晚–9/4晨 AutoDL, CLRNet-R50 vs ADNet-R34, 兼任 shakedown, DECISIONS §15.2)
+  → 赢家 36ep(9/4 开跑) → T43(9/5 M2出分, 触发 DECISIONS §15.1 重估)
+  → T50 后处理套件 → T51 阈值/NMS/max_lanes扫描(J4 三件套) → T55 分辨率2档(960×480 vs 800×320)
   → T53 退化增强(雾+雨一组) → T43 全量首评
   → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
   → T70 B榜首提(9/16) → T72 终提交(9/17 15:00)
@@ -1245,7 +1247,7 @@ seaborn==0.13.2
 #   git+https://github.com/zkyseu/UnLanedet@<commit-sha>
 #   或 vendored/third_party/UnLanedet（推荐，进 solution.zip 更可控）
 
-# 可选：若 α-SimADNet / RVLD 原版 repo 可得，同样 vendored 固定 commit
+# α-SimADNet / RVLD 原版 repo 已核实不可得（DECISIONS §15.2，2026-09-01），原「可得则 vendored」分支关闭
 ```
 
 ### 7.3 工具链
@@ -1340,7 +1342,7 @@ SUBMIT_ROOT # outputs/submits/
 
 | 对象 | 格式 | 示例 |
 |---|---|---|
-| 实验 ID | `NNN_<主题>_<关键变量>` | `003_restore_clahe`、`010_main_alpha_simadnet` |
+| 实验 ID | `NNN_<主题>_<关键变量>` | `003_restore_clahe`、`009_main_convnext_t` |
 | 权重文件 | `{exp_id}_{valF1}_{date}.pth` | `003_restore_clahe_82.41_20260906.pth` |
 | 最佳权重（软链） | `best.pth` → 指向最优 epoch | |
 | 预测目录 | `outputs/preds/<exp_id>/<split>/` | `outputs/preds/001_baseline/val/` |
@@ -1355,8 +1357,8 @@ SUBMIT_ROOT # outputs/submits/
 **日志**（`common/logging_setup.py`，每行前缀 `[<ISO时间>][<exp_id>][<LEVEL>]`）：
 
 ```
-2026-09-05T14:23:10 [001_baseline_adnet_800x320][INFO] epoch 12/36 loss=0.4312 lr=6.2e-4 12.3s/it
-2026-09-05T14:23:10 [001_baseline_adnet_800x320][WARN] 主干 alpha_simadnet 不可用，降级为 adnet
+2026-09-05T14:23:10 [001b_baseline_winner_36ep][INFO] epoch 12/36 loss=0.4312 lr=6.2e-4 12.3s/it
+2026-09-05T14:23:10 [001b_baseline_winner_36ep][WARN] 主干 clrnet_convnext_t 不可用，降级为 clrnet_r50
 ```
 
 **实验台账** `docs/experiments.csv`（机读，`src/exp/ledger.py` 自动追加；≥15 行）：
@@ -1365,7 +1367,7 @@ SUBMIT_ROOT # outputs/submits/
 exp_id,config_file,config_hash,git_commit,seed,val_f1,val_f1_ci_low,val_f1_ci_high,val_f1_at_07,
 lateral_p50,lateral_over10px_ratio,count_exact_ratio,min_scene_f1,a_board_f1,train_hours,
 gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
-001_baseline_adnet_800x320,configs/exp/001.yaml,7a3f9c21,abc1234,42,80.12,78.4,81.8,58.3,
+001b_baseline_winner_36ep,configs/exp/001b.yaml,7a3f9c21,abc1234,42,80.12,78.4,81.8,58.3,
 4.9,0.171,0.842,71.4,,11.9,autodl4090,-,-,对照组,
 003_restore_clahe,configs/exp/003.yaml,5b1e7742,def5678,42,81.55,79.9,83.1,60.1,
 4.6,0.158,0.861,73.2,81.2,11.9,autodl4090,restore.clahe=False->True,+1.43,保留,
@@ -1401,7 +1403,7 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 
 | # | 问题 | 阻塞什么 | 建议动作与截止 | 责任人 |
 |---|---|---|---|---|
-| **Q-A1** | α-SimADNet / RVLD 开源代码是否可得且 4h 内跑通？（v2 Q1） | T52 主干接入、T60 定模型 | **9/2 门禁**；不可得即降级 `adnet` 为主力，省下时间投后处理与退化增强 | 架构师 |
+| **Q-A1** | ~~α-SimADNet / RVLD 可得性~~ **已关闭（9/1 晚，DECISIONS §15.2）**：UnLanedet 未收录；现门禁 = 双路权重核验 + 双套 1366×720 config 迁移 | T42 双路筛选、T60 定模型 | **9/3 前**完成权重加载核验（R34 链接错位风险见 DECISIONS §15.2）与 config 迁移 | 架构师 |
 | **Q-A2** | 算力预算（100 / 200 / 300 元 4090）（v2 Q7 / v1 Q1） | T42 基线训练时长（12h vs 35.7h）、实验次数 | **9/2 前拍板**；按 DECISIONS.md §10 测算：先用满 Kaggle 免费 68.5 T4×2-h，剩余只需补购 4090 ≈27h = **67~80 元即覆盖全部计划**；**200 元含约一倍冗余**；300 元为 2× 安全缓冲（针对吞吐测算不确定 R10）。未批则砍全部 P1，只保 P0，目标下调至 80 | 用户 |
 | **Q-A3** | 官方 metric 的 B 样条细节：阶数 k、稠密化采样间距、按弧长还是按参数采样、端点处理（v2 Q4） | **T12 能否全绿，进而决定全部后续决策是否可信** | 9/3 前查官方 baseline 代码；无则用 1–2 次 A 榜额度做反演标定 | 架构师 + PM |
 | **Q-A4** | 官方是否提供每段场景标签？（v2 Q3） | T24 场景分桶、T23 场景分层、S6 条件化 CLAHE | 9/3 前确认；不可得则人工标注 90 段（1 人 2h 内可完成） | PM |
@@ -1431,7 +1433,7 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 
 | 约束（来自任务要求） | 是否满足 | 落地位置 |
 |---|---|---|
-| 起步框架给出明确倾向 + 理由 | ✅ | §1.1–1.2（UnLanedet 工程底座 + 论文原版主干双注册） |
+| 起步框架给出明确倾向 + 理由 | ✅ | §1.1–1.2（UnLanedet 工程底座 + 双路 15ep 筛选定主干，v1.2） |
 | 主干可插拔 | ✅ | §1.3 `BaseLaneDetector` + `registry.py` + 降级链 |
 | 版本锁定策略（TOP3 复现） | ✅ | §1.4 三层锁定 + env_fingerprint + deterministic |
 | 五层架构 + Mermaid | ✅ | §2（数据 / 模型 / 后处理 / 评测 / 实验管理 / 交付） |

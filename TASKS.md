@@ -57,7 +57,7 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T1.1 | **metric 1:1 复刻**：B 样条 k=3 稠密化(5px) → 1366×720 画布 → `cv2.polylines(thickness=30, lineType=8)` → IoU 矩阵 → 匈牙利 → `F1=2TP/(P+G)`，全参数可配 | `src/eval/{rasterize,matching,official_metric}.py` ✅（2026-09-01，隔离 venv `envs/lane`） | P0 | ✅ 9/1 |
-| ✅ | T1.2 | metric 自检：GT 对 GT=1.0；横移 5/10/15px → IoU 0.722/0.512/0.348（<0.02 容差）；TP 边界实测 ≈10.3px；1TP+1FP 场景 = 0.6667 | `tests/test_metric_selfcheck.py` **8/8 全绿**（2026-09-01）；Q-A3 反演标定**关闭**（见 DECISIONS §9.1） | P0 | ✅ 9/1 |
+| ✅ | T1.2 | metric 自检：GT 对 GT=1.0；横移 5/10/15px → IoU 0.722/0.512/0.348（<0.02 容差）；TP 边界实测 ≈10.3px；1TP+1FP 场景 = 0.6667 | `tests/test_metric_selfcheck.py` **8/8 断言全绿**（=8 条断言 / 5 个 pytest 函数；全套 15 项含 parse 6 + submit 4，2026-09-01）；Q-A3 反演标定**关闭**（见 DECISIONS §9.1） | P0 | ✅ 9/1 |
 | 🔵 | T1.3 | `submit.zip` 打包器 + 强校验器（清单齐全/无多余/路径一致/偶数点数/1 位小数/无 NaN/未归一化/<200MB） | `src/submit/{export_lines,pack_submit,verify_submit}.py` + `src/common/checksum.py` ✅ 合成测试 4/4 全绿（`tests/test_submit.py`）；**待真实 testA 清单跑 900 张全检** | P0 | 9/4–9/5（**M1 减载解耦**，DECISIONS §15.5；首提 9/5 前就绪即可） |
 | ⬜ | T1.4 | 按视频段 hold-out 切分本地验证集（**8 段默认，区间 6–10**，EDA 后固化） | `configs/splits/v1_seed42.yaml`，切分脚本带禁止随机切断言 | P0 | 9/3 |
 | ⬜ | T1.5 | A 榜首提（只烧 1 次额度验链路） | 平台返回有效分数，与本地 val 差值入台账 | P1 | 9/5 |
@@ -70,7 +70,7 @@
 | 🔵 | T2.0 | 三格式解析 + 一致性校验（ARCHITECTURE T20/T21）：`common/io_utils.py`（.lines.txt/.json/实例 PNG 三格式 IO 原语）+ `data/parse_labels.py`（LabelBundle 编排）+ `data/check_label_consistency.py`（T21 匈牙利匹配 + badlist） | ✅ 合成数据测试 6/6 全绿（`tests/test_parse_labels.py`）；**待真实数据**：JSON schema 用 `probe_json_schema` 校准 + 7100 张全量 badlist（<0.1%） | P0 | 9/2–9/3 |
 | ⬜ | T2.1 | UnLanedet 落地 + **双路权重下载核验**：CLRNet-R50（`clrnet_model_best_culane.pth`）+ ADNet-R34（`adnet_model_best_culane.pth`），URL 见 `docs/weight_scout_report.md`；⚠️ model zoo 的 CLRNet-R34 行链接文件名带 r50 疑似错位，下载后必须加载核验 backbone | 两权重可载入 + demo 推理可视化正常 | P0 | 9/3 |
 | ⬜ | T2.2 | 赛题 dataloader + **双套 config 迁移**（1366×720：`ori_img`/`cut_height`/`sample_y`/`num_classes`/`max_lanes`；ADNet SPGHead 的 `img_width/img_height`；权重经 `MODEL.WEIGHTS` opts 注入，head 末层非 strict）——迁移清单见 `docs/weight_scout_report.md` 问题 4/5 | 跑通 1 epoch train + val，loss 正常下降 | P0 | 9/3 白天 |
-| ⬜ | T2.3 | baseline：**双路 15ep 廉价筛选（CLRNet-R50 vs ADNet-R34，CULane 权重 fine-tune）→ 赢家 36ep**（DECISIONS §15.2；筛选兼任管线 shakedown；AutoDL 4090 各 ≈6h + 36ep ≈13h；判定：\|ΔF1\|<1.5pp 取 CLRNet-R50） | **9/5 出分（M2）**：val F1@0.5 首个数据点（入门线 0.75）+ 主干裁决入台账 → **立即触发 §15.1 重估** | P0 | 9/3 晚–9/5 |
+| ⬜ | T2.3 | baseline：**双路 15ep 廉价筛选（CLRNet-R50 vs ADNet-R34，CULane 权重 fine-tune）→ 赢家 36ep**（DECISIONS §15.2；筛选兼任管线 shakedown；AutoDL 4090 各 ≈6h + 36ep ≈13h；判定：\|ΔF1\|<1.5pp 取 CLRNet-R50） | **9/5 出分（M2）**：val F1@0.5 首个数据点（入门线 0.75）+ 主干裁决入台账 → **立即触发 §15.1 重估**；⚠️ fine-tune 预案（DECISIONS §16.3）：若出现过拟合形态（train 降 / val 降），第一调节项 = LR 降档（1/5–1/10）+ 缩短 schedule，排除后再查 bug | P0 | 9/3 晚–9/5 |
 | ❌ | T2.4 | ~~多主干横向对比（ADNet/CondLaneNet/UFLD/RESA）~~ | **已砍**（DECISIONS §13：20h 人工超单人容量；α-SimADNet/RVLD 原版接入分支已于 9/1 晚关闭——UnLanedet 未收录两者；主干由 T2.3 双路筛选定，见 DECISIONS §15.2） | ~~P1~~ | — |
 
 ### W3 · 恶劣场景专项（9/6 – 9/11）
