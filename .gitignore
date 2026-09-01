@@ -1,6 +1,6 @@
-# 数据与产物（10GB 级，不入库）
-data/
-outputs/
+# 数据与产物（10GB 级，不入库）—— 锚定根目录，避免误伤 src/data/ 源码目录
+/data/
+/outputs/
 
 # Python
 __pycache__/
