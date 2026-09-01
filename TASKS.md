@@ -67,7 +67,7 @@
 
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
-| ⬜ | T2.0 | 三格式解析 + 一致性校验（ARCHITECTURE T20/T21）：`.lines.txt` 主标注解析器 + `.json`/实例 PNG 辅助解析 + 三格式互检（**可与下载并行先写**，只依赖格式规格，DECISIONS §15.5） | 解析器单测 + 一致性差异报告（容差内） | P0 | 9/2–9/3 |
+| 🔵 | T2.0 | 三格式解析 + 一致性校验（ARCHITECTURE T20/T21）：`common/io_utils.py`（.lines.txt/.json/实例 PNG 三格式 IO 原语）+ `data/parse_labels.py`（LabelBundle 编排）+ `data/check_label_consistency.py`（T21 匈牙利匹配 + badlist） | ✅ 合成数据测试 6/6 全绿（`tests/test_parse_labels.py`）；**待真实数据**：JSON schema 用 `probe_json_schema` 校准 + 7100 张全量 badlist（<0.1%） | P0 | 9/2–9/3 |
 | ⬜ | T2.1 | UnLanedet 落地 + **双路权重下载核验**：CLRNet-R50（`clrnet_model_best_culane.pth`）+ ADNet-R34（`adnet_model_best_culane.pth`），URL 见 `docs/weight_scout_report.md`；⚠️ model zoo 的 CLRNet-R34 行链接文件名带 r50 疑似错位，下载后必须加载核验 backbone | 两权重可载入 + demo 推理可视化正常 | P0 | 9/3 |
 | ⬜ | T2.2 | 赛题 dataloader + **双套 config 迁移**（1366×720：`ori_img`/`cut_height`/`sample_y`/`num_classes`/`max_lanes`；ADNet SPGHead 的 `img_width/img_height`；权重经 `MODEL.WEIGHTS` opts 注入，head 末层非 strict）——迁移清单见 `docs/weight_scout_report.md` 问题 4/5 | 跑通 1 epoch train + val，loss 正常下降 | P0 | 9/3 白天 |
 | ⬜ | T2.3 | baseline：**双路 15ep 廉价筛选（CLRNet-R50 vs ADNet-R34，CULane 权重 fine-tune）→ 赢家 36ep**（DECISIONS §15.2；筛选兼任管线 shakedown；AutoDL 4090 各 ≈6h + 36ep ≈13h；判定：\|ΔF1\|<1.5pp 取 CLRNet-R50） | **9/5 出分（M2）**：val F1@0.5 首个数据点（入门线 0.75）+ 主干裁决入台账 → **立即触发 §15.1 重估** | P0 | 9/3 晚–9/5 |
