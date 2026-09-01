@@ -49,7 +49,7 @@
 |---|---|---|---|---|---|
 | ✅ | T0.1 | 完成赛事报名 | 报名状态已参赛（账号 daniel1547） | P0 | 9/1 ✅ |
 | 🔵 | T0.2 | **下载数据（当前阻塞项·今晚第一件事）**：训练集 71 段/7100 张 + 三类标签、testA 9 段/900 张、`db_info.yaml`、`testA.txt`；**落盘后立即起上传**（Kaggle Dataset / AutoDL，10GB 估 2–6h 挂夜传，DECISIONS §15.5） | 文件数与清单核对一致，SHA-256 存档 | P0 | 9/1 晚–9/2 |
-| 🔵 | T0.3 | 仓库骨架（`src/ configs/ outputs/ scripts/ docs/ tests/`）+ 云 GPU 环境 | 本地骨架已建 ✅；**git 本地仓库已建 ✅（2026-09-01，远程备份待用户确认，DECISIONS §15.6）**；云 GPU（Kaggle/AutoDL）未开 | P0 | 9/1–9/2 |
+| 🔵 | T0.3 | 仓库骨架（`src/ configs/ outputs/ scripts/ docs/ tests/`）+ 云 GPU 环境 | 本地骨架已建 ✅；**git 本地 + GitHub 私有远程已推 ✅（`poncioponcho/lane-detection-challenge`，DECISIONS §15.6）**；云 GPU（Kaggle/AutoDL）未开 | P0 | 9/1–9/2 |
 | ⬜ | T0.4 | 数据 EDA：场景分布、条数分布、点数分布、空标注占比 | `docs/eda.md`，≥10 条可指导建模的结论 | P0 | 9/2–9/3 |
 
 ### W1 · 评测与提交管线（9/2 – 9/5）— 已部分提前完成
