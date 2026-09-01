@@ -15,6 +15,7 @@
 - **BSD grep（bash 里的 grep）对中文+`\|` 交替模式会静默返回零命中**（连纯 ASCII 子模式都不匹配），必须用内置 Grep 工具（ripgrep）做中文内容检索。
 - `software-*` 系列 subagent 调 TaskList 必崩（Tools 列表为空）；多 Agent 并行易触发 429 限流。长文档定向修订由主 Agent 直接 Edit 更稳。
 - 本地 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1，python 3.13.12）。
+- **`.gitignore` 目录模式陷阱**：无前导斜杠的 `data/` 会匹配**任意层级**同名目录（误伤 `src/data/` 源码）；忽略根目录必须写 `/data/`（锚定）。
 
 ## 已闭环的技术事实（勿重新推导）
 
