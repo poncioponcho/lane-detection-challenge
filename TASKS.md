@@ -58,7 +58,7 @@
 |---|---|---|---|---|---|
 | ✅ | T1.1 | **metric 1:1 复刻**：B 样条 k=3 稠密化(5px) → 1366×720 画布 → `cv2.polylines(thickness=30, lineType=8)` → IoU 矩阵 → 匈牙利 → `F1=2TP/(P+G)`，全参数可配 | `src/eval/{rasterize,matching,official_metric}.py` ✅（2026-09-01，隔离 venv `envs/lane`） | P0 | ✅ 9/1 |
 | ✅ | T1.2 | metric 自检：GT 对 GT=1.0；横移 5/10/15px → IoU 0.722/0.512/0.348（<0.02 容差）；TP 边界实测 ≈10.3px；1TP+1FP 场景 = 0.6667 | `tests/test_metric_selfcheck.py` **8/8 全绿**（2026-09-01）；Q-A3 反演标定**关闭**（见 DECISIONS §9.1） | P0 | ✅ 9/1 |
-| ⬜ | T1.3 | `submit.zip` 打包器 + 强校验器（清单齐全/无多余/路径一致/偶数点数/1 位小数/无 NaN/未归一化/<200MB） | `scripts/pack_submit.py` + `scripts/verify_submit.py`，900 张全检通过 | P0 | 9/4–9/5（**M1 减载解耦**，DECISIONS §15.5；首提 9/5 前就绪即可） |
+| 🔵 | T1.3 | `submit.zip` 打包器 + 强校验器（清单齐全/无多余/路径一致/偶数点数/1 位小数/无 NaN/未归一化/<200MB） | `src/submit/{export_lines,pack_submit,verify_submit}.py` + `src/common/checksum.py` ✅ 合成测试 4/4 全绿（`tests/test_submit.py`）；**待真实 testA 清单跑 900 张全检** | P0 | 9/4–9/5（**M1 减载解耦**，DECISIONS §15.5；首提 9/5 前就绪即可） |
 | ⬜ | T1.4 | 按视频段 hold-out 切分本地验证集（**8 段默认，区间 6–10**，EDA 后固化） | `configs/splits/v1_seed42.yaml`，切分脚本带禁止随机切断言 | P0 | 9/3 |
 | ⬜ | T1.5 | A 榜首提（只烧 1 次额度验链路） | 平台返回有效分数，与本地 val 差值入台账 | P1 | 9/5 |
 | ✅ | T1.6 | （新增）A 榜每日快照提醒（每日 20:00，9/14 前） | 自动提醒已建；榜单 JS 渲染需人工记录前 5 名 | P1 | ✅ 9/1 |
