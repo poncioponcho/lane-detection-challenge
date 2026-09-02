@@ -90,7 +90,14 @@ print(torch.__version__, torchvision.__version__, torch.version.cuda, torch.cuda
   exit 2
 fi
 
-export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}"
+# Auto-detect the CUDA arch from the actual GPU compute capability (3090 -> 8.6, 4090 -> 8.9).
+# Honor an explicit TORCH_CUDA_ARCH_LIST from the caller; only default-detect when unset.
+# Fallback 8.6 targets the RTX 3090 (sm_86) used for this challenge's baseline runs.
+if [[ -z "${TORCH_CUDA_ARCH_LIST:-}" ]]; then
+  TORCH_CUDA_ARCH_LIST="$("$PYTHON_BIN" -c 'import torch; c = torch.cuda.get_device_capability(0); print(f"{c[0]}.{c[1]}")' 2>/dev/null || echo 8.6)"
+  echo "setup: TORCH_CUDA_ARCH_LIST auto-detected = $TORCH_CUDA_ARCH_LIST (fallback 8.6 for 3090)"
+fi
+export TORCH_CUDA_ARCH_LIST
 export MAX_JOBS="${MAX_JOBS:-4}"
 "$PYTHON_BIN" -m pip install --no-build-isolation -v -e "$UNLANEDET_ROOT"
 
