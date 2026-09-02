@@ -69,6 +69,12 @@ else
 fi
 
 "$PYTHON_BIN" -m pip install --upgrade pip setuptools wheel ninja
+# Pin the exact PyTorch/TorchVision build the project is validated against. AutoDL official
+# images only ship 2.2.1 / 2.0.0 / 2.5.1 etc. (no 2.1.2), so reinstall here regardless of the
+# base image. cu118 runtime is backward compatible with cu121 drivers on the 3090.
+"$PYTHON_BIN" -m pip install \
+  "torch==2.1.2+cu118" "torchvision==0.16.2+cu118" \
+  --index-url https://download.pytorch.org/whl/cu118
 "$PYTHON_BIN" -m pip install -r "$UNLANEDET_ROOT/requirements.txt"
 "$PYTHON_BIN" -m pip install \
   "numpy==1.26.4" "scipy==1.11.4" "opencv-python-headless==4.9.0.80" \
