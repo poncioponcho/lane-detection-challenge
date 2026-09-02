@@ -1,0 +1,19 @@
+diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_head.py
+--- a/unlanedet/model/CLRNet/clr_head.py
++++ b/unlanedet/model/CLRNet/clr_head.py
+@@ -289,6 +289,6 @@ class CLRHead(nn.Module):
+             # extend its prediction until the x is outside the image
+             mask = ~((((lane_xs[:start] >= 0.) & (lane_xs[:start] <= 1.)
+-                       ).cpu().numpy()[::-1].cumprod()[::-1]).astype(np.bool))
++                       ).cpu().numpy()[::-1].cumprod()[::-1]).astype(bool))
+             lane_xs[end + 1:] = -2
+             lane_xs[:start][mask] = -2
+             lane_ys = self.prior_ys[lane_xs >= 0]
+@@ -445,6 +445,6 @@ class CLRHead(nn.Module):
+                 nms_predictions,
+                 scores,
+                 overlap=self.cfg.test_parameters.nms_thres,
+-                top_k=self.cfg.max_lanes)
++                top_k=self.cfg.test_parameters.nms_topk)
+             keep = keep[:num_to_keep]
+             predictions = predictions[keep]

@@ -101,11 +101,10 @@ v2 把"零成本后处理 +1.5~3.5pp"叠加在论文 SOTA 83.2 之上。**这是
 两版 PRD 原本都建议"若收益 ≥2pp 则向组委会书面确认"。**许清楚撤回了这条，我采纳。**
 
 理由：
-1. 【测算】1 秒间隔 × 60km/h → 相邻帧车辆位移约 **16.7 米**，场景已实质变化，时序平滑的先验失效，预期收益 **<1pp**
-2. 收益 <1pp 意味着"≥2pp 才去问"的触发条件**永远不会被满足**，这条建议是空转的
-3. **主动询问反而会让组委会记住这支队伍**——在无实质收益的情况下增加被关注风险，不划算
+1. ~~【测算】1 秒间隔 × 60km/h → 相邻帧车辆位移约 16.7 米，时序平滑的先验失效~~ **（§17.8 修订：帧编号步长 3 是事实，但源视频 FPS 未知，「1 秒间隔」假设无依据、真实时间间隔无法确定，该测算作废）**
+2. 结论改由三条独立理由支撑：① **合规不确定**——主动询问会让组委会记住这支队伍，无实质收益下不划算；② **实现成本**——单帧管线已排满单人容量；③ **缺少收益证据**——无任何实测表明跨帧对本数据有益
 
-**决定：完全单帧检测，不实现、不询问、不保留开关。**
+**决定：完全单帧检测，不实现、不询问、不保留开关（结论不变，论据以 §17.8 为准）。**
 
 ---
 
@@ -113,11 +112,11 @@ v2 把"零成本后处理 +1.5~3.5pp"叠加在论文 SOTA 83.2 之上。**这是
 
 | 项 | 结论 |
 |---|---|
-| A 榜的用途 | **只做校准，不用于选模型**。选模型的判定标准是段级验证集 + 段级 bootstrap，与 A 榜解耦 |
-| 判定阈值的统计口径 | 段级 bootstrap（以段为最小重采样单位，段内帧不独立）；A/B 差异需 **>2pp** 才可信 |
+| A 榜的用途 | **只做校准，不用于选模型**。选模型的判定标准是段级验证集 + paired 段级 bootstrap（§17.3），与 A 榜解耦 |
+| 判定阈值的统计口径 | **paired 段级 bootstrap**（成对重采样同一批 clip、TP/FP/FN 全局汇总后算 F1、对 ΔF1 做 paired CI）；闸门 = 效应量门槛（点估计）+ paired CI 下界 > 0 + LOCO 敏感性（§17.3，取代原「>2pp 才可信」） |
 | P50 ≤ 5px 的有效性 | 修改为 **P83 ≤ 10px**（即 83% 的预测线横向误差在 10px 内）。P50 是必要非充分条件 |
 | 最先启动的任务 | **A 榜对手分数每日快照**（零 GPU 成本，是把"门槛推测"降级为"事实"的唯一途径） |
-| 验证集 | 按视频段 hold-out 8 段（800 张），场景分层，固定种子。禁止按图随机切 |
+| 验证集 | 按视频段 hold-out 8 段（800 张），多维场景标签分层（§17.2），固定种子。禁止按图随机切 |
 
 ---
 
@@ -170,8 +169,8 @@ v2 把"零成本后处理 +1.5~3.5pp"叠加在论文 SOTA 83.2 之上。**这是
 |---|---|---|
 | J1 | `F1 = 2·TP/(P+G)`。调试时**只需要盯 TP 和 P 两个数**，不必反复算 P/R 再合成 F1 | 日报/台账的字段设计 |
 | J2 | **放宽置信度阈值的充要条件**：新增预测线的匹配率 > `F1/2`（当前 ≈41.6%）。低于此值，阈值扫到再低也是净亏 | `scripts/sweep_threshold.py` 的停止条件，不用等到跑完整个网格 |
-| J3 | **检对的边际价值是抑制 FP 的 2.40 倍**。当两个改动互斥、只能做一个时，优先做能提升召回的那个；`max_lanes` 截断要保守（宁可多留 1 条等 NMS，也不要在阈值层砍掉） | 后处理链 `order` 与 `max_lanes` 默认值 |
-| J4 | **阈值网格扫描（T51）的采纳条件**（§15.3）：① 取「平台区」中心而非单点峰值——在峰值收益 ≥98% 的连续参数区间内取稳健点；② 扫描全表入台账（含负结果）；③ 最终组合必须在**段级 bootstrap CI 下界**上赢基线 ≥2.0pp（均值赢不算数） | 8 段 val 上几十组网格取最优 = 多重比较过拟合，与 A 榜过拟合（R3）同病；J4 把防过拟合纪律推广到 val 网格 |
+| J3 | **检对的边际价值是抑制 FP 的 2.40 倍**。当两个改动互斥、只能做一个时，优先做能提升召回的那个；`max_output_lanes` 截断要保守（宁可多留 1 条等 NMS，也不要在阈值层砍掉） | 后处理链 `order` 与 `max_output_lanes` 默认值 |
+| J4 | **阈值网格扫描（T51）的采纳条件**（§15.3）：① 取「平台区」中心而非单点峰值——在峰值收益 ≥98% 的连续参数区间内取稳健点；② 扫描全表入台账（含负结果）；③ 最终组合须过 §17.3 双门槛：点估计达效应量门槛（阈值扫描类 +0.5pp）且 paired CI 下界 > 0，并附 LOCO 敏感性（均值赢不算数） | 8 段 val 上几十组网格取最优 = 多重比较过拟合，与 A 榜过拟合（R3）同病；J4 把防过拟合纪律推广到 val 网格 |
 
 J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 18 条废线"这条路的 0.15pp 天花板很低，
 84.0 主要得靠"多检对 24~40 条"**，也就是靠恶劣场景下的召回——退化增强（T4.3）与分辨率（D6）是主战场，
@@ -182,7 +181,7 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 本地 metric 模块已实现并自检全绿（`tests/test_metric_selfcheck.py`，8 项全过）。
 核心实现：`src/eval/rasterize.py`（B 样条 k=3 稠密化 + `cv2.polylines(thickness=30, lineType=8)`）
 → `src/eval/matching.py`（逐图 IoU 矩阵 + Hungarian 一对一指派 + IoU>0.5 判 TP）→
-`F1 = 2·TP/(P+G)`。所有栅格参数（canvas/line_width/line_type/spline_k/densify_step）全部可配。
+`F1 = 2·TP/(P+G)`。所有栅格参数（canvas/line_width/line_type/spline_k/interp_n）全部可配——`interp_n` 为官方插值倍率（参数均匀 (N−1)·n+1 点），固定 = 5，非弧长步长（§18.6，旧 `densify_step` 弧长语义作废）。
 
 **关键校正（影响 §9 顶部的"10px 横向误差边界"表述）**：
 - 理想矩形模型 `IoU=(30−d)/(30+d)` 在 d=10px 时给 IoU=0.5；
@@ -191,8 +190,10 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 - 该偏差与官方一致（官方同用 cv2），属**忠实复刻**；0.3px 偏移远在 2pp 决策容差内，不影响任何 J1–J3 判据。
 - 实测对照：`IoU(5px)=0.7222`（理想 0.7143）、`IoU(15px)=0.3478`（理想 0.3333），均 <0.02 容差。
 
-**结论**：测量仪器可靠，后续基线/消融的 F1 读数可直接采信，无需 A 榜反演标定（Q-A3 关闭）。
-下一步按 §6.5 单人关键路径推进 T20 三格式解析 → T21 一致性 → T22 EDA。
+**原结论（已被 §17.1 覆盖）**：当时曾判定本地测量仪器可直接采信；官方脚本到手后已证实不成立。现行裁决一律走 Oracle，不做 A 榜反演标定。
+当时下一步为 T20→T21→T22；三项现已分别于 §21/§22 闭环，现行下一项为 T31 dataloader/双套 config。
+
+**⚠️ §17.1 修订（2026-09-01 晚，四轮审计）**：官方 score.py 随提交样例到手后，与本地实现逐数差分发现三处差异（匈牙利 cost 构造、稠密化方式、float32 输入 / 异常回退），方向均为本地系统性偏高（边界案例最多 +5 条 TP / 846）。本地 metric 定位降为**诊断/扫描层**，裁决一律以冻结的官方 Oracle 为准。本节「Q-A3 关闭」的结论改述为：**Q-A3 以「官方脚本即 Oracle」重新关闭**（反演标定彻底取消）；本地实现的差分修复与差分测试套件随 T1.1/T1.2 重开（TASKS v2.1）。
 
 ---
 
@@ -260,7 +261,7 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 
 **环境遗留问题**：两个 Agent（pm2、架构师）均因 **429 too many requests** 失败。其交付物已落盘、不受影响；但其后续运行不可用，需重试或我直接代劳。根因疑似短时间内多 Agent 并行调用触发平台限流。
 
-**编号体系决定**：本文 §8 的 Q1–Q6 为唯一对外编号；PRD v2 / 架构文档内部的 Q-A\*、Q-B\*、S1–S8 等是文档内局部编号，对外沟通时统一映射到 §8。任务编号双体系并存：TASKS.md 用 **W0–W6/T*.x**（工作流层，对外汇报用），ARCHITECTURE §6.2 用 **T00–T72**（任务层，开发实施用），映射表见 TASKS.md v2 头部。
+**编号体系决定**：本文 §8 的 Q1–Q6 为唯一对外编号；PRD v2 / 架构文档内部的 Q-A\*、Q-B\*、S1–S8 等是文档内局部编号，对外沟通时统一映射到 §8。任务编号双体系并存：TASKS.md 用 **W0–W6/T*.x**（工作流层，对外汇报用），ARCHITECTURE §6.2 用 **T00–T81（非连续编号）**（任务层，开发实施用），映射表见 TASKS.md v2 头部。
 
 ---
 
@@ -319,13 +320,13 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 
 | 文档 | 版本 | 状态 | 职责 | 被谁取代/覆盖 |
 |---|---|---|---|---|
-| `docs/DECISIONS.md` | 16 节 | **active** | 唯一争议仲裁源 + 常量裁决层 | — |
-| `docs/ARCHITECTURE.md` | v1.2 | **active** | 系统设计（6 层 / T00–T72；v1.2 传导 §15.2 主干裁决，见 §16.1） | 目标/预算/范围随 DECISIONS |
-| `TASKS.md` | v2 | **active** | 单人执行跟踪（W0–W6 + 勾选列） | v1（多团队版）已 archived |
+| `docs/DECISIONS.md` | 18 节 | **active** | 唯一争议仲裁源 + 常量裁决层 | — |
+| `docs/ARCHITECTURE.md` | v1.4 | **active** | 系统设计（6 层 / T00–T81；传导 §17/§18 的 Oracle runner、manifest、多标签分层、框架中性条数常量与实施验收） | 目标/预算/范围随 DECISIONS |
+| `TASKS.md` | v2.2 | **active** | 单人执行跟踪（W0–W6 + 勾选列；传导 §17/§18 开工门禁与验收） | v1（多团队版）已 archived |
 | `docs/PRD.md` | v2 | **superseded（部分）** | 需求全集仍有效；目标 83.0/预算 300 元已被 DECISIONS §1/§12 覆盖 | 目标与预算以 DECISIONS 为准 |
 | `docs/PRD_v1_目标84.md` | v1 | **superseded** | 历史版本，洞察已被 ARCHITECTURE §0 吸收 | 同上 |
 | `overview.md` | 2026-09-01 | **active** | 对用户交付摘要（只引用不复制常量与判据） | — |
-| `configs/default.yaml` | v2 | **active** | 代码侧常量唯一取值点（§15.4 扩充） | — |
+| `configs/default.yaml` | v4 | **active** | 代码侧常量唯一取值点（§17/§18：Oracle / 闸门 / 框架中性条数常量） | — |
 
 ---
 
@@ -342,7 +343,7 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 | 步骤 | 数值 | 依据 |
 |---|---|---|
 | 起点：架构类水位 | ≈80.5 | ADNet HardLane-F100 论文值 80.5（**原版实现**）；UnLanedet 同框架 CULane 复现：CLRNet-R50 79.30 > ADNet 77.88（+1.42pp，筛选路 A 先验）；HardLane 无直接参考（两候选均然）——9/5 首分校准 |
-| 数据子集折损 | −0.5 ~ −1.5pp | 9000 张/71 段 vs 论文 10600 张/106 段（PRD §1.2 第 3 步） |
+| 训练数据子集折损 | −0.5 ~ −1.5pp | 比赛训练集 7100 张/71 段 vs 论文 10600 张/106 段（PRD §1.2 第 3 步） |
 | 复现/实现折损 | −0 ~ −1pp | UnLanedet 作者验证过的实现；**CULane 预训练起步可对冲 0~1pp（见 15.2）** |
 | 真增量（与主干无关，全额保留） | +1.6pp 中位 | 退化增强 + 分辨率 + 后处理标定（§3） |
 | **落点** | **79.5–81.1，中位 ≈80.3** | 执行缺口从 1.8pp 扩大至 **≈3.7pp** |
@@ -382,11 +383,11 @@ J3 与 §3 的结论（真增量只有 +1.6pp）叠加后的推论：**"少画 1
 - **筛选兼任 dataloader/trainer 管线 shakedown**：12h 的 36ep 前本就需要短跑验证（首跑必然排障），一鱼两吃——贯彻用户「两阶段验证（cheap screen + expensive gate）」纪律。预算影响：+≈30 元（总 ≈100–110 元，仍在 200 元帽内）。
 - **scout 结论行「建议 ADNet-R34 无需换」未直接采纳**：其判断框架是「权重可得性」（本节原始条件式），未纳入同框架分数对比；分数数据（77.88 vs 79.30）支持实证裁决而非维持现状。
 - **修正过程留档（教训）**：① 初版裁决（凭回报要点、未读全文）写「ADNet→CLRNet 改判，DLA34 优先」；② 读全文发现 DLA-34 不存在且 ADNet 权重可得——单边改判依据不成立；③ 终版 = 双路筛选。**教训：裁决必须基于报告全文，不能基于转述要点**（与 §14 on-disk 纪律同源）。
-- 配置迁移清单（T2.2/T31 直接用，报告 §一 问题 4/5）：`ori_img_w=1366, ori_img_h=720`；按视野重设 `cut_height`/`sample_y`（CULane 270/590≈46% 高 → 720 下先验 ≈330，EDA 校准）；`num_classes`/`max_lanes` 按 HardLane EDA 定（head 末层 shape 变化，非 strict 加载）；ADNet SPGHead 构造参数 `img_width/img_height` 与训练输入一致；权重注入 = detectron2 LazyConfig `MODEL.WEIGHTS` opts 覆盖或 output_dir + `--resume`（无 mmcv `load_from`）；model zoo 权重均为 from-scratch 训练（backbone 仅 ImageNet 初始化），不影响作 fine-tune 起点。
+- 配置迁移清单（T2.2/T31 直接用，报告 §一 问题 4/5）：`ori_img_w=1366, ori_img_h=720`；方案 A 先用 `cut_height=180 + 800×320`，后续与方案 B 整套比较；CLRNet `max_lanes=8 / num_classes=9 / num_priors=192 / nms_topk=12`（decode 须打项目 patch 解耦 top-k），ADNet `max_lanes=8 / anchors_num=300 / nms_topk=12`；SPGHead `img_width/img_height` 与训练输入一致。**权重注入字段修正为 `train.init_checkpoint`**；`MODEL.WEIGHTS` 是未接入主训练路径的残留帮助文字。原始 checkpoint 先在 AutoDL 按 shape 过滤成 adapted checkpoint并记录重初始化清单。
 
 ### 15.3 网格扫描防过拟合（J4，已并入 §9 判据表）
 
-裁决内容见 §9 J4 行。落地点：TASKS T4.1 验收标准、`scripts/sweep_threshold.py` 实现约束（平台区选取 + 全表台账 + CI 下界 2pp 三件套）。
+裁决内容见 §9 J4 行。落地点：TASKS T4.1 验收标准、`scripts/sweep_threshold.py` 实现约束（平台区选取 + 全表台账 + §17.3 双门槛 三件套；旧「CI 下界 2pp」已于 §17.3 作废）。另注（§18.7）：阈值网格在同一 val 上选优再算 CI 存在选择偏差——定位为**调参证据**，取平台区稳健点，选中后的普通 CI **不得描述为无偏确认**。
 
 ### 15.4 常量收口清单（修复「§14 制度未执行到位」）
 
@@ -441,3 +442,314 @@ overview §二 仍写 84.0/82.2/1.8pp，与同文档 §六（82.0/84.0/80.3/3.7p
 - **default.yaml 结构归位**：`pretrained` / `backbone_screen` / `backbone_upgrade` 从 `data:` 段移入新建 `model:` 段（值不变；§15.2 中 `data.pretrained` 引用同步改为 `model.pretrained`）。
 - **「8/8 全绿」口径注明**：= 8 条断言 / 5 个 pytest 函数（全套 15 项含 parse 6 + submit 4）。落点：`docs/T11_T12_metric_done.md`、TASKS T1.2。
 - **执行面两件不过夜事项（提醒，不代办）**：① 数据下载 + 挂夜传（`data/raw/` 仍为 0B，是 9/3 晚筛选的全部前提）；② git 远程备份确认推送（本地 commit 已有，远程尚无）。
+
+---
+
+## 十七、四轮审计：官方数据核实驱动的 spec 修订（2026-09-01 晚，用户四轮审计驱动）
+
+> 背景：官方数据集（训练集 / 测试集 A / 提交样例）已落盘 `data/raw/dataset/`（解压至 `_extract/`，.gitignore 已锚定）。提交样例中含**官方评分脚本 score.py + 预检查 check_submission.py + 评测环境 pins**——spec 的数据假设第一次有了可对盘的仲裁源。本轮实测：复建官方评测环境（Python 3.12 + numpy 2.1.3 / scipy 1.15.3 / opencv 4.12.0.88，官方 pins）、7100 图全量 EDA、本地 metric 与官方脚本逐数差分。用户据此裁决 6 项修订 + 2 项措辞修正，本节为裁决与落地点。
+> **开工前置裁决（用户拍板）：官方 Oracle → manifest → 场景 schema/切分 → max_lanes/crop → 提交校验；前三项完成前不进入 T2.x 之后的实施。**
+
+### 17.1 官方 score.py 定义为评测 Oracle（双层评测结构）
+
+**裁决：废弃「仿官方 1:1 复刻」定位，改为双层结构。**
+
+- **Oracle 层（裁决）**：官方 `score.py` 逐字节冻结于 `src/eval/official_oracle/score.py`（SHA-256 `b2f4c9b21de1083de8a420c106262e799947fac37c938994f7d160b8c62de0d2`；同目录冻结 `check_submission.py`、`requirements_official.txt`，全量哈希见该目录 README）。冻结**不可变**：禁止「修改后更新哈希」，官方新版须新增版本目录并保留旧版（§18.1）；`tests/test_official_oracle_hash.py` 哈希断言守护（§18.1）。调用入口 = `src/eval/oracle_runner.py` 适配层（契约见 §18.2 / ARCHITECTURE §4.3）：运行前校验哈希、输出结构化 JSON（全局 + 逐 clip TP/FP/FN/F1）、不改写官方算法。**所有最终 A/B 裁决、冻结前定稿、台账结论数，一律以 Oracle 读数为准。**
+- **诊断层（扫描）**：本地快速 metric（`src/eval/rasterize.py` / `matching.py`）只用于诊断与网格扫描；**通过差分测试套件前不得参与任何裁决**。差分测试覆盖：真实全集（train 71 段）、IoU≈0.5 边界扫描、不同线数（0/1/多/7 条）、空文件、缺文件、重复点、折返、越界、匈牙利反例（合成 IoU 矩阵）。
+- **环境解耦（用户措辞修正②）**：Oracle 走**独立评测环境**（Python 3.12 + 官方 pins，本机已复建验证）。**训练环境不随之降级**；训练与评测通过 `.lines.txt` + manifest 解耦。
+
+**实测差异记录（2026-09-01，官方 pins 环境实测；差分用例 = 2 段 200 图 / 846 条 GT 线）**：
+
+| 用例 | 官方 score.py | 本地 metric | 判定 |
+|---|---|---|---|
+| GT vs GT（identity） | TP=846，F1=1.0 | TP=846，F1=1.0 | ✅ 一致 |
+| 横移 5 / 9 / 10 / 10.5 / 11px | TP=846 | TP=846 | ✅ 一致 |
+| 横移 15px | TP=695，F1=0.8215 | TP=700，F1=0.8274 | ⚠️ 本地偏高 5 条 |
+| 横移 25px | TP=432 | TP=432 | ✅ 一致 |
+| 空标注三例（空 GT+有预测→FP / 缺 pred 文件→FN / 双空→不计） | — | 语义全同 | ✅ 一致 |
+| 匈牙利反例（合成 IoU 矩阵 [[0.9,0.6],[0.6,0.4]]） | TP=1 | TP=2 | ❌ 指派逻辑不等价 |
+| 弯线 IoU（top-5 曲率 × 横移 2/5/10px） | 基准 | 高 0.0005~0.0029 | ⚠️ 系统性偏高 |
+| 全量 7100 图 GT vs GT | TP=24435，F1=1.0，零崩溃 | —（诊断层不跑裁决） | ✅ 官方鲁棒性确认 |
+
+差异根因三处：① **匈牙利 cost**——官方 `1−iou`（最大化总 IoU，低 IoU 对也参与指派）vs 本地 `1e6` 屏蔽；② **稠密化**——官方参数均匀 `(N−1)*5+1` 点 + 逐段 `cv2.line` vs 本地弧长 5px + `polylines`；③ 本地样条输入 **float32**（官方 float64）且**异常回退线性插值**（官方直接抛错中断全场评分）。①②方向均为本地系统性偏高。
+**已证实不影响的项**：cv2 4.12 vs 5.0 读数逐数相同；官方 `interp_lane` 的 `t=5` 为无效参数（实测等价默认 `splprep(s=0)` 三次插值样条）；官方 parse 去连续重复后对近重复 / 折返 / 非连续重复均鲁棒；缺预测文件按空预测计 FN、不报错。
+
+**传导**：TASKS T1.1/T1.2 **重开**（不得再标「1:1 复刻完成」）；R1 从「已大幅缓解」回退为「开放（缓解中）」；ARCHITECTURE EVAL 层改双层（v1.3）；§9.1 结论修订（见该节末）；tests 增 Oracle 哈希断言 + 差分套件。
+
+### 17.2 场景标签：官方不提供，改多维多标签 schema
+
+**数据事实**：`db_info.yaml` 仅 name/num_frames/set/eval_t；Json `info.scenes` 7100/7100 全空，`objects/area/light` 恒空。**Q-A4 关闭：官方无场景标签，人工标注 71 个训练段（约 1–2h）。**
+
+**架构矛盾（用户指出）**：ARCHITECTURE §4.2 单标签 `scene_of_clip: dict[str, str]` +「9 类场景在 8 段 val 全覆盖」断言——9 类 > 8 段，数学上不可满足；且雨 / 低照度 / 反光 / 弯道天然共存，单标签是错误抽象。
+
+**裁决 schema（多维多标签，人工标注产物 `data/processed/scene_labels.json`）**：
+
+| 维度 | 取值 | 基数 |
+|---|---|---|
+| weather | rain / fog / snow / clear / mixed / unknown | 单选 |
+| illumination | normal / low_light / backlight / mixed / unknown | 单选 |
+| artifact | glare / shadow | 可多选（空 = 无） |
+| geometry | curve / crossroad | 可多选（空 = 无） |
+| 附注 | 标注置信度（high/low）+ 抽查帧号（审计回溯用） | — |
+
+- 切分规则（§18.4 修订）：多标签转**二元特征**（维度×取值，含 none 桶）后以**分布偏差最小化**做迭代分层，不再逐维硬凑 ≥2 个正标签（硬凑会迫使稀有场景进 val、让唯一稀有样本完全离开训练集）；仅 1 个 clip 持有的特征**优先留 train**，val 对应桶记 **N/A**；**全部 low-confidence 与稀有标签二次复核**（不只固定抽 5 段）；`spot_frames` 保存**真实帧 ID 字符串**（如 "00042"），不用易混淆的序号索引。
+- **关键边界**：人工标签只用于切分与诊断，**不得**支撑测试集上的「场景条件化 CLAHE」——B 榜没有人工标签。条件化推理若保留，必须有可部署的自动判别规则 / 分类器；否则 v1 只做离线分桶（ARCHITECTURE §4.4 `RestoreConfig.apply_on="scene_conditional"` 与 §4.6 S6 随之降级为离线诊断）。
+
+### 17.3 bootstrap 与 A/B 闸门重定义（修复门槛互斥）
+
+**问题**：官方指标是全局汇总，而旧闸门互相冲突——TASKS T3.1 接受 +1.0pp、T3.3 接受 +0.5pp，全局配置却要求「CI 下界超过 +2.0pp」，前两类实验即使成功也过不了总闸门。
+
+**裁决（paired bootstrap，与官方全局汇总口径对齐）**：
+1. 以段为最小单位**成对**重采样同一批 clip（A、B 两组共用同一次抽样）；
+2. 每次重采样把抽中 clip 的 TP/FP/FN 相加后算**全局** F1——**禁止**先算每段 F1 再平均；
+3. 对 ΔF1 = F1_A − F1_B 直接构造 paired CI——**禁止**比较两条独立 CI。
+
+**闸门拆两层 + 一条附加**：
+- **效应量门槛**：点估计 ΔF1 ≥ 各实验设定值（退化增强 / 分辨率类 +1.0pp，后处理 / TTA 类 +0.5pp）；
+- **不确定性门槛**：paired CI 下界 > 0；
+- **附加**：8 段样本过少时附 **leave-one-clip-out 敏感性**（逐段剔除后结论不变），bootstrap 不当绝对保证。
+
+传导：§7 共识表、§9 J4 ③、`configs/default.yaml::validation`、ARCHITECTURE §0.2 / §4.6 / §5.3 / §8.5、TASKS T3.1 / T3.3 / T4.1。
+
+### 17.4 max_lanes 拆三常量
+
+**数据事实**：训练集每图 GT 条数 max = **7**（mean 3.44，≥5 条占 17.4%）；训练集 max ≠ 测试集 max，「永远截断为 8」仍需验证。
+
+**裁决（收口 `configs/default.yaml::data` v4；§18.5 重命名，消除「同名不同义」）**：
+- `max_gt_lanes = 8`：训练侧 GT 容量上限（loss assignment / target padding）；GT 实测 max=7 + 余量；
+- `candidate_topk = 12`：推理候选保留量，**> 输出上限**（避免过早截断）；
+- `max_output_lanes`：后处理最终输出截断，val 扫描定，网格 {7, 8, 10, 12}，不与训练容量绑死（ARCHITECTURE §4.4 `max_lanes=4` 作废）。
+- **框架映射（§23 已核源码）**：CLRNet `max_lanes=8` 是 target 容量、`num_classes=9` 是辅助分割类别、`num_priors=192` 是 proposal 容量；ADNet `max_lanes=8` 是 target 容量、`anchors_num/start_points_num=300` 是 proposal 容量；两者候选保留均为 `nms_topk=12`。早先预写的 ADNet `num_queries` 名称作废。
+- **验收项**：预训练权重非 strict 加载时，必须在台账记录**哪些 head 参数被重新初始化**（形状失配清单入台账备注）。
+
+### 17.5 cut_height 与输入比例联合裁决（§15.2 先验作废）
+
+**数据事实**：GT y 上端 P5=254、min=193 → §15.2 的 cut_height≈330 先验会截断 ≥5% 真实线，**作废**。GT y 下端 P50=632、P95=715 → 端点外推到底边可能稀释 IoU，收益须 A/B（§13 已留开关，不变）。
+
+**裁决：不孤立裁决 cut_height，裁决「预处理方案组合」**（有效画面比例与输入比例的匹配是核心变量）：
+- **方案 A**：cut=180 + 800×320 直接缩放（有效画面 1366×540 ≈ 2.53:1，与 800×320 的 2.5 匹配）；
+- **方案 B**：cut=0 + 近原比例输入 / letterbox（960×480）。
+- 每套方案验收必带 **GT→网络→原图坐标 round-trip 测试 + 可视化 overlay**；归入分辨率 ablation（ARCHITECTURE T55 / exp 002 系）。
+- **归因边界（§18.7）**：方案组合比较同时改变视野与算力，结论只按**整套管线**归因，不得写成单独证明 crop 或分辨率有效；需单因素归因时追加匹配分辨率控制组。
+
+### 17.6 manifest 为有序任务清单（不只是 key 集合）
+
+**裁决**：
+- manifest 从官方清单（`train.txt` / `testA.txt`）**逐行构造有序 task list，先断言无重复**——官方脚本逐行计分，dict/set 会静默去重；
+- `image_id = <clip>/<frame>`（禁止只用文件 stem）；记录契约 `ManifestRecord = {image_id, image_path, pred_rel_path, gt_path: Optional, clip_id, frame_id, split, order}`（§18.3 / ARCHITECTURE §4.2）；
+- 存在性断言**按 split 区分**：labeled split（train/val）强制图像 + GT 同时存在；无标签 split（testA/testB）只断言图像存在、`gt_path = None`；「每段恰好 100 帧」只对**已核实的 train/testA** 强制执行，testB 以官方发布清单为准、**不预设帧数**（§18.3）；
+- 缺预测文件按空预测计 FN（与官方一致），verify 层单独报告缺失数；
+- 所有聚合与分桶从**同一 manifest** 派生；评测 runner 不得以字典 key 集合充当清单（本地 `compute_f1_from_masks` 只遍历 pred key 的隐患由此消除）。
+
+### 17.7 verify_submit 补强（对齐 check_submission.py + 全链 smoke）
+
+**裁决**：
+- 断言补：**≤64 条/图、≤2048 点/条**（官方资源上限，check_submission.py 同源，原实现未覆盖）；
+- **全链 smoke test**：对最终序列化后的文本逐文件执行官方 `parse_lines_txt → interp_lane → draw_lane_mask`，任一抛错即红灯（官方评分遇错中断全场；实测官方 parse 去重后鲁棒，但保险成本极低）；
+- 内部取严禁止越界：像素边界明确为 **x ≤ 1365、y ≤ 719**（官方语义是截断非拒绝，项目策略严于官方）；
+- 「保留 1 位小数」标注为**项目策略**（官方 README 措辞为「建议」），不得写成官方硬约束。
+
+### 17.8 措辞修正两条（用户裁决）
+
+1. **跨帧（§6 修订）**：帧编号步长 3 是事实，但源视频 FPS 未知 → 「1 秒间隔」假设无依据、真实时间间隔无法确定，原 16.7m 测算作废。§6 结论（完全单帧、不实现、不询问、不保留开关）**不变**，理由改为：合规不确定 + 实现成本 + 缺少收益证据。
+2. **官方 pins（已并入 §17.1）**：独立 Python 3.12 评测环境，训练环境不随之降级，训练 / 评测经 `.lines.txt` + manifest 解耦。
+
+### 17.9 数据事实备案（本轮全量 EDA 结论：7100 图 / 24435 条线）
+
+| 事实 | 数值 | 落点 |
+|---|---|---|
+| 每图条数 | min 0 / mean 3.44 / **max 7**；≥5 条占 17.4% | §17.4 |
+| 空标注 | 262 张（3.69%） | 训练 / 评测语义已实测一致 |
+| 每条点数 | 2–103，P50=47 | 后处理点数下限参考 |
+| GT y 上端 | P50=431 / P5=254 / **min=193** | §17.5（cut=330 作废） |
+| GT y 下端 | P50=632 / P95=715 | 端点外推须 A/B |
+| 段均条数 | 1.24–6.82 | 段间难度方差大，切分需分层 |
+| 坐标合法性 | 奇数坐标行 0、超 1 位小数 0、全量解析零错误 | IO 契约 |
+| 横移容差 | 真实斜向车道线横移 11px 仍全 TP、15px 掉到 82% | 后处理 / 增强设计定量依据 |
+| 帧编号 | 步长 3（00000…00297） | §17.8.1 |
+| Json attribute | 8 个取值（1:10525 / 2:10195 / 7:2180 / 3:1041 / 5:408 / 9:45 / 4:22 / 8:19），含义未文档化 | 可选探索（辅助监督），用前需视觉解码，**不进 v1** |
+| Json occlusion / scenes | 恒 0 / 全空 | §17.2 |
+| 分辨率 | 1366×720（train / testA 抽查一致） | — |
+
+**传导清单**：ARCHITECTURE v1.3、TASKS v2.1、`configs/default.yaml` v3、overview.md、`docs/T11_T12_metric_done.md` 状态注记（本节生效即视为 §14.4 传导义务）。
+
+---
+
+## 十八、五轮审计：spec 冻结前缺口修订（2026-09-02，用户五轮审计驱动）
+
+> 背景：§17 落地后用户对 spec 做冻结前复核，确认官方三份文件与原始逐字节一致、`git diff --check` 通过、pytest 15/15 全绿，但指出 **6 项冻结前缺口 + 4 项实施验收补充 + 提交卫生项**。本节为裁决与落地点；**本节全部落地后 spec 方可标记冻结**。
+
+### 18.1 Oracle 冻结文件不可变 + 哈希断言落地（修复「T17 声称的守护不存在」）
+
+**问题**：`src/eval/official_oracle/README.md` 与 ARCHITECTURE T17 声称「tests 中有哈希断言守护」，但 tests/ 下实际没有 Oracle 相关测试（15 个全是旧套件）；且原规则「改动须先更新哈希表」等于允许改后补登。
+
+**裁决**：
+- 新增 `tests/test_official_oracle_hash.py`，对三份冻结文件做存在性 + SHA-256 断言，任何一字节改动即红灯（2026-09-02 落地，2/2 通过）；T17 在该测试通过后维持 ✅。
+- 冻结文件**不可变**：禁止「修改后更新哈希」。官方若发布新版评测脚本，**新增版本目录**（`official_oracle_v2/`）并保留旧版，新旧并存可差分。
+
+### 18.2 oracle_runner 适配层契约（修复「裁决走 Oracle」与「paired bootstrap 要逐 clip 计数」之间缺桥）
+
+**问题**：冻结的 score.py 只接受目录 + list、输出打印到 stdout；paired bootstrap 需要逐 clip TP/FP/FN，两者之间缺适配层。
+
+**裁决**：`src/eval/oracle_runner.py` 为调用冻结 score.py 的**唯一入口**，契约——① 运行前校验三文件 SHA-256，不匹配即拒绝运行；② 不修改、不复制改写官方算法，只以子进程调用冻结脚本；③ 输出结构化 JSON：全局 {tp,fp,fn,precision,recall,f1} + 逐 clip 同字段；④ 逐 clip 计数按 manifest clip 子集**分别调用官方脚本**获得（与官方口径逐数一致；全局 F1 必须全量单独调用，≠ 逐 clip 平均）；⑤ paired bootstrap（§17.3）消费其 per_clip 输出，任何代码不得绕开本层直接 import 官方函数。
+传导：ARCHITECTURE §4.3 契约块 + §6.2 新增 T18（T13/T14 依赖改为 T12 + T18 + manifest）、TASKS 新增 T1.7。
+
+### 18.3 manifest 契约修正（无标签 split 无 GT）
+
+**问题**：§17.6 要求 train 与 testA 都断言「图像/GT 存在」，但 testA 没有 GT，契约不可直接实现。
+
+**裁决**：`ManifestRecord = {image_id, image_path, pred_rel_path, gt_path: Optional, clip_id, frame_id, split, order}`。存在性断言按 split 区分：labeled split（train/val）强制图像 + GT 同时存在；无标签 split（testA/testB）只断言图像存在、`gt_path=None`。「每段恰好 100 帧」只对**已核实的 train/testA** 强制执行；testB 以官方发布清单为准，**不预设帧数与段数**。
+
+### 18.4 场景 schema 与分层规则修订（修复两处逻辑矛盾）
+
+**问题**：① 文档说允许 mixed 但 weather/illumination 枚举里没有；② 「artifact/geometry 验证集各 ≥2 个正标签」硬断言可能迫使稀有场景进 val、让唯一稀有样本完全离开训练集。
+
+**裁决**：
+- weather / illumination 枚举补 `mixed`（多天气 / 混合光照共存时的单选取值）；
+- 分层规则改为：多标签转**二元特征**（维度×取值，含 none 桶）→ **分布偏差最小化**的迭代分层，不逐维硬凑 ≥2 个正类；
+- **稀有标签保护**：仅 1 个 clip 持有的特征，该段优先留 train，val 对应桶记 **N/A**；
+- 标注质控：**全部** low-confidence 与稀有标签二次复核（不只固定抽 5 段）；
+- `spot_frames` 保存**真实帧 ID 字符串**（如 "00042"），不用易混淆的序号索引。
+
+### 18.5 max_lanes 三常量改框架中性名（消除同名不同义）
+
+**问题**：旧 `max_lanes_model=8` 把 query/anchor/head/num_classes 混为一谈——若 query 数真是 8，推理阶段不可能保留 12 条候选。
+
+**裁决**（收口 `configs/default.yaml::data` v4）：`max_gt_lanes=8`（训练侧 GT 容量：loss assignment / target padding）/ `candidate_topk=12`（推理候选保留，> 输出上限）/ `max_output_lanes`（后处理最终截断，网格 {7,8,10,12} val 扫描定）。框架真实字段映射见 §23；proposal/anchor 容量不等于 target 容量。
+
+### 18.6 残留口径清理
+
+- DECISIONS §15.3 落地点「CI 下界 2pp 三件套」→ §17.3 双门槛三件套（已改）；
+- ARCHITECTURE §6.1「T10 完成后 T31 即可开工」与 §6.5 开工前置门禁冲突 → 叠加门禁表述（已改）；
+- ARCHITECTURE §6.3 关键路径图与「metric 复刻单点风险 / Q4 反演标定」段落过期 → 按双层结构重写（已改）；
+- eval 稠密化参数 `densify_step`（弧长语义）改名 **`interp_n: 5`**——官方语义是插值倍率（参数均匀 (N−1)·n+1 点），固定常量；default.yaml v4、ARCHITECTURE §4.3、§9.1 参数列表已同步。
+
+### 18.7 实施验收补充四条（已写入 TASKS / ARCHITECTURE 对应验收标准）
+
+1. **零车道样本冒烟**（TASKS T2.2 / ARCHITECTURE T31 验收）：冻结 split 中 train 227 + val 35 张空 GT 图不得被 dataset/sampler 丢弃；两模型各取空图 batch 做 loss/backward，必须不崩溃且全部有限。
+2. **随机性控制**（TASKS T2.3 / ARCHITECTURE §8.5 台账规则）：paired clip bootstrap 只覆盖样本不确定性，不覆盖训练随机性；廉价筛选一律固定相同 seed/初始化，进入最终定稿的改动再按 {101,202,303} 多 seed 复核。
+3. **阈值网格选择偏差**（TASKS T4.1 / DECISIONS §15.3）：在同一 val 上选优再算 CI 存在选择偏差——网格扫描定位为**调参证据**，取平台区稳健点；选中后的普通 CI **不得描述为无偏确认**。
+4. **cut_height 归因边界**（§17.5 / ARCHITECTURE T55）：cut=180+800×320 vs cut=0+960×480 是**整套管线**比较（同时改变视野与算力），结论只按方案组合归因，不得写成单独证明 crop 或分辨率有效；需单因素归因时追加匹配分辨率控制组。
+
+### 18.8 提交卫生
+
+- `src/eval/official_oracle/` 三份冻结文件必须随下次 commit 实际进入提交（审计时未跟踪）；
+- `.workbuddy/memory/*` 已被 git 跟踪且有改动——**建议排除出版本库**（助手记忆不属于项目资产），待用户确认后执行 `git rm --cached` + .gitignore 锚定；
+- 按纪律，git commit 须经用户明确指令后执行。
+
+**spec 冻结条件（本节全部满足后方可在文档头标「冻结」）**：① 18.1 哈希测试落地全绿（✅ 9/2）；② 18.2–18.5 契约写入 ARCHITECTURE v1.4 / TASKS v2.2 / default.yaml v4（✅ 9/2）；③ 18.6 四处残留清理（✅ 9/2）；④ 18.7 四条验收写入对应任务行（✅ 9/2）；⑤ 18.8 提交卫生待下次 commit 时确认。
+
+---
+
+## 十九、非 identity 跨环境审计与提交双防线裁决（2026-09-02）
+
+### 19.1 identity 证据边界与本地 metric 放行
+
+**问题**：GT vs GT 的 IoU 恒为 1，不能单独证明渲染、0.5 阈值与匈牙利指派一致。
+
+**证据**：本地 OpenCV 5.0/SciPy 1.18/NumPy 2.5 与官方 pins 跨环境比较——1034 个非平凡渲染用例逐比特一致；576 图/2009 线的 drop、FP、0–35px shift、一位小数序列化整图差分逐图 TP/FP/FN 零分歧，两边总计 TP=1488/FP=812/FN=521/F1=0.690647。
+
+**裁决**：本地诊断 metric 放行用于训练期扫描；最终成绩仍只认 Oracle 全局全量单次调用。per-clip F1 只用于归因，**禁止求平均充当成绩**（576 图实测逐图均值偏离全局 −0.99pp）。
+
+### 19.2 提交防线必须双层
+
+**问题**：原校验器放行“序列化后连续去重不足 2 点”和逗号输入，官方会抛异常中断整份评分。
+
+**裁决**：
+
+- 导出层在一位小数序列化后检查连续去重仍有 ≥2 点，源头拒绝退化输出；
+- 最终校验层独立重复官方判据，防手写文件或其他上游绕过；
+- 最终层同时拒绝逗号、x>1365/y>719、>64 条/图、>2048 点/条，并执行 interp→draw 全链 smoke；
+- manifest 强制 image/image_id/pred/GT 四条路径与 clip/frame 完整一致；
+- `interp_lane` 不额外去重：文本去重只属于 parse 层，数组/JSON 直喂失败语义与 Oracle 相同；
+- 画布尺寸收口 `common.types.CANVAS_W/H`，matching 引用 rasterize 的评测默认常量。
+
+**验收**：本批次当时 66 tests 全绿（§20 后 74，§21 后 76，§22 后当前 80）；原致命 zip 由 PASS 变 FAIL；真实 train 7100 文件/24435 线全链 smoke PASS；testA 900 路径打包/校验 PASS。详细证据见 `docs/differential_audit_20260902.md`。
+
+---
+
+## 二十、71 段场景标注与确定性 hold-out 固化（2026-09-02）
+
+### 20.1 人工标签裁决
+
+- 71 段均按固定 0/25/50/75/100% 五帧接触表标注，`spot_frames` 保存真实帧 ID；标签仅用于离线切分/诊断，继续禁止用于测试时条件化推理。
+- 首轮唯一低置信项 `v566817042_1_0_728` 追加 11 帧密集二审：道路两侧持续积雪/霜雪且有重雾，最终裁决 `weather=mixed`、`confidence=high`。稀有标签操作定义为二元特征持有段数 ≤5；`artifact:glare` 的 5 个持有段也各追加 5 个非首轮帧二审。共 6 个稀有特征持有段全部复核，记录进入标签文件。
+- 未看到可靠正例的枚举值（snow 单独天气、backlight、shadow 等）保持零样本；禁止为追求桶覆盖而制造标签。
+- 标签分布：weather clear/fog/mixed/rain = 31/18/1/21；illumination low_light/normal = 31/40；artifact glare/none = 5/66；geometry curve/crossroad/none（特征可重叠）= 22/36/18。
+
+### 20.2 切分裁决
+
+- `src/data/split_by_clip.py` 将标签转为维度×取值二元特征（artifact/geometry 空集进入 none），固定 seed=42 搜索 100,000 个 8 段候选，再做确定性单交换下降；scene 首要目标为所有非 singleton 特征的 val-vs-all 占比偏差平方和。T22 后的次级 tie-break 修订见 §22。
+- singleton 特征不进入目标函数，持有段硬性禁止进入 val；配置中对应桶标 `N/A`。标签、manifest 的 SHA-256 与完整特征计数随 split 一并固化，避免输入静默漂移。
+- 最终 `v1_seed42` = 63 train 段 / 8 val 段（6300/800 图），段 ID 零交集；目标值 0.0237614，所有可测特征的最大占比偏差 0.0633803。原始 manifest 的帧顺序在两个派生 JSONL 中分别保持不变。
+- 固化产物：`data/processed/scene_labels.json`、`configs/splits/v1_seed42.yaml`、`data/processed/manifest_{train,val}_v1_seed42.jsonl`；详细审计见 `docs/scene_split_audit_20260902.md`。
+
+---
+
+## 二十一、真实三格式标签语义与全量 badlist 裁决（2026-09-02）
+
+### 21.1 合成测试未覆盖的三处真实执行面
+
+- JSON 实际入口是 `annotations.lane[]`，旧 parser 不支持；真实标签又分布在 `anno_txt/Json/Annotations`，不是 JPEG sibling。
+- PNG 是 palette instance 图，OpenCV 展开为 BGR；固定取 `mask[...,0]` 会丢红/绿通道实例，甚至静默得到 0 条线。
+- `.lines.txt` 常按 bottom-to-top 存点（y 递减）；`np.interp` 要求自变量递增，旧 `mean_lateral_error` 可对同一条线报 90px 以上假误差。现统一稳定按 y 排序。
+
+### 21.2 一致性门定义与结果
+
+lossless 的 `.lines.txt`↔JSON 做 lane/点逐元素精确比对；PNG 属有损栅格，只比较 `.lines.txt` 以 10px 重绘后的非零 union mask，门槛 IoU≥0.75，不把遮挡/交汇下的中心线逆提取误差当源标签冲突。
+
+全量 7100 图结果：text↔JSON 7100/7100 精确相同（24435 线）；262 张空 GT 三格式同空；PNG union IoU min/P1/median=0.728155/0.886039/0.911731。badlist 仅 `v576104564_1_0_17161/00120`，即 1/7100=0.0141% <0.1%。该样本是一条靠近底边的极短二点线，text/JSON 相同，低 IoU 由端帽/取整放大造成，**保留训练、不删除**。证据与复现命令见 `docs/label_consistency_audit_20260902.md`。
+
+---
+
+## 二十二、T22 EDA 与 hold-out 二次固化裁决（2026-09-02）
+
+### 22.1 数据体检结论
+
+- 7100 图 / 24435 线 / 1,158,352 点；每图车道 0–7（mean 3.442），每线 2–103 点（mean 47.405），空 GT 262/7100=3.690%。
+- 非有限点、画布外点、原始不足 2 点线、连续去重后不足 2 点线均为 0。226 条线/198 图含连续重复点，但去重后均有效。
+- 24435 条线全部按 bottom-to-top 存点；最上端 y 的 min/P5 为 192.8/253.7。`cut_height=180` 不触及 GT，旧 `330` 会触及 3929 条线（16.08%）和 1043 图（14.69%），故 §17.5 的旧值作废裁决被全量证据加固。
+- clip 平均车道数 1.24–6.82，单段空图率 0–56%，按图随机切分风险再次确认。weather 与 illumination 在训练集完全混杂（clear 全为 low_light，其余天气全为 normal），后续不得声称拆出了二者的单因素因果效应。
+
+### 22.2 scene-only split 漏洞与无代价修复
+
+**发现**：§20 第一版 split 的 scene 分层全绿，但 val 空 GT=0/800，导致验证期无法观测空图误报的 FP。根因是大量候选具有完全相同的 scene 目标分数，旧算法最终按 clip ID 字典序偶然决胜。
+
+**裁决**：scene 平方偏差和 scene 最大偏差继续作为前两级、不可牺牲的目标；仅在两者完全相同的候选之间，以逐图车道条数 0–7 直方图的平方/最大占比偏差作次级 tie-break。禁止根据未来模型分数改 split。
+
+**结果**：scene 目标值/最大偏差逐位不变（0.023761406466970843 / 0.06338028169014087）；新 val 含 35/800=4.375% 空 GT，接近全量 3.690%，车道直方图最大偏差 2.697pp。train/val 平均车道数 3.457/3.319。seed=42、100k 搜索、单交换、singleton 保护、63/8 段和 manifest 顺序全部保持。固化 split SHA-256=`715eb8a0…fd4ab`，详细数据见 `docs/eda.md` 与 `docs/scene_split_audit_20260902.md`。
+
+---
+
+## 二十三、T2.1/T2.2 AutoDL 执行边界与 UnLanedet 适配裁决（2026-09-02）
+
+- 训练实验的事实环境是 **AutoDL CUDA**。本地只允许做 CPU 数据契约、配置生成、patch 可应用性、语法和单元测试；不得本地下载两份完整 CLRNet 权重，也不得把静态检查表述为权重/模型验收。
+- UnLanedet 固定 commit `03921844220adb2e65c840de2d9759478d5c3d4c`。所有机器路径仅从 `HARDLANE_PROJECT_ROOT / HARDLANE_DATA_ROOT / UNLANEDET_ROOT / HARDLANE_WEIGHTS_ROOT`（输出可选 `HARDLANE_OUTPUT_ROOT`）读取，禁止固化用户实例路径。
+- 官方 CULane dataset 不复用：其 `set` 去重破坏顺序、`len>3` 丢短线、OpenCV 取 palette 单通道会丢实例，且不消费冻结 manifest。项目 `HardLaneDataset` 保留 2/3 点线与空图、仅连续稳定去重、Pillow 读取原始 palette id、严格保持 manifest 顺序。
+- `scripts/autodl/probe_weights.py` 同时核验两份 CLR checkpoint 与 R34/R50 实例，按实际参数 shape 兼容率裁决文件映射；过滤异形项生成 adapted checkpoint，完整记录 missing/unexpected/shape-mismatch 与 SHA。
+- `scripts/autodl/smoke_dataloader_and_loss.py` 必须证实 train/val=6300/800、空图=227/35，两模型各一空/非空 batch 的 forward/loss/backward 全有限，并生成预处理 overlay 与 checkpoint demo。之后 `run_one_epoch.sh` 才可验收 1 epoch train+val。
+- T2.1/T2.2 维持进行中，直到 AutoDL 证据 JSON 和 1 epoch 日志真实返回。
+- 固定 train/val 派生 manifest 是训练输入契约，虽可再生仍须随代码版本化；`.gitignore` 只放行这两个 seed42 manifest 与 scene labels，原始数据/全量中间产物继续忽略。本地新增 9 项契约测试后全套为 **89 passed**。
+
+---
+
+## 二十四、预测精度归一化与原生训练执行面收口（2026-09-02）
+
+### 24.1 预测提交链必须有 canonicalization 边界
+
+**问题**：`HardLaneEvaluator` 为训练诊断保留 5 位小数，而竞赛提交契约严格要求 1 位；`pack_submit.py` 只复制文件。直接把 AutoDL evaluator 输出交给 pack 会被最终校验器必然拒绝，且 5→1 位舍入还可能把原本不同的点压成同一点。
+
+**裁决**：
+
+- 新增 `src/submit/prepare_submit.py` 为预测交付唯一编排入口：任意精度 raw `.lines.txt` → `export_lines(..., ndigits=1)` → canonical 目录 → pack → verify；禁止直接将 evaluator raw 目录当提交目录。
+- raw 文件集合必须与 manifest/官方清单精确相等；默认缺文件即失败。只有调用方显式 `missing_as_empty=True` 时，才将缺预测解释为空文件。raw 多余文件与 canonical 目录陈旧多余文件均失败。
+- 每条线在一位小数序列化后继续经过边界、有限值及连续去重仍 ≥2 点的源头门；最终 zip 再由 `verify_submit.py` 独立复核。官方 `/JPEGImages/<clip>/<frame>.jpg` 清单统一映射为 `<clip>/<frame>.lines.txt`，绝对路径与 `..` traversal 必须拒绝。
+- labeled rehearsal 可在同一入口追加冻结 Oracle；testA/testB 只做 canonicalize→pack→verify，不伪造 GT。
+
+**验收**：新增 5 个提交契约测试后全套 **94 passed**。非 identity 合成演练含一张正确线与一张横移线，canonicalize→pack→verify→Oracle 返回 `TP=1/FP=1/FN=1/F1=0.5`；5 位输入在 canonical 与 zip 内均变为严格 1 位；5→1 位塌缩、缺失、多余、陈旧输出和 traversal 均被预期层拒绝。
+
+### 24.2 T40 不再开发自研 trainer/checkpoint
+
+**裁决**：ARCHITECTURE 中旧 `engine/trainer.py + engine/checkpoint.py + Kaggle Dataset 同步 + EMA` 是未落地的过时规格。实际训练固定为 pinned UnLanedet `tools/train_net.py`，由两套 LazyConfig 配置 `train.init_checkpoint / output_dir / max_iter / amp / checkpointer / eval_period`，直接使用上游 `AMPTrainer`、`PeriodicCheckpointer` 与 `BestCheckpointer`。checkpoint 落到 `HARDLANE_OUTPUT_ROOT` 指向的 AutoDL 持久目录，以原生 `--resume` / `last_checkpoint` 续跑。
+
+本地仍只验 CPU 契约与静态执行面；上述 checkpoint、resume、forward/loss/backward 与 1 epoch 的完成证据必须来自 AutoDL，不得用本地结果替代。

@@ -2,22 +2,30 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v1.2** |
+| 文档版本 | **v2.0** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0（1146 行，5 层，W0–W7 编号）→ **v1.1**（重写为 6 层 + T00–T72 编号 + 推测→开关→证伪矩阵 + 三线并行 Gantt；随后落地 AR-1..AR-5 修正与 §6.5 单人版）→ **v1.2**（DECISIONS §15.2 主干裁决传导：clrnet_dla34/rvld/alpha_simadnet 除名，双路 15ep 筛选入主线路径） |
+| 版本链 | v1.0 → … → v1.9（§23 AutoDL/UnLanedet 执行面）→ **v2.0**（§24 预测提交链 + 原生训练执行面收口） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1 修订落盘）｜2026-09-01（v1.2 传导 §15.2） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.0 传导 §18–§24） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
 > **v1.2 变更记录**（2026-09-01 晚，DECISIONS §15.2/§16 传导）：① 主干线全改——`clrnet_dla34`（UnLanedet 无权重无 config）与 `rvld`/`alpha_simadnet`（未收录）除名，主干改由**双路 15ep 筛选（CLRNet-R50 vs ADNet-R34，CULane 预训练 fine-tune）**实测定，`clrnet_convnext_t` 为 9/10 升级备选；涉及 §0.2/§0.3、§1.1–1.3、§2 mermaid、§3 文件清单、§4.5 ModelConfig、§6.2 任务表、§6.5 单人路径、§8.4/8.5 示例、§9.1 Q-A1；② `fallback_chain` 收口为 `(clrnet_r50, adnet_r34, clrnet_convnext_t)`；③ 版本头同步升级（执行 DECISIONS §14.1）。
+> **v1.3 变更记录**（2026-09-01 晚，DECISIONS §17 四轮审计传导，全部改动均有官方数据实测支撑）：① 评测层改**双层结构**——官方 score.py 冻结为裁决 Oracle（`src/eval/official_oracle/`，SHA-256 存证 + 独立 py3.12 环境），本地 metric 降为诊断层、须过差分测试套件（§2 mermaid EVAL、§3.1、§4.3）；② **manifest 有序清单**（从官方清单逐行构造 + 无重复/存在性/每段 100 帧断言，image_id=clip/frame；§2、§3.1、§4.2、§8.4）；③ 场景单标签改**多维多标签**（weather/illumination/artifact/geometry + 置信度 + 抽查帧号；人工标签只用于切分与诊断，不支撑测试集条件化推理；§4.2、§4.4 RestoreConfig、§4.6 S6）；④ **max_lanes 拆三常量**（模型容量 8 / 推理保留 12 / 输出扫描 {7,8,10,12}；§4.4）；⑤ **cut_height 与输入比例联合裁决**（旧先验 330 作废，方案组合 A/B + round-trip 验收；§4.5）；⑥ **paired bootstrap + 双门槛闸门**（效应量 + paired CI 下界 > 0 + LOCO，取代 CI 下界 +2.0pp；§0.2、§4.6、§5.3、§8.5）；⑦ verify_submit 补强（≤64 条/≤2048 点断言 + 官方 parse→interp→draw 全链 smoke；§3.1、§5.2）；⑧ Q-A3 / Q-A4 关闭（§9.1）；⑨ T11/T12 重开、新增 T17（§6.2、§6.5）。
+> **v1.4 变更记录**（2026-09-02，DECISIONS §18 五轮审计传导）：① Oracle 哈希断言落地（`tests/test_official_oracle_hash.py` 校验三份冻结文件；冻结文件**不可变**，官方新版须新增版本目录）；② 新增 **oracle_runner 适配层契约**（运行前哈希校验、结构化 JSON 输出全局 + 逐 clip TP/FP/FN/F1、子进程调用不改写官方算法）；③ manifest 契约修正——`ManifestRecord.gt_path` Optional，labeled split 才强制 GT 存在，「每段 100 帧」仅限已核实 train/testA；④ 场景分层改为多标签二元特征 + 分布偏差最小化 + 稀有标签保护；⑤ max_lanes 三常量改框架中性名 `max_gt_lanes / candidate_topk / max_output_lanes`；⑥ 清理旧关键路径与反演标定口径，评测插值参数改名固定 `interp_n=5`；⑦ 增加零车道样本、训练随机性、网格选择偏差与预处理归因边界验收。
+> **v1.5 变更记录**（2026-09-02，DECISIONS §19）：① 1034 渲染 + 576 图非 identity 跨环境差分为本地诊断层补足判别力；② 明确全局 F1 唯一成绩口径，per-clip 禁止平均；③ 提交导出+最终校验双防线，补序列化退化/逗号/资源上限/严格边界/全链 smoke；④ manifest image/GT 路径闭环；⑤ 数组插值异常语义与 Oracle 对齐、常量收口；⑥ T15 提前完成。
+> **v1.6 变更记录**（2026-09-02，DECISIONS §20）：① 71 段五帧人工标注落盘，low-confidence 与稀有特征（持有段≤5）全部密集二审；② `split_by_clip.py` 落地二元特征、none 桶、singleton 硬保护、真实 spot-frame 与质控断言；③ seed=42 的 100k 搜索+单交换下降固化 63/8 段，标签/manifest SHA 与逐桶计数写入 split；④ 当前测试总数更新为 74。
+> **v1.7 变更记录**（2026-09-02，DECISIONS §21）：① T20 对齐真实 `annotations.lane[]` 与跨目录标签布局；② palette PNG 按非零 union 读取，实例诊断按完整 BGR 色码，禁止单通道丢实例；③ 横向误差对 y 点序方向无关；④ T21 定义为 text↔JSON 精确点比对 + PNG 10px union IoU≥0.75；⑤ 全量 badlist=1/7100（0.0141%），T20/T21 完成，当时测试 76。
+> **v1.8 变更记录**（2026-09-02，DECISIONS §22）：① T22 全量 EDA 落地 `eda.py`/结构化报告/8 类固定 overlay；② 量化 330 crop 触及 16.08% 线、clip 空图率 0–56%、weather/illumination 完全混杂；③ 修复 scene-only 同分候选令 val 空 GT=0 的漏洞，以车道条数直方图作次级 tie-break，scene 主目标逐位不变，新 val 空 GT=35/800；④ split 二次固化，当前测试 80。
+> **v1.9 变更记录**（2026-09-02，DECISIONS §23）：① GPU 模型验收环境明确为 AutoDL，本地仅做 CPU 契约/静态验证；② manifest-backed `HardLaneDataset` 保留空图、2/3 点线与 palette 索引；③ 两套 LazyConfig 与 pinned UnLanedet patch 落地，CLRNet GT 容量和候选 top-k 解耦；④ 权重入口修正为 `train.init_checkpoint`；⑤ 三权重 shape/load、双模型空/非空 loss+backward、demo 与 1 epoch 均以 AutoDL 证据为完成门。
+> **v2.0 变更记录**（2026-09-02，DECISIONS §24）：① 增加 `prepare_submit.py`，将 evaluator 的任意精度原始预测统一经一位小数导出器重写后才允许打包；② 以非 identity 合成预测贯通 canonicalize→pack→verify→Oracle；③ T40 从未实现的自研 trainer/checkpoint 方案收口为 pinned UnLanedet `tools/train_net.py` + LazyConfig + 原生 AMP/PeriodicCheckpointer/BestCheckpointer，训练与续跑动态验收只在 AutoDL。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
-> **本架构不裁决目标分数，但登记裁决结果。** 目标 83.0 / 84.0 之争已由 `docs/DECISIONS.md` §1 裁决为**双轨**：竞争门槛（top-down）**84.0** 为本项目工作性目标，能力预测中位 **82.2**，执行缺口 **1.8pp**。代码常量、台账、过程指标一律以 **0.84** 为基准，**不下调**（理由：目标会自我实现——按能力定 82 会砍掉集成/分辨率 ablation/付费算力，然后真的停在 82）。本架构的唯一使命是：
+> **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1 双轨滚动机制；当前工作目标 82.0、冲刺线 84.0，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
 > **让两版 PRD 中的每一条【推测】都变成一个可被一次实验证伪或证实、且互不干扰的配置开关。**
 > 因此本文档中「可配置 / 可开关 / 可单变量 A/B / 可回退」是最高设计约束，优先级高于任何单点性能。
 
@@ -35,8 +43,8 @@
 | **§1.4 把目标翻译成「多少条线」**（+0.8pp = 多检对 24 条 + 少画 18 条） | `src/postprocess/`（少画）与 `src/data/degrade.py` + `src/data/sampler.py`（多检对） | 两个战场**拆成两条独立链路**，各自独立开关、各自独立度量（`count_report.py` 与 `scene_report.py` 分别读数） |
 | **Q6 决赛答辩能否出席/形式（线下/线上）**（v2 Q2 / v1 Q6） | `docs/ablation.md` + `docs/runbook_b_phase.md` | 台账与答辩素材**同源自动化产出**，不额外投入人力 | *已核实赛题原文（DECISIONS.md §5）：只有 B 榜**作品分前三**受邀答辩，答辩 30% 只在前三内部排一二三等奖，**不构成翻盘通道**；故「出席与否」影响能否拿奖，而非能否进前三。* |
 | **D7 A 榜提交节奏**（总 ≤12 次，每次只改 1 个变量） | `src/exp/ablation.py::assert_single_variable` + `src/submit/submit_log.py` | 单变量约束**代码级强制**，不止是纪律 |
-| **过程指标体系**（F1@0.7 ≥ 62.0、平均横向误差 ≤ 6.0px、>10px 占比 ≤ 12%、条数正确率 ≥ 88%、最低桶 ≥ 72.0） | `src/eval/evaluate.py` 一次跑全，输出 `EvalBundle` | 全部指标**每次实验自动重算**，不靠手工 |
-| **COMPUTE-P0-01/02**（算力台账、双环境灾备） | `src/exp/compute_ledger.py` + `scripts/autodl/` + `scripts/kaggle/` | 算力是硬约束，必须有账本 |
+| **过程指标体系**（F1@0.7 ≥ 62.0、平均横向误差 ≤ 6.0px、>10px 占比 ≤ 12%、条数正确率 ≥ 88%、最低非 N/A 桶 ≥ 72.0） | `src/eval/evaluate.py` 一次跑全，输出 `EvalBundle` | 全部指标**每次实验自动重算**，不靠手工 |
+| **COMPUTE-P0-01/02**（算力台账、AutoDL 持久化） | `src/exp/compute_ledger.py` + `scripts/autodl/` | 算力是硬约束，必须有账本；GPU 动态证据只来自 AutoDL |
 | **FINAL-P0-03 全流程 ≤ 90 分钟** | `scripts/drill/drill_b_phase.sh` | 比 v2 的 ≤6h 更严，**取严者**：内部演练按 90 分钟验收，对外承诺 6 小时 |
 | **DATA-P0-04 数据双备份** | `scripts/kaggle/kaggle_sync_dataset.py` + `data/raw/RAW_SHA256.txt` | 数据丢失 = 比赛结束 |
 
@@ -44,18 +52,18 @@
 
 | v2 独有洞察 | 架构落地位置 |
 |---|---|
-| 每图多/漏 0.1 条 ≈ F1 掉 1.0pp | `src/postprocess/count_calib.py` 以 F1 为直接优化目标做阈值 / NMS / max_lanes 网格扫描 |
+| 每图多/漏 0.1 条 ≈ F1 掉 1.0pp | `src/postprocess/count_calib.py` 以 F1 为直接优化目标做阈值 / NMS / `max_output_lanes` 网格扫描 |
 | P50 横向误差需 ≤ 5px | `src/eval/lateral_error.py` 输出 P50/P90/达标率（v1 的「平均 ≤6.0px」同时保留，两个都出） |
 | 主干排序 α-SimADNet > RVLD > CLRNet-DLA34 | **已作废（v1.2）**：weight scout 核实 UnLanedet 未收录 α-SimADNet/RVLD、无 DLA-34 权重（DECISIONS §15.2）；registry 改注册 `clrnet_r50` / `adnet_r34` / `clrnet_convnext_t`，主干由双路 15ep 筛选实测定 |
-| A 榜段级 bootstrap 标准误 1.67pp，差异 <2pp 视为噪声 | `src/eval/bootstrap.py` + `src/exp/ablation.py::is_significant`（CI 下界提升 > 2.0pp 才可提交 A 榜） |
-| 跨帧时序收益 <1pp，明确放弃 | **架构上不提供该扩展点**（避免诱惑），仅在 `docs/decisions.md` 记录决策与理由 |
+| A 榜段级 bootstrap 标准误 1.67pp，差异 <2pp 视为噪声 | **v1.3 重定义（DECISIONS §17.3）**：`src/eval/bootstrap.py` 改 **paired 段级**（成对重采样同一批 clip、TP/FP/FN 全局汇总后算 F1、对 ΔF1 做 paired CI）+ `src/exp/ablation.py::is_significant` 改**双门槛**（效应量门槛 + paired CI 下界 > 0 + LOCO 敏感性） |
+| 跨帧时序：不做 | **架构上不提供该扩展点**（避免诱惑）；理由 = 合规不确定 + 实现成本 + 缺少收益证据（原「1s 间隔 ×16.7m」测算已作废——帧步长 3 但源 FPS 未知，DECISIONS §6/§17.8） |
 
 ### 0.3 冲突项：取严者 / 双轨保留
 
 | 冲突点 | v1 | v2 | 架构处置 |
 |---|---|---|---|
 | 起步框架 | UnLanedet（全家桶） | 论文原版 α-SimADNet/RVLD/ADNet | **冲突消解（v1.2）**：论文原版经核实不可得（DECISIONS §15.2），改为 UnLanedet 内置双主干 15ep 筛选（CLRNet-R50 vs ADNet-R34），配置一行切换不变 |
-| 验证集规模 | 固定 8 段 | 8–10 段 | 配置 `split.val_size: 8`，可改；断言区间 [8, 10] |
+| 验证集规模 | 固定 8 段 | 8–10 段 | 默认 8 段，可改；按 DECISIONS §15.4 断言区间 [6, 10] |
 | 冻结截止 | 9/14 前 | 9/15 24:00 前 | **取严者：9/14 24:00 完成冻结**，9/15 全天做复现演练 |
 | B 榜流程耗时 | ≤ 90 分钟 | ≤ 6 小时 | 内部验收 90 分钟，对外承诺 6 小时 |
 | 目标分 | 84.0（工作性目标） | 83.0 | 双轨：目标 0.84（DECISIONS.md §1），能力预测 0.822，缺口 1.8pp；常量取 0.84 不下调 |
@@ -75,76 +83,26 @@
 | # | 理由 | 类型 |
 |---|---|---|
 | 1 | **赛程不允许「先完美选型再动手」。** 今天 9/1，9/3 要数据与评测就绪、9/5 要基线出分。UnLanedet 已内置 CLRNet / CLRerNet / ADNet / CondLaneNet / UFLD / RESA / GANet 且单卡验证过，**clone 到跑通 1 epoch 预计 6 小时内**，是唯一能在 9/4 前拿到真实数据点的路径 | 【事实】 |
-| 2 | **UnLanedet 内置 ADNet 与 CLRNet（R50/R34/ConvNeXt-T 权重均可得），正是双路筛选的两个候选与升级备选。** 无论赢家是谁，数据管线、评测管线、后处理、台账**全部可复用**，只有 `src/models/*.py` 一个文件要换 | 【事实】+【推测】 |
+| 2 | **UnLanedet 内置 ADNet 与 CLRNet（R50/R34/ConvNeXt-T 权重均可得），正是双路筛选的两个候选与升级备选。** 两条筛选路共享 HardLane adapter、manifest、评测、后处理与提交链，只切换一份 `configs/unlanedet/*.py` | 【事实】+【推测】 |
 | 3 | **α-SimADNet / RVLD 可得性已于 9/1 晚核实（DECISIONS §15.2）：UnLanedet 未收录，原版接入线关闭。** 「CLRNet-DLA34 CULane 80.47」为原版仓库数字，UnLanedet 无 DLA-34 权重与 config——**100% 可跑通的下限路径 = CLRNet-R50 / ADNet-R34（CULane 权重均可得，见 `docs/weight_scout_report.md`）** | 【事实】 |
 | 4 | **评测与后处理才是本赛题的主要增量来源，且与主干完全正交。** 零训练成本项合计 +1.5~3.5pp，主干从 CLRNet 换到 α-SimADNet 是 +2.7pp。**评测/后处理代码与主干无关** —— 选成熟工程底座不会损失任何主干升级空间 | 【测算】 |
 | 5 | **复现要求（TOP3 必查）偏好成熟框架。** UnLanedet 有标准 `requirements.txt` 与社区验证；论文原版 repo 常有隐式依赖与脏提交。底座越标准，R3/R5 风险越低 | 【事实】 |
-| 6 | **反对「纯论文原版起步」**：原版 repo 常绑定特定 torch 版本与自研 CUDA 算子，在 Kaggle T4 与 AutoDL 4090 双环境编译通过概率不高，调试时间不可控。我们只有 16 天，**不可控时间是最大的敌人** | 【推测】 |
+| 6 | **反对「纯论文原版起步」**：原版 repo 常绑定特定 torch 版本与自研 CUDA 算子，在 AutoDL 4090 环境编译通过与复现的调试时间不可控。我们只有 16 天，**不可控时间是最大的敌人** | 【推测】 |
 
-### 1.3 主干可插拔设计（核心）
+### 1.3 主干切换设计（核心）
 
-无论最终选哪个主干，训练 / 评测 / 后处理 / 提交代码**一行不改**，只改配置 `configs/exp/*.yaml::model.name`。
+主干切换复用 pinned UnLanedet 的注册与构建机制，不再另造尚未实现的 `BaseLaneDetector` / `src/models/registry.py`。两条筛选路分别由 `configs/unlanedet/clrnet_r50_hardlane.py` 与 `adnet_r34_hardlane.py` 定义；共同的数据边界集中在 `src/integrations/unlanedet_hardlane.py`。切换主干只换 `--config-file`，manifest、Oracle、后处理和提交链不变。
 
-```python
-# src/models/base.py
-class BaseLaneDetector(Protocol):
-    """主干统一契约。所有注册主干（CLRNet / ADNet 等，见 registry.py）必须满足。
-
-    坐标约定：predict() 返回的 Lane 一律在【1366×720 原图绝对像素坐标系】，
-    网络内部的下采样 / 归一化在主干实现内部闭环，不得外泄。
-    """
-
-    name: str                        # 注册名，用于 configs/model/*.yaml 索引
-
-    def build(self, cfg: ModelConfig, input_size: tuple[int, int]) -> nn.Module:
-        """构建网络。input_size=(W,H) 为可配置网络输入尺寸（D6 分辨率 ablation 入口）。"""
-
-    def forward_train(self, batch: dict) -> dict[str, torch.Tensor]:
-        """返回 {'loss': ..., 'loss_ce': ..., 'loss_iou': ...} 等，供 trainer 汇总。"""
-
-    @torch.no_grad()
-    def predict(self, images: torch.Tensor) -> list[list[Lane]]:
-        """B×C×H×W → 每图 list[Lane]，坐标为【原图 1366×720】绝对像素，含 conf 分。"""
-
-    def load_weights(self, ckpt_path: str) -> None:
-        """权重加载（支持 FP16 / FP32 / 键名重映射）。"""
-
-    def export_fp16(self, out_path: str) -> int:
-        """导出 FP16 权重用于 solution.zip，返回字节数（用于 200MB 包体核算）。"""
-```
-
-```python
-# src/models/registry.py
-REGISTRY: dict[str, type[BaseLaneDetector]] = {}
-
-def register_model(name: str):
-    def _wrap(cls):
-        assert name not in REGISTRY, f"重复注册: {name}"
-        REGISTRY[name] = cls
-        return cls
-    return _wrap
-
-def build_model(cfg: ModelConfig, input_size: tuple[int, int]) -> BaseLaneDetector:
-    cls = REGISTRY.get(cfg.name)
-    if cls is None:
-        # ★ 降级链：配置里的主干不可用时按序 fallback，保证链路永不中断
-        for fb in cfg.fallback_chain:      # e.g. ["clrnet_r50", "adnet_r34", "clrnet_convnext_t"]
-            if fb in REGISTRY:
-                logger.warning(f"主干 {cfg.name} 不可用，降级为 {fb}")
-                cfg = replace(cfg, name=fb)
-                cls = REGISTRY[fb]
-                break
-    return cls(cfg).build(cfg, input_size)
-```
+训练配置必须显式提供 `train.init_checkpoint / output_dir / max_iter / amp / checkpointer / eval_period`；训练入口固定为 pinned commit 的 `tools/train_net.py`。若候选不可用，调度层明确失败并切换另一份已验证 config，禁止运行时静默 fallback 后仍沿用原实验名。
 
 | 主干 | 桥接方式 | 定位 | 水位 | 时间点 |
 |---|---|---|---|---|
-| `clrnet_r50` | UnLanedet 内置 + CULane 权重 fine-tune | **筛选路 A**（先验：同框架 CULane 最强 ResNet 系） | CULane 复现 79.30 | 双路筛选 9/3 晚 |
-| `adnet_r34` | UnLanedet 内置 + CULane 权重 fine-tune | **筛选路 B**（恶劣场景架构假设待 HardLane 实证） | CULane 复现 77.88（HardLane 论文 80.5 为原版实现，非本生态水位） | 双路筛选 9/3 晚 |
+| `clrnet_r50` | `clrnet_r50_hardlane.py` + CULane adapted checkpoint | **筛选路 A**（先验：同框架 CULane 最强 ResNet 系） | CULane 复现 79.30 | 双路筛选 9/3 晚 |
+| `adnet_r34` | `adnet_r34_hardlane.py` + CULane adapted checkpoint | **筛选路 B**（恶劣场景架构假设待 HardLane 实证） | CULane 复现 77.88（HardLane 论文 80.5 为原版实现，非本生态水位） | 双路筛选 9/3 晚 |
 | `clrnet_convnext_t` | UnLanedet 内置 + CULane 权重 | 9/10（T60）升级备选（训练更慢，不进筛选） | CULane 复现 80.21 | T60 后 |
 | ~~`clrnet_dla34` / `rvld` / `alpha_simadnet`~~ | — | **已除名（v1.2）**：DLA-34 无权重无 config；RVLD/α-SimADNet 未被 UnLanedet 收录（DECISIONS §15.2，`docs/weight_scout_report.md`） | — | — |
 
-> **门禁状态（v1.2 更新）**：原 9/2 门禁（α-SimADNet/RVLD 可得性）已于 9/1 晚提前关闭（未收录）。**现门禁（9/3 前）= 双路权重下载核验（⚠️ model zoo 的 CLRNet-R34 行链接文件名带 r50 疑似错位，下载后必须加载核验 backbone）+ 两套 1366×720 config 迁移完成**（TASKS T2.1/T2.2，迁移清单见 DECISIONS §15.2 末条）。筛选判定：|ΔF1| < 1.5pp（8 段 val 噪声带内）→ 取 CLRNet-R50。此门禁不阻塞任何其他工作线。
+> **门禁状态（v2.0 更新）**：本地已构建两套 1366×720 config、manifest dataset、pinned patch 和可复现脚本；模型门仍未关闭。必须在 AutoDL 用 `probe_weights.py` 裁决 CLRNet 两文件的真实 R34/R50 映射，再完成双模型空/非空 loss+backward、demo、1 epoch train+val 与 `last_checkpoint` 续跑。训练权重唯一入口为 `train.init_checkpoint`。筛选判定保持不变：|ΔF1| < 1.5pp → 取 CLRNet-R50。
 
 ### 1.4 技术栈与版本锁定策略
 
@@ -155,15 +113,15 @@ def build_model(cfg: ModelConfig, input_size: tuple[int, int]) -> BaseLaneDetect
 | 层 | 文件 | 用途 | 约束 |
 |---|---|---|---|
 | 精确锁 | `requirements.txt` | `pip freeze` 产出，**逐包 `==`**，进 `solution.zip` | 复现环境只用这个 |
-| 范围锁 | `requirements-range.txt` | `>=x.y,<a.b` | 双环境搭建时的容错 |
+| 范围锁 | `requirements-range.txt` | `>=x.y,<a.b` | AutoDL 环境搭建时的容错 |
 | 环境指纹 | `outputs/runs/<exp_id>/env_fingerprint.txt` | 记录 python / torch / torch.version.cuda / cv2 / nvidia-smi / git commit | 每次实验自动落盘，进台账 |
 
-**核心版本（三环境统一）**
+**核心版本（本地 CPU 契约环境与 AutoDL 分责）**
 
 | 包 | 锁定版本 | 理由 |
 |---|---|---|
-| Python | **3.10.13** | 本机与 AutoDL 用 conda 精确锁；Kaggle 若默认 3.11 则切 3.10 kernel，差异记入 fingerprint |
-| PyTorch | **2.1.2+cu118** | Kaggle T4 与 AutoDL 4090（sm_89）均支持；deterministic 路径稳定 |
+| Python | **3.10.13（AutoDL 训练）** | GPU 实验环境锁定；本地 CPU 契约检查当前为 3.13.12，不参与模型验收，差异记入 fingerprint |
+| PyTorch | **2.1.2+cu118** | AutoDL 4090（sm_89）训练环境；本地不安装/加载训练权重作验收 |
 | torchvision | **0.16.2+cu118** | 与 torch 严格配套 |
 | CUDA runtime | **11.8** | T4 与 4090 双兼容的最大公约数 |
 | numpy | **1.26.4** | 支持 Py3.10 且避开 2.0 ABI 破坏 |
@@ -188,23 +146,24 @@ flowchart TB
     subgraph DATA["1. 数据层 DATA —— 原始数据 到 可训练样本"]
         direction TB
         D1["data/raw/<br/>官方包只读 + SHA-256 存证"]
+        D0["manifest.py<br/>官方清单 → 有序任务清单<br/>无重复/存在性/每段100帧断言"]
         D2["parse_labels.py<br/>三格式统一解析"]
         D3["check_label_consistency.py<br/>7100 张全量一致性校验"]
-        D4["split_by_clip.py<br/>按段 hold-out + 场景分层 + 交集断言"]
-        D5["scene_bucket.py<br/>9 类场景分桶"]
+        D4["split_by_clip.py<br/>按段 hold-out + 多维场景分层 + 交集断言"]
+        D5["scene_bucket.py<br/>多维场景标签分桶"]
         D6["dataset.py + transforms.py<br/>坐标同步的几何与光度变换"]
         D7["degrade.py 退化增强<br/>restore.py 复原前置<br/>sampler.py 短板桶过采样"]
-        D1 --> D2 --> D3 --> D4 --> D6
+        D1 --> D0 --> D2 --> D3 --> D4 --> D6
         D4 --> D5 --> D6
         D6 --> D7
     end
 
-    subgraph MODEL["2. 模型层 MODEL —— 可插拔主干 + 训练引擎"]
+    subgraph MODEL["2. 模型层 MODEL —— pinned UnLanedet + AutoDL 原生训练引擎"]
         direction TB
-        M1["models/registry.py<br/>主干注册表 + 降级链"]
-        M2["clrnet_r50 / adnet_r34（双路筛选）<br/>clrnet_convnext_t（9/10 升级备选）"]
-        M3["engine/trainer.py<br/>AMP + EMA + 梯度累积"]
-        M4["engine/checkpoint.py<br/>每 epoch 存盘 + 云端同步 + 续跑"]
+        M1["integrations/unlanedet_hardlane.py<br/>manifest Dataset + evaluator"]
+        M2["configs/unlanedet/<br/>CLRNet-R50 / ADNet-R34 LazyConfig"]
+        M3["UnLanedet tools/train_net.py<br/>SimpleTrainer / AMPTrainer"]
+        M4["原生 PeriodicCheckpointer + BestCheckpointer<br/>AutoDL 持久目录 + --resume"]
         M1 --> M2 --> M3 --> M4
     end
 
@@ -212,21 +171,23 @@ flowchart TB
         direction TB
         P1["postprocess/pipeline.py<br/>各步骤独立开关编排"]
         P2["resample 稠密化 / extrapolate 端点外推<br/>filter 长过滤+裁剪 / nms 横向去重"]
-        P3["count_calib.py<br/>阈值 与 max_lanes 与 NMS 网格扫描<br/>直接以 F1 为优化目标"]
+        P3["count_calib.py<br/>阈值 / max_output_lanes / NMS 网格扫描<br/>直接以 F1 为优化目标"]
         P4["infer/tta.py<br/>水平翻转 + 多尺度结果级融合"]
         P1 --> P2 --> P3
         P4 --> P1
     end
 
-    subgraph EVAL["4. 评测层 EVAL —— 唯一事实来源，所有决策的地基"]
+    subgraph EVAL["4. 评测层 EVAL —— 双层结构：Oracle 裁决 + 本地诊断（唯一事实来源）"]
         direction TB
+        E0["eval/official_oracle/score.py<br/>★ 冻结官方脚本 = 最终裁决唯一入口<br/>SHA-256 存证 + 独立 py3.12 环境"]
         E1["eval/rasterize.py<br/>B样条稠密化 + 30px 无抗锯齿绘制"]
-        E2["eval/match.py<br/>IoU 矩阵 + 匈牙利一对一"]
-        E3["eval/official_metric.py<br/>compute_f1 一比一复刻"]
-        E4["bootstrap 段级CI / lateral_error 横向误差<br/>count_report 条数 / scene_report 分桶F1"]
-        E5["eval/selfcheck.py<br/>GT对GT + 横移 5 10 15px 标定"]
+        E2["eval/matching.py<br/>IoU 矩阵 + 匈牙利一对一"]
+        E3["eval/official_metric.py<br/>本地快速 metric（诊断/扫描层）"]
+        E4["bootstrap paired段级CI / lateral_error 横向误差<br/>count_report 条数 / scene_report 分桶F1"]
+        E5["eval/diff_test.py<br/>差分套件：全集/边界/线数/空缺文件/<br/>重复点/折返/越界/匈牙利反例"]
         E1 --> E2 --> E3 --> E4
         E5 -.->|每次改动后必跑| E3
+        E5 -.->|对齐基准| E0
     end
 
     subgraph EXP["5. 实验管理层 EXP —— 单变量纪律 + 可复现存证"]
@@ -241,12 +202,13 @@ flowchart TB
 
     subgraph DELIV["6. 交付层 DELIV —— 把预测变成合法且不可逆的提交"]
         direction TB
+        V0["submit/prepare_submit.py<br/>任意精度 raw → 一位小数 canonical"]
         V1["submit/pack_submit.py<br/>submit.zip + 根目录 submit/"]
         V2["submit/verify_submit.py<br/>全量断言 + 解包回放 + 错误注入"]
         V3["submit/submit_log.py<br/>A 榜额度账本"]
         V4["scripts/freeze_solution.sh<br/>冻结 + SHA-256 + 字节数"]
         V5["common/checksum.py<br/>64 位 SHA-256 + 精确字节数"]
-        V1 --> V2 --> V4 --> V5
+        V0 --> V1 --> V2 --> V4 --> V5
         V3 --> V4
     end
 
@@ -255,7 +217,7 @@ flowchart TB
     POST -->|outputs/preds/exp_id/split/| EVAL
     POST -->|导出 lines.txt| DELIV
     EVAL -->|F1 与 CI 与 误差 与 条数 与 分桶| EXP
-    EXP -->|闸门：CI 下界提升 大于 2.0pp| DELIV
+    EXP -->|闸门：效应量达标 且 paired CI 下界 > 0（+LOCO，§17.3）| DELIV
     DELIV -.->|A 榜分回流校准| EVAL
 
     style EVAL fill:#ffe8e8
@@ -267,9 +229,9 @@ flowchart TB
 
 | 层 | 职责 | **不负责** | 对外唯一出口 | 允许依赖 |
 |---|---|---|---|---|
-| ① 数据层 | 解析、切分、分桶、增强、复原；**保证坐标始终是 1366×720 原图绝对像素** | 不做评测、不写提交 | `torch Dataset` + `index_*.jsonl` | common |
+| ① 数据层 | 解析、切分、分桶、增强、复原；**保证坐标始终是 1366×720 原图绝对像素** | 不做评测、不写提交 | `torch Dataset` + 有序 `manifest_*.jsonl` | common |
 | ② 模型层 | 可插拔主干构建、训练循环、checkpoint 续跑 | 不做后处理、不打包 | `list[list[Lane]]`（原图坐标）+ ckpt | common, data |
-| ③ 后处理层 | 几何质量（重采样/外推/去重）与条数准确（阈值/NMS/max_lanes）—— **两个独立战场** | 不训练、不评测 | `outputs/preds/**/*.lines.txt` | common, models |
+| ③ 后处理层 | 几何质量（重采样/外推/去重）与条数准确（阈值/NMS/`max_output_lanes`）—— **两个独立战场** | 不训练、不评测 | `outputs/preds/**/*.lines.txt` | common, models |
 | ④ 评测层 | **唯一事实来源**：F1、段级 CI、横向误差、条数准确率、分桶 F1 | 不做任何决策（只出数） | `EvalBundle` | common |
 | ⑤ 实验管理层 | 单变量纪律强制、台账、算力账、复现验证 | 不改模型 | `experiments.csv` / `ablation.md` | common |
 | ⑥ 交付层 | 打包、全量校验、冻结、哈希存证 | 不做任何算法决策 | `submit.zip` + `freeze.md` | common |
@@ -302,11 +264,12 @@ lane-competition/
 │   │   ├── labels_cache/                    # 三格式解析缓存
 │   │   └── consistency_badlist.txt          # 三格式不一致样本清单
 │   └── processed/                           # 切分与索引产物
-│       ├── index_train.jsonl
-│       ├── index_val.jsonl
-│       ├── index_testA.jsonl
-│       ├── index_testB.jsonl
-│       ├── scene_of_clip.json               # 段 ID -> 场景类别
+│       ├── manifest_train.jsonl             # ★ 有序任务清单（由 train.txt 逐行构造 + 无重复/存在性/每段100帧断言）
+│       ├── manifest_testA.jsonl             # 同上（由 testA.txt 构造）；一切聚合/分桶的唯一派生源
+│       ├── manifest_testB.jsonl             # B 榜发布后由官方清单构造；不预设段数/帧数，gt_path=None
+│       ├── split_train.jsonl                # manifest_train 的有序子集（由固定 split config 派生）
+│       ├── split_val.jsonl                  # 同上；不得另行扫描目录或用 set/dict 重建顺序
+│       ├── scene_labels.json                # 段 ID -> 多维场景标签（weather/illumination/artifact/geometry+置信度+抽查帧号）
 │       └── data_report.md                   # 体检报告（由 eda.py 生成）
 │
 ├── src/
@@ -315,36 +278,26 @@ lane-competition/
 │   │   ├── geo.py                           # 重采样 / B样条 / 端点外推 / 裁剪 / 横向误差
 │   │   ├── io_utils.py                      # .lines.txt / .json / 实例 .png 读写，统一 1 位小数
 │   │   ├── seed.py                          # 全种子固定 + deterministic 开关
-│   │   ├── paths.py                         # 三环境（本机 / Kaggle / AutoDL）路径自动探测
+│   │   ├── paths.py                         # 本地 CPU / AutoDL 路径契约；GPU 仅 AutoDL
 │   │   ├── config.py                        # 配置 dataclass + load/dump/hash/diff/单变量断言
 │   │   ├── logging_setup.py                 # 统一日志格式（含 exp_id 前缀）
 │   │   └── checksum.py                      # 64 位 SHA-256 + 精确字节数
 │   │
 │   ├── data/
+│   │   ├── manifest.py                      # ★ 官方清单 → 有序任务清单（无重复/存在性/每段100帧断言；一切聚合的派生源）
 │   │   ├── parse_labels.py                  # 三格式统一解析器 -> list[Lane]
 │   │   ├── check_label_consistency.py       # 7100 张全量三格式线数一致性校验
 │   │   ├── eda.py                           # EDA + 分布体检报告
-│   │   ├── split_by_clip.py                 # 按段 hold-out + 场景分层 + 段 ID 交集断言
-│   │   ├── scene_bucket.py                  # 9 类场景分桶（规则优先 + 人工标注兜底）
+│   │   ├── split_by_clip.py                 # 按段 hold-out + 多维场景分层 + 段 ID 交集断言
+│   │   ├── scene_bucket.py                  # 多维场景标签分桶（人工标注 scene_labels.json 驱动）
 │   │   ├── dataset.py                       # torch Dataset，输出原图坐标标注
 │   │   ├── transforms.py                    # 几何 / 光度变换，标注同步
 │   │   ├── degrade.py                       # 退化增强各算子（独立开关）
-│   │   ├── restore.py                       # 复原前置 CLAHE / 自适应gamma / 暗通道去雾（独立开关）
+│   │   ├── restore.py                       # 复原前置 CLAHE / 自适应gamma / 暗通道去雾（独立开关；条件化仅限可部署自动判别）
 │   │   └── sampler.py                       # 短板桶定向过采样
 │   │
-│   ├── models/
-│   │   ├── base.py                          # BaseLaneDetector 抽象契约
-│   │   ├── registry.py                      # 主干注册表 + 自动降级链
-│   │   ├── clrnet_r50.py                    # 筛选路 A（UnLanedet 桥接 + CULane 权重）
-│   │   ├── adnet_r34.py                     # 筛选路 B（UnLanedet 桥接 + CULane 权重）
-│   │   └── clrnet_convnext_t.py             # 9/10 升级备选（T60 后启用）
-│   │
-│   ├── engine/
-│   │   ├── trainer.py                       # 训练循环：AMP + EMA + 梯度累积 + 定时优雅退出
-│   │   ├── checkpoint.py                    # 每 epoch 存盘 + 云端同步 + 自动续跑
-│   │   ├── schedulers.py                    # LR 策略
-│   │   ├── ema.py                           # EMA 权重
-│   │   └── metrics_logger.py                # 训练期指标落盘（jsonl）
+│   ├── integrations/
+│   │   └── unlanedet_hardlane.py            # manifest Dataset + evaluator；保留空图/短线/palette id
 │   │
 │   ├── postprocess/
 │   │   ├── pipeline.py                      # 后处理编排，每步独立开关
@@ -352,26 +305,29 @@ lane-competition/
 │   │   ├── extrapolate.py                   # 端点外推到图像底边
 │   │   ├── filter.py                        # 线长过滤（<图高20%）+ 坐标裁剪
 │   │   ├── nms.py                           # 横向 NMS 去重（横距<15px 且纵重叠>50%）
-│   │   └── count_calib.py                   # 阈值 / NMS / max_lanes 网格扫描，直接以 F1 为目标
+│   │   └── count_calib.py                   # 阈值 / NMS / max_output_lanes 网格扫描，直接以 F1 为目标
 │   │
 │   ├── infer/
 │   │   ├── predictor.py                     # 单图推理 -> list[Lane]（原图坐标），GPU / CPU 双路径
 │   │   ├── tta.py                           # 水平翻转 + 多尺度 0.8/1.0/1.25 结果级融合
-│   │   ├── run_infer.py                     # 批量推理入口（B 榜主入口）
-│   │   └── export_lines.py                  # list[Lane] -> .lines.txt（1 位小数 + 全量断言）
+│   │   └── run_infer.py                     # 批量推理入口；输出可保留诊断精度
 │   │
 │   ├── eval/
-│   │   ├── rasterize.py                     # B样条(k<=3)稠密化 -> 1366x720 画布 -> cv2.line(thickness=30, lineType=8)
-│   │   ├── match.py                         # IoU 矩阵 + 匈牙利一对一 + IoU>0.5 判 TP
-│   │   ├── official_metric.py               # compute_f1() 一比一复刻官方指标
-│   │   ├── bootstrap.py                     # 段级 bootstrap（1000 次）95% CI
+│   │   ├── official_oracle/                 # ★ 冻结官方脚本（score.py / check_submission.py / requirements_official.txt + SHA-256，禁改）
+│   │   ├── rasterize.py                     # B样条(k<=3)稠密化 -> 1366x720 画布 -> cv2.line(thickness=30, lineType=8)【诊断层】
+│   │   ├── matching.py                      # IoU 矩阵 + 匈牙利一对一 + IoU>0.5 判 TP【诊断层】
+│   │   ├── official_metric.py               # 本地快速 compute_f1（诊断/扫描层；参与过程判断前须过差分套件）
+│   │   ├── diff_test.py                     # ★ 本地 vs Oracle 差分套件（全集/边界/线数/空缺文件/重复点/折返/越界/匈牙利反例）
+│   │   ├── bootstrap.py                     # paired 段级 bootstrap（1000 次）95% CI（TP/FP/FN 全局汇总口径）
 │   │   ├── lateral_error.py                 # 单线平均横向误差 P50 / P90 / 大于10px 占比
 │   │   ├── count_report.py                  # 预测条数等于真值条数 的图占比
-│   │   ├── scene_report.py                  # 9 类场景分桶 F1
+│   │   ├── scene_report.py                  # 多维场景标签分桶 F1
 │   │   ├── selfcheck.py                     # metric 自检：GT对GT / 横移 5 10 15px 理论值标定
 │   │   └── evaluate.py                      # 一次跑全 -> EvalBundle
 │   │
 │   ├── submit/
+│   │   ├── export_lines.py                  # list[Lane] -> 官方一位小数文本；序列化塌缩保护
+│   │   ├── prepare_submit.py                # raw 预测精度归一化 → pack → verify → 可选 Oracle
 │   │   ├── pack_submit.py                   # 生成 submit.zip（根目录 submit/）
 │   │   ├── verify_submit.py                 # 全量断言 + 解包回放 + 5 类错误注入拦截
 │   │   └── submit_log.py                    # A 榜提交额度账本
@@ -379,12 +335,12 @@ lane-competition/
 │   └── exp/
 │       ├── ledger.py                        # experiments.csv 台账自动写入
 │       ├── ablation.py                      # 单变量断言 + 配置 diff + 显著性闸门
-│       ├── compute_ledger.py                # GPU 小时台账 + Kaggle 周配额追踪
+│       ├── compute_ledger.py                # AutoDL GPU 小时与费用台账
 │       └── repro_check.py                   # 同一权重两次推理逐字节一致验证
 │
 ├── configs/
 │   ├── default.yaml                         # 全量默认值（唯一事实源）
-│   ├── model/{clrnet_r50,adnet_r34,clrnet_convnext_t}.yaml
+│   ├── unlanedet/{clrnet_r50_hardlane,adnet_r34_hardlane}.py # AutoDL LazyConfig
 │   ├── splits/v1_seed42.yaml                # 8 段验证集的显式段 ID 列表
 │   ├── preset/
 │   │   ├── res_800x320.yaml                 # D6 基线档
@@ -413,19 +369,15 @@ lane-competition/
 │   └── submits/submit_<ts>.zip
 │
 ├── scripts/
-│   ├── setup_env.sh                         # 三环境一键建环境（含 cu118 索引）
+│   ├── setup_env.sh                         # 本地 CPU 契约环境；CUDA 环境走 scripts/autodl/
 │   ├── prep_data.sh                         # 解析 -> 校验 -> EDA -> 切分 -> 索引
-│   ├── train.sh                             # 训练入口（--resume 自动续跑）
-│   ├── infer.sh                             # 推理入口（GPU / --cpu 降级）
+│   ├── autodl/run_one_epoch.sh              # pinned tools/train_net.py 的动态验收入口
+│   ├── autodl/smoke_dataloader_and_loss.py  # 双模型空/非空 forward-loss-backward
 │   ├── eval.sh                              # 评测 + 全量诊断报告
-│   ├── pack_submit.sh                       # 打包 + 校验 + 哈希
+│   ├── pack_submit.sh                       # 调 prepare_submit：精度归一化 + 打包 + 校验 + 哈希
 │   ├── freeze_solution.sh                   # 冻结 solution.zip + SHA-256 + 字节数
 │   ├── selfcheck.sh                         # 干净环境自检（进 solution.zip）
-│   ├── kaggle/
-│   │   ├── kaggle_train.ipynb               # GPU session 模板（9h 上限自动续跑）
-│   │   ├── kaggle_cpu_eval.ipynb            # CPU notebook：评测/EDA/打包全链路，0 GPU 配额
-│   │   └── kaggle_sync_dataset.py           # /kaggle/working -> Kaggle Dataset 持久化
-│   ├── autodl/autodl_setup.sh               # 4090 环境 + 数据盘挂载
+│   ├── autodl/setup_unlanedet.sh             # 固定 commit、应用 patch、环境与数据盘契约
 │   └── drill/drill_b_phase.sh               # B 榜沙盘演练（含空目录/缺文件异常注入）
 │
 ├── docs/
@@ -442,6 +394,14 @@ lane-competition/
 │   ├── runbook_b_phase.md                   # B 榜 41 小时作战手册
 │   └── freeze.md                            # 冻结记录：SHA-256 + 精确字节数（双份留痕）
 │
+├── scripts/autodl/
+│   ├── setup_unlanedet.sh                   # 固定 commit + patch + AutoDL 环境检查
+│   ├── probe_weights.py                     # checkpoint shape/load 探针
+│   ├── smoke_dataloader_and_loss.py         # 空/非空 forward-loss-backward 动态门
+│   └── run_one_epoch.sh                     # 原生 train_net.py 的 1 epoch train+val 门
+│
+├── patches/unlanedet_hardlane.patch         # pinned 上游的 np.bool/top_k 最小补丁
+│
 └── tests/
     ├── test_metric_selfcheck.py             # GT对GT=1.000 / 横移 5 10 15px 理论值误差<0.02
     ├── test_submit_inject_errors.py         # 5 类注入错误拦截率 100%
@@ -456,25 +416,25 @@ lane-competition/
 
 | v1 编号 | v2 编号 | 需求 | 落地文件 | 验收产物 |
 |---|---|---|---|---|
-| EVAL-P0-01 | P0-A01 | 一比一复刻官方 metric | `src/eval/{rasterize,match,official_metric,selfcheck}.py` | `docs/metric_selfcheck.md` |
-| — | P0-A02 | 段级 bootstrap CI | `src/eval/bootstrap.py` | `outputs/reports/<exp>/ci.json` |
-| EVAL-P0-02 | P0-A03 | submit.zip 打包器 | `src/submit/pack_submit.py` | `outputs/submits/*.zip` |
+| EVAL-P0-01 | P0-A01 | 双层评测：官方 Oracle 冻结 + oracle_runner 适配层 + 本地诊断 metric + 差分套件 | `src/eval/official_oracle/` + `src/eval/{oracle_runner,rasterize,match,official_metric,diff_test}.py` + `tests/test_official_oracle_hash.py` | `docs/metric_selfcheck.md` + 差分报告 |
+| — | P0-A02 | paired 段级 bootstrap CI（TP/FP/FN 全局汇总口径，对 ΔF1 做 paired CI） | `src/eval/bootstrap.py`（消费 oracle_runner 逐 clip TP/FP/FN，§18.2） | `outputs/reports/<exp>/ci.json` |
+| EVAL-P0-02 | P0-A03 | 原始预测一位小数归一化 + submit.zip 打包器 | `src/submit/{prepare_submit,export_lines,pack_submit}.py` | `outputs/submits/*.zip` + 转换报告 |
 | EVAL-P0-02 | P0-A04 | 提交校验器 + 解包回放 | `src/submit/verify_submit.py` | `outputs/reports/verify_<ts>.md` |
 | FINAL-P0-03 | P0-A05 | B 榜沙盘演练 | `scripts/drill/drill_b_phase.sh` | `docs/runbook_b_phase.md` |
 | EVAL-P0-03 | P0-C10 | 后处理套件（稠密化/外推/过滤/NMS/裁剪） | `src/postprocess/{pipeline,resample,extrapolate,filter,nms}.py` | `outputs/reports/<exp>/eval.md` |
 | DATA-P0-03 | P0-B06 | 三格式解析 + 一致性校验 | `src/data/{parse_labels,check_label_consistency}.py` | `data/interim/consistency_badlist.txt` |
-| DATA-P0-01 | P0-B07 | 按段 hold-out + 场景分层 + 断言 | `src/data/{split_by_clip,scene_bucket}.py` + `tests/test_split_assert.py` | `configs/splits/v1_seed42.yaml` |
+| DATA-P0-01 | P0-B07 | 按段 hold-out + 多维场景标签分层 + 断言 + manifest 有序清单 | `src/data/{manifest,split_by_clip,scene_bucket}.py` + `tests/test_split_assert.py` | `configs/splits/v1_seed42.yaml` + `data/processed/manifest_*.jsonl` |
 | DATA-P0-02 | P0-B08 | EDA / 数据体检报告 | `src/data/eda.py` | `docs/eda.md` |
 | DATA-P0-04 | — | 数据双备份 + 哈希存证 | `scripts/kaggle/kaggle_sync_dataset.py` + `data/raw/RAW_SHA256.txt` | 云端 Dataset + 本地副本 |
-| MODEL-P0-01 | P0-C09 | 基线模型跑通 | `src/models/{registry,clrnet_r50,adnet_r34}.py` | `outputs/runs/<exp>/best.pth` |
-| MODEL-P0-02 | P0-C09② | 赛题 dataloader（原图坐标） | `src/data/dataset.py` + `src/common/geo.py` | 1 epoch 日志 |
+| MODEL-P0-01 | P0-C09 | 基线模型跑通 | `configs/unlanedet/{clrnet_r50_hardlane,adnet_r34_hardlane}.py` + pinned UnLanedet `tools/train_net.py` | `outputs/autodl/<exp>/model_best.pth` |
+| MODEL-P0-02 | P0-C09② | 赛题 dataloader（原图坐标） | `src/integrations/unlanedet_hardlane.py` + 固定 manifests | AutoDL 1 epoch 日志 |
 | MODEL-P0-03 | P1-C18 | 恶劣场景专项（退化增强可开关） | `src/data/degrade.py` | `configs/exp/004_*.yaml` |
 | MODEL-P0-04 | P0-C10② | 条数预测校准 | `src/postprocess/count_calib.py` | 阈值扫描曲线 + 条数准确率 |
 | — | P0-C11 | 横向误差诊断报告 | `src/eval/lateral_error.py` | `outputs/reports/<exp>/lateral_error.md` |
 | EVAL-P1-01 | P1-D23 | 分场景 F1 看板 | `src/eval/scene_report.py` | `outputs/reports/<exp>/scene_f1.csv` |
 | EXP-P0-01 | P0-D12 | 消融台账 | `src/exp/{ledger,ablation}.py` | `docs/ablation.md` + `docs/experiments.csv` |
 | EXP-P0-02 | P0-D13 | 可复现三件套 | `requirements.txt` + `scripts/{train,infer}.sh` + `README.md` + `src/exp/repro_check.py` | `docs/freeze.md` |
-| EXP-P0-03 | — | 权重与产物归档 | `src/engine/checkpoint.py` | `{exp_id}_{valF1}_{date}.pth` |
+| EXP-P0-03 | — | 权重与产物归档 | UnLanedet 原生 `PeriodicCheckpointer` / `BestCheckpointer` + AutoDL 持久输出目录 | `model_*.pth` / `model_best.pth` + `last_checkpoint` |
 | COMPUTE-P0-01 | — | 算力预算台账 | `src/exp/compute_ledger.py` | `docs/compute_ledger.md` |
 | COMPUTE-P0-02 | US-09/10 | 双 GPU 环境灾备 | `scripts/kaggle/*` + `scripts/autodl/*` | 两环境各跑通 1 epoch mini-train |
 | FINAL-P0-01 | P0-E15 | B 榜 41 小时作战手册 | `docs/runbook_b_phase.md` | 按小时排布时间表 |
@@ -498,7 +458,8 @@ import numpy as np
 #   画布   : 1366 × 720（W × H），左上原点
 #   x 向右为正 ∈ [0, 1365]；y 向下为正 ∈ [0, 719]
 #   单位   : 原图绝对像素，禁止任何归一化值流出 IO 边界
-#   存储   : float32；写文件保留 1 位小数
+#   存储   : float32（★ 送评测 Oracle 前转 float64——官方为 float64 路径，DECISIONS §17.1）；
+#          写文件保留 1 位小数（项目策略；官方措辞为「建议」，§17.7）
 #   排序   : Lane.points 一律按 y 升序（行 anchor 顺序）
 # ────────────────────────────────────────────────────────────────────
 
@@ -526,10 +487,10 @@ class Lane:
         硬约束：采样间距 ≤ 10px（与评测端稠密化一致，P0-C10①）。"""
 
     def bspline_smooth(self, k: int = 3,
-                       densify_step_px: float = 5.0) -> "Lane":
-        """B 样条（阶数 k ≤ 3）平滑 + 稠密化。
-        ★ 与 src/eval/rasterize.py 共用同一个 scipy.interpolate 实现，
-          保证「训练输出的稠密化」与「评测端的稠密化」完全一致。"""
+                       smooth_step_px: float = 5.0) -> "Lane":
+        """B 样条（阶数 k ≤ 3）后处理平滑 + 弧长重采样。
+        ★ 这是可开关的几何后处理，与官方评测的固定参数插值
+          `interp_n=5` 是两个独立契约，禁止共用「5px 弧长步长」语义。"""
 
     def extrapolate_to_bottom(self, img_h: int = CANVAS_H,
                               extend_px: float = 60.0) -> "Lane":
@@ -556,8 +517,8 @@ class Lane:
 @dataclass
 class ImagePrediction:
     """单张图的预测 / 真值全集。image_id 为相对路径（不含扩展名）。"""
-    image_id: str                       # e.g. "testA/clip_0007/00042"
-    clip_id: str                        # e.g. "clip_0007" —— 段级 bootstrap 的分组键
+    image_id: str                       # "<clip>/<frame>"，由 manifest 派生（DECISIONS §17.6），e.g. "v239132710_1_0_1110/00042"
+    clip_id: str                        # e.g. "v239132710_1_0_1110" —— 段级 bootstrap 的分组键
     lanes: list[Lane] = field(default_factory=list)
     scene: str | None = None
 
@@ -571,8 +532,23 @@ class ImagePrediction:
 # src/data/split_by_clip.py
 from dataclasses import dataclass, field
 
-SCENES = ("low_light", "rain", "snow", "fog", "backlight",
-          "glare", "shadow", "curve", "crossroad")     # 9 类恶劣场景
+# v1.3（DECISIONS §17.2）：官方不提供场景标签（db_info.yaml 无、Json scenes 7100/7100 全空），
+# 单标签 9 类改为多维多标签——雨/低照度/反光/弯道天然共存，单标签是错误抽象。
+WEATHER      = ("rain", "fog", "snow", "clear", "mixed", "unknown")        # 单选；mixed = 多天气共存（v1.4，§18.4）
+ILLUMINATION = ("normal", "low_light", "backlight", "mixed", "unknown")    # 单选；mixed = 混合光照（v1.4，§18.4）
+ARTIFACT     = ("glare", "shadow")                                # 可多选
+GEOMETRY     = ("curve", "crossroad")                             # 可多选
+
+@dataclass(frozen=True)
+class SceneLabels:
+    """段级多维场景标签。来源：人工标注（71 段，1–2h）-> data/processed/scene_labels.json。
+    关键边界：只用于切分与离线诊断，不得支撑测试集条件化推理（B 榜无标签，§17.2）。"""
+    weather: str = "unknown"
+    illumination: str = "unknown"
+    artifact: tuple[str, ...] = ()
+    geometry: tuple[str, ...] = ()
+    confidence: str = "high"               # high / low（标注置信度）
+    spot_frames: tuple[str, ...] = ()      # 标注时抽查的真实帧 ID 字符串（如 "00042"），不用序号索引（v1.4，§18.4）
 
 @dataclass(frozen=True)
 class Split:
@@ -581,7 +557,7 @@ class Split:
     train_clips: tuple[str, ...]
     val_clips: tuple[str, ...]
     test_clips: tuple[str, ...] = ()
-    scene_of_clip: dict[str, str] = field(default_factory=dict)
+    scene_labels: dict[str, SceneLabels] = field(default_factory=dict)
     seed: int = 42
 
     def __post_init__(self):
@@ -590,17 +566,28 @@ class Split:
         assert not (tr & va), f"训练/验证段 ID 交集非空: {tr & va}"
         assert not (tr & te), f"训练/测试段 ID 交集非空: {tr & te}"
         assert not (va & te), f"验证/测试段 ID 交集非空: {va & te}"
-        # 验证集规模：v1 定 8 段，v2 允许 8–10 段
-        assert 8 <= len(self.val_clips) <= 10, f"验证集段数越界: {len(self.val_clips)}"
-        # 场景分层：每类场景在验证集中至少 1 段（P0-B07 ②）
-        if self.scene_of_clip:
-            val_scenes = {self.scene_of_clip[c] for c in self.val_clips
-                          if c in self.scene_of_clip}
-            missing = set(SCENES) - val_scenes
-            assert not missing, f"验证集缺失场景: {missing}"
+        # 验证集规模：默认 8 段，区间 6–10（DECISIONS §15.4）
+        assert 6 <= len(self.val_clips) <= 10, f"验证集段数越界: {len(self.val_clips)}"
+        # 场景分层（v1.4，DECISIONS §18.4）：稀有标签保护——
+        # 某二元特征（维度×取值，含 none 桶）在全数据集仅 1 段持有时，该段不得进 val
+        # （否则唯一稀有样本完全离开训练集）；val 中无正例的桶记 N/A，不逐维硬凑正类数。
+        if self.scene_labels:
+            holders: dict[tuple[str, str], set[str]] = {}
+            for c, lab in self.scene_labels.items():
+                for dim in ("weather", "illumination", "artifact", "geometry"):
+                    v = getattr(lab, dim)
+                    feats = set(v) if isinstance(v, tuple) else {v}
+                    feats.discard("unknown")
+                    if not feats:
+                        feats = {"none"}
+                    for feat in feats:
+                        holders.setdefault((dim, feat), set()).add(c)
+            for (dim, feat), cs in holders.items():
+                if len(cs) == 1:
+                    assert not (cs & va), f"稀有场景 {dim}={feat} 唯一持有段 {cs} 不得划入验证集"
 
     def image_ids(self, part: str) -> list[str]:
-        """返回该部分全部 image_id，按 (clip_id, frame_no) 稳定排序（确定性必需）。"""
+        """返回该部分全部 image_id（<clip>/<frame>），顺序以 manifest 为准（确定性必需）。"""
 
     def save(self, path: str) -> None:
         """落盘为 configs/splits/<name>.yaml，含显式段 ID 列表（人工可审）。"""
@@ -609,10 +596,30 @@ class Split:
     def load(cls, path: str) -> "Split": ...
 ```
 
-切分算法要点：
-- 输入 71 个训练段 + 场景标签；用**场景分层抽样**（每类场景按占比分配 val 名额，同类内按 `seed` 随机取段）
-- 若某类场景只有 1 段且被划入 val，则该段不得进 train（断言保证）
+切分算法要点（v1.4，DECISIONS §18.4）：
+- 输入 71 个训练段 + 多维场景标签（`scene_labels.json`，人工标注）；多标签先转**二元特征**（维度×取值，含 none 桶），以**分布偏差最小化**做迭代分层（train/val 各特征占比差最小，按 `seed` 随机搜索），不逐维硬凑 ≥2 个正类
+- 稀有标签保护：仅 1 段持有的特征，该段**优先留 train**，val 对应桶记 **N/A**（`__post_init__` 断言保证）
+- 标注质控：**全部 low-confidence 与稀有标签二次复核**（不只固定抽 5 段）
 - 切分结果**一次性固化**到 `configs/splits/v1_seed42.yaml`，后续所有实验复用同一 split（否则 ablation 不可比）
+
+**manifest（有序任务清单，DECISIONS §17.6 + §18.3）**：
+
+```python
+# src/data/manifest.py
+@dataclass(frozen=True)
+class ManifestRecord:
+    """官方清单一行 = 一条评测/训练任务；有序 task list 的元素（v1.4，§18.3）。"""
+    image_id: str             # "<clip>/<frame>"（禁止只用文件 stem）
+    image_path: str           # 图像路径（相对数据根）
+    pred_rel_path: str        # 预测 .lines.txt 相对路径（提交与评测共用同一约定）
+    gt_path: str | None       # GT .lines.txt 路径；仅 labeled split 非空，testA/testB = None
+    clip_id: str
+    frame_id: str             # 真实帧 ID 字符串（如 "00042"）
+    split: str                # train / val / testA / testB
+    order: int                # 在官方清单中的行序（保序是契约的一部分）
+```
+
+从官方清单（`train.txt` / `testA.txt`）逐行构造**有序** task list，构造时先断言无重复（官方脚本逐行计分，dict/set 会静默去重）。存在性断言**按 split 区分**：labeled split（train/val）强制图像与 GT 同时存在；无标签 split（testA/testB）只断言图像存在、`gt_path=None`；「每段恰好 100 帧」只对**已核实的 train/testA** 强制执行，testB 以官方发布清单为准、不预设帧数。缺预测文件按空预测计 FN（与官方一致），verify 层单独报告缺失数；**所有聚合与分桶从同一 manifest 派生**，评测 runner 不得以字典 key 集合充当清单。
 
 ### 4.3 评测接口 `compute_f1`
 
@@ -635,7 +642,7 @@ class F1Result:
     n_images: int
     per_clip: dict[str, dict]         # clip_id -> {f1, p, r, tp, fp, fn, n}
     clip_std: float                   # 段级 F1 标准差（显式打印，P0-A02 ②）
-    ci95: tuple[float, float] | None  # 段级 bootstrap 95% CI
+    ci95: tuple[float, float] | None  # paired 段级 bootstrap 95% CI（TP/FP/FN 全局汇总口径，DECISIONS §17.3）
     per_image: list[ImageMetric] | None
 
 def compute_f1(
@@ -647,21 +654,52 @@ def compute_f1(
     canvas_size: tuple[int, int] = (CANVAS_W, CANVAS_H),
     line_width: int = LINE_WIDTH,
     line_type: int = cv2.LINE_8,        # ★ 无抗锯齿，官方固定
-    bspline_k: int = 3,                 # ★ B 样条阶数 k ≤ 3（Q4 待标定）
-    densify_step_px: float = 5.0,       # ★ 稠密化采样间距（Q4 待标定）
+    bspline_k: int = 3,                 # ★ B 样条阶数（官方实测 = splprep 默认三次样条，§17.1）
+    interp_n: int = 5,                  # ★ 官方插值倍率（参数均匀 (N-1)*interp_n+1 点 + 逐段 cv2.line）；
+                                        #   固定常量，非弧长步长（v1.4 改名，§18.6；旧 densify_step_px 弧长语义作废）
     match_by: str = "hungarian",        # 一对一匹配
     by_clip: bool = True,               # 段级分组，供 bootstrap
     return_per_image: bool = False,
 ) -> F1Result:
-    """一比一复刻官方 F1。
+    """本地快速 F1（★ v1.3 起定位 = 诊断/扫描层，DECISIONS §17.1）。
 
-    流程：读 pred/gt 的 .lines.txt → B 样条(k<=3)平滑与稠密化 →
+    流程对齐官方：读 pred/gt 的 .lines.txt → 官方同款 B 样条稠密化
+    （splprep(s=0) + 参数均匀 (N-1)*interp_n+1 点 + 逐段 cv2.line）→
     1366×720 全零画布 cv2.line(thickness=30, lineType=8) →
-    逐图 IoU 矩阵 → 匈牙利一对一 → IoU > iou_thresh 计 TP → 全集汇总。
+    逐图 IoU 矩阵 → 匈牙利一对一（cost = 1 − IoU）→ IoU > iou_thresh 计 TP → 全集汇总。
 
     ★ FP = 该图预测线总数 − TP；FN = 该图真值线总数 − TP（官方定义，与条数强相关）
     ★ 匈牙利只看几何 IoU，车道线 ID 不参与评分
+    ★ 参与任何裁决前必须通过 diff_test.py 差分套件；最终裁决一律走官方 Oracle
+    ★ 输入以 manifest（有序任务清单）为准；缺预测文件按空预测计 FN
     """
+```
+
+> **裁决口径（v1.3 / DECISIONS §17.1）**：所有最终 A/B 裁决、冻结前定稿、台账结论数，一律以冻结官方脚本 `src/eval/official_oracle/score.py`（SHA-256 存证，`tests/test_official_oracle_hash.py` 哈希断言守护，§18.1）的读数为准；运行环境独立（Python 3.12 + numpy 2.1.3 / scipy 1.15.3 / opencv 4.12.0.88），训练环境不随之降级，二者经 `.lines.txt` + manifest 解耦。本地 `compute_f1` 只用于诊断与网格扫描，`diff_test.py` 全绿前不得参与裁决。Oracle 的唯一调用入口是下述 `oracle_runner.py` 适配层（§18.2）。
+
+**Oracle 适配层契约（v1.4 / DECISIONS §18.2）——「裁决走 Oracle」与「paired bootstrap 要逐 clip 计数」之间的桥**
+
+```python
+# src/eval/oracle_runner.py
+def run_official_eval(
+    pred_dir: str | Path,
+    gt_dir: str | Path,
+    manifest: str | Path,          # 有序 task list（§4.2 ManifestRecord）
+    *,
+    official_python: str,          # 独立评测环境解释器（py3.12 + 官方 pins，§17.1）
+    per_clip: bool = True,
+) -> OfficialEvalResult:
+    """调用冻结官方 score.py 的唯一入口。契约：
+    1. 运行前校验 official_oracle/ 三份文件 SHA-256，任一不匹配即拒绝运行；
+    2. 不修改、不复制改写官方算法——只以子进程方式调用冻结脚本；
+    3. 全局指标 = 按 manifest 全量逐行调用一次（全局 F1 ≠ 逐 clip 平均）；
+    4. 逐 clip TP/FP/FN/F1 = 按 manifest 的 clip 子集逐段调用官方脚本获得
+       （保证与官方口径逐数一致）；
+    5. 输出结构化 JSON 落盘 outputs/reports/<exp>/oracle_*.json：
+       {global: {tp,fp,fn,precision,recall,f1,n_images},
+        per_clip: {clip_id: 同字段}, oracle_sha256, env}。
+    paired bootstrap（§17.3）消费 per_clip 的 TP/FP/FN；
+    任何代码不得绕开本层直接 import 官方函数。"""
 ```
 
 **一次跑全的聚合接口（每次实验必调）**
@@ -687,9 +725,9 @@ class EvalBundle:
     count_exact_ratio: float              # 目标 ≥ 88%
     mean_count_delta: float               # 每图平均多/漏条数（0.1 条 ≈ 1.0pp）
     # ── 长尾：分场景 ────────────────────────────────────
-    scene_f1: dict[str, float]            # 9 类
-    worst_scenes: list[tuple[str, float]] # 最差 3 类
-    min_scene_f1: float                   # 目标 ≥ 72.0（v1）
+    scene_f1: dict[str, float | None]     # 多维场景桶；无 val 正例的稀有桶记 None / N/A
+    worst_scenes: list[tuple[str, float]] # 排除 N/A 后最差 3 个多维桶
+    min_scene_f1: float                   # 排除 N/A 后的最低桶；目标 ≥ 72.0（v1）
 
 def evaluate(pred_dir: str, gt_dir: str, split: Split, part: str,
              exp_id: str, *, iou_thresh: float = 0.5,
@@ -723,10 +761,13 @@ class PostConfig:
     nms_lateral_px: float = 15.0          # 横向均距 < 15px
     nms_overlap_ratio: float = 0.50       # 且纵向重叠 > 50% 视为重复
     conf_thresh: float = 0.40             # ★ 在 val 上标定，禁止用 A 榜调
-    max_lanes: int = 4
+    max_output_lanes: int = 8             # ★ v1.4（DECISIONS §17.4/§18.5）：最终输出截断，默认 8、实际值由 val 扫描 {7,8,10,12} 定。
+                                          #   与训练容量 max_gt_lanes=8 解耦（字段实映射见 DECISIONS §23）
+                                          #   / 推理候选保留 candidate_topk=12 解耦（框架中性命名，同名不同义已消除）；
+                                          #   GT 实测 max=7、mean=3.44（训练集 max ≠ 测试集 max，截断值不锁死）
 
 def run_postprocess(raw: list[list[Lane]], cfg: PostConfig) -> list[list[Lane]]:
-    """按固定顺序执行：稠密化 → 外推 → 长过滤 → NMS → 阈值截断 → max_lanes → 裁剪。
+    """按固定顺序执行：稠密化 → 外推 → 长过滤 → NMS → 阈值截断 → max_output_lanes → 裁剪。
     每一步前后都做 np.isfinite 断言，任何一步产出 NaN 立即抛错（不静默）。"""
 
 
@@ -734,7 +775,7 @@ def run_postprocess(raw: list[list[Lane]], cfg: PostConfig) -> list[list[Lane]]:
 def sweep_count_params(
     raw_pred_dir: str, gt_dir: str, split: Split, part: str,
     conf_grid: Sequence[float] = tuple(np.arange(0.20, 0.76, 0.05)),
-    max_lanes_grid: Sequence[int] = (3, 4, 5, 6),
+    max_output_lanes_grid: Sequence[int] = (7, 8, 10, 12),  # v1.4（§17.4/§18.5）：GT 实测 max=7；训练集 max ≠ 测试集 max，不与训练容量绑死
     nms_grid: Sequence[float | None] = (None, 10.0, 15.0, 20.0),
 ) -> CountCalibResult:
     """三维网格扫描，直接以 F1 为优化目标（不是以 AP 或 loss）。
@@ -751,6 +792,11 @@ class DataConfig:
     root: str
     img_size: tuple[int, int] = (1366, 720)     # (W,H) 原图，只读常量
     input_size: tuple[int, int] = (800, 320)    # ★ (W,H) 网络输入 —— D6 ablation 主开关
+    cut_height: int | None = None               # ★ v1.3（DECISIONS §17.5）：待方案组合 A/B 裁决——
+                                                #   方案 A: 180 + 800×320 直缩（有效画面 1366×540≈2.53≈输入比 2.5）
+                                                #   方案 B: 0 + 近原比例输入/letterbox（960×480）
+                                                #   旧先验 330 已作废（实测截断 ≥5% GT：y 上端 P5=254、min=193）
+                                                #   验收必带 GT→网络→原图 round-trip 测试 + 可视化 overlay
     keep_ratio: bool = False
     norm_mean: tuple[float, float, float] = (0.485, 0.456, 0.406)
     norm_std:  tuple[float, float, float] = (0.229, 0.224, 0.225)
@@ -780,6 +826,8 @@ class RestoreConfig:
     dehaze: bool = False            # 暗通道去雾
     apply_on: str = "all"           # "all" | "scene_conditional"
     scene_whitelist: tuple[str, ...] = ()   # 条件化开启的场景（低照度/阴影）
+    # ★ v1.3 边界（DECISIONS §17.2）：scene_conditional 上测试集的前提是【可部署的自动判别器】；
+    #   人工标签 B 榜不可得——判别器缺席时条件化仅限离线分桶诊断，提交管线一律 apply_on="all"。
 
 @dataclass
 class ModelConfig:
@@ -790,17 +838,18 @@ class ModelConfig:
 
 @dataclass
 class TrainConfig:
-    epochs: int = 36
+    # 仅为上层实验意图；实际执行字段由 configs/unlanedet/*.py 的 LazyConfig 定义。
+    epochs: int = 15
     batch_size: int = 8
-    lr: float = 1e-3
+    lr: float = 3e-4
     amp: bool = True
-    ema: bool = False
-    ema_decay: float = 0.999
-    ohem: bool = False
     seed: int = 42
-    max_seconds: int | None = 28800     # ★ Kaggle 9h session 保护：到点优雅退出+同步
-    save_every_epoch: bool = True
-    resume: str | None = "auto"         # "auto" = 自动找最新 checkpoint
+    iterations_per_epoch: int = 525
+    init_checkpoint: str = "${HARDLANE_WEIGHTS_ROOT}/adapted_*.pth"
+    output_dir: str = "${HARDLANE_OUTPUT_ROOT}/<model>"
+    checkpoint_period: int = 525        # UnLanedet 原生每 epoch 存盘
+    eval_period: int = 525              # 每 epoch 触发 HardLaneEvaluator
+    resume: bool = True                 # tools/train_net.py --resume
 
 @dataclass
 class TTAConfig:
@@ -858,12 +907,14 @@ flowchart LR
 
 **分辨率 preset 对照表（D6 证伪实验，configs/exp/002 系列）**
 
-| preset | 输入尺寸 | 10px 容差在输入坐标系的等效值 | 纵向压缩比 | 预估 epoch 时长（T4×2） | 用途 |
+| preset | 输入尺寸 | 10px 容差在输入坐标系的等效值 | 纵向压缩比 | 预估 epoch 时长（AutoDL 4090，待实测） | 用途 |
 |---|---|---|---|---|---|
 | `res_800x320` | 800×320 | 5.9 px | 2.25× | 45.4 min（基准） | 对照组 |
 | `res_1600x320` | 1600×320 | 11.7 px | 2.25× | ~60 min | CLRNet 常规档对照 |
 | `res_960x480` | 960×480 | 7.1 px | 1.50× | ~68 min | **推荐折中档** |
 | `res_1366x720` | 1366×720 | 10.0 px | 1.00× | ~82 min | 上限档（需测显存） |
+
+> **v1.3 增补（DECISIONS §17.5）**：分辨率 ablation 升级为「预处理方案组合」裁决——`cut_height` 与输入比例**绑定比较**，不孤立裁决：方案 A（cut=180 + 800×320 直缩，有效画面 1366×540 比例 ≈2.53 ≈ 输入比 2.5）vs 方案 B（cut=0 + 960×480 letterbox）。注意：完全不裁的 1366×720（比例 1.90）直接压到 800×320（2.5）会产生明显比例畸变。每套方案验收必带 **GT→网络→原图坐标 round-trip 测试 + 可视化 overlay**。
 
 ### 4.6 「推测 → 开关 → 证伪实验」矩阵（架构核心使命）
 
@@ -871,13 +922,13 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 
 | # | 推测内容 | 配置开关 | 证伪实验 | 判定闸门（可回退） |
 |---|---|---|---|---|
-| S1 | 退化增强 +0.5~1.5pp | `degrade.enabled` + 各算子概率 | `004_degrade_rain_fog` | val F1 段级 CI 下界 > +1.0pp 才保留 |
-| S2 | 折线重采样/端点外推 +0.5~1.0pp | `post.resample` / `post.extrapolate_bottom` | `005_post_resample` / `006_post_extrapolate` | CI 下界 > +0.5pp 才保留 |
-| S3 | 阈值以 F1 为目标扫描 +0.3~0.8pp | `post.conf_thresh` / `post.max_lanes` / `post.nms_lateral_px` | `count_calib.sweep_count_params` | 条数正确率 ≥ 88% 且 F1 不降 |
-| S4 | 集成 / TTA +0.5~1.5pp | `tta.enabled` / `tta.hflip` / `tta.scales` | `008_tta_flip` | CI 下界 > +0.5pp 才保留；**左右不对称可能有害，必须实测** |
-| S5 | 本地 val 比测试集高 1~2pp | —（观测项） | 每次 A 榜提交回流 | 差值稳定在 ±0.5pp 内才算 metric 复刻正确 |
-| S6 | CLAHE 对低照度有效、对逆光/反光有害 | `restore.clahe` / `restore.apply_on` / `scene_whitelist` | `003_restore_clahe` | **分桶 F1 判定**，全集 CI 下界 > +1.0pp 才保留；回退纪律：<1.0pp 立即回退 |
-| S7 | 分辨率是隐性天花板 | `data.input_size` + `configs/preset/res_*.yaml` | `002_res_960x480` | CI 下界 > +1.0pp 且 epoch 时长增幅 ≤ 80% |
+| S1 | 退化增强 +0.5~1.5pp | `degrade.enabled` + 各算子概率 | `004_degrade_rain_fog` | **双门槛（§17.3）**：点估计 ≥ +1.0pp 且 paired CI 下界 > 0，附 LOCO 敏感性 |
+| S2 | 折线重采样/端点外推 +0.5~1.0pp | `post.resample` / `post.extrapolate_bottom` | `005_post_resample` / `006_post_extrapolate` | 双门槛：点估计 ≥ +0.5pp 且 paired CI 下界 > 0 |
+| S3 | 阈值以 F1 为目标扫描 +0.3~0.8pp | `post.conf_thresh` / `post.max_output_lanes` / `post.nms_lateral_px` | `count_calib.sweep_count_params` | 条数正确率 ≥ 88% 且 F1 不降；选中后的普通 CI 只是调参证据，非无偏确认 |
+| S4 | 集成 / TTA +0.5~1.5pp | `tta.enabled` / `tta.hflip` / `tta.scales` | `008_tta_flip` | 双门槛：点估计 ≥ +0.5pp 且 paired CI 下界 > 0；**左右不对称可能有害，必须实测** |
+| S5 | 本地 val 比测试集高 1~2pp | —（观测项） | 每次 A 榜提交回流 | 差值稳定在 ±0.5pp 内才算 metric 链路正确（以 Oracle 为校准基准，§17.1） |
+| S6 | CLAHE 对低照度有效、对逆光/反光有害 | `restore.clahe` / `restore.apply_on` / `scene_whitelist` | `003_restore_clahe` | **分桶 F1 判定**（多维标签）+ 双门槛：点估计 ≥ +1.0pp 且 paired CI 下界 > 0；回退纪律：点估计 <1.0pp 立即回退。**⚠️ v1.3（§17.2）：B 榜无场景标签，条件化仅限可部署自动判别，否则只做离线分桶** |
+| S7 | 分辨率是隐性天花板 | `data.input_size` + `data.cut_height` + `configs/preset/res_*.yaml` | `002_res_960x480` | 双门槛：点估计 ≥ +1.0pp 且 paired CI 下界 > 0，且 epoch 时长增幅 ≤ 80%；按**预处理方案组合**裁决（§17.5） |
 | S8 | TOP3 门槛 83–87（竞争强度） | —（观测项） | A 榜对手分数每日快照 | 9/10 前基于实际分布修订目标（PM 职责） |
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
@@ -894,72 +945,62 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 sequenceDiagram
     autonumber
     actor U as 参赛者
-    participant SH as scripts/train.sh
-    participant CFG as common/config.py
-    participant SPL as data/split_by_clip.py
-    participant DS as data/dataset.py
-    participant REG as models/registry.py
-    participant TR as engine/trainer.py
-    participant CK as engine/checkpoint.py
-    participant CLD as 云端 Kaggle Dataset / OSS
+    participant SH as scripts/autodl/run_one_epoch.sh
+    participant TN as pinned UnLanedet tools/train_net.py
+    participant CFG as configs/unlanedet/*.py
+    participant DS as HardLaneDataset
+    participant TR as AMPTrainer / SimpleTrainer
+    participant CK as Periodic + BestCheckPointer
+    participant EV as HardLaneEvaluator
+    participant DISK as AutoDL 持久输出目录
 
-    U->>SH: make train EXP=001b_baseline_winner_36ep
-    SH->>CFG: Config.load(configs/exp/001b.yaml)
-    CFG-->>SH: Config + config.hash()
-    SH->>SPL: Split.load(configs/splits/v1_seed42.yaml)
-    SPL-->>SH: train 63 段 / val 8 段（断言交集为空 + 场景全覆盖）
-    SH->>DS: 构建 Dataset（degrade / restore 按开关注入）
-    SH->>REG: build_model(cfg.model, cfg.data.input_size)
-    REG-->>SH: BaseLaneDetector（不可用时按 fallback_chain 降级）
-    SH->>CK: resume="auto" 查找最新 checkpoint
-    alt 存在 checkpoint
-        CK->>CLD: 从云端拉取 last.pth + optimizer.pt + rng_state.pt
-        CLD-->>CK: 权重 + 优化器状态 + 随机状态
-        CK-->>TR: 恢复 epoch / step / lr / RNG
+    U->>SH: 在 AutoDL 选择 clrnet_r50 或 adnet_r34
+    SH->>TN: --config-file + LazyConfig overrides
+    TN->>CFG: instantiate model/data/optimizer/train
+    CFG->>DS: 读取固定 train/val manifest（6300/800）
+    TN->>CK: resume_or_load(train.init_checkpoint, resume=--resume)
+    alt 存在 last_checkpoint 且 --resume
+        CK->>DISK: 恢复模型、optimizer、trainer iteration
     else 冷启动
-        TR->>TR: seed_everything(42) + deterministic 模式
+        CK->>DISK: 加载 adapted CULane init_checkpoint
     end
 
-    loop 每个 epoch（1..36）
-        TR->>DS: next batch（原图坐标标注 + 已增强图像）
-        TR->>TR: forward + loss + AMP 反传（可选 EMA / OHEM）
-        TR->>CK: save_every_epoch → last.pth + epoch_XXX.pth
-        CK->>CLD: 同步上传（★ Kaggle /kaggle/working 会被清空）
-        TR->>TR: 每 N epoch 在 val 上跑一次 quick eval（F1 粗值，非决策用）
-        alt 距 session 上限 < 15 分钟 或 达到 max_seconds
-            TR->>CK: 优雅退出：存盘 + 同步 + 打印 resume 命令
-        end
+    loop 每个 epoch（525 iter）
+        TR->>DS: next batch（含空 GT 与 2/3 点短线）
+        TR->>TR: forward + loss + AMP backward
+        CK->>DISK: PeriodicCheckpointer 存盘（最多保留 3 个）
+        TN->>EV: val 推理 + diagnostic_metric.json
+        EV-->>CK: val metric
+        CK->>DISK: BestCheckpointer 更新 model_best.pth
     end
 
-    TR->>CK: 训练结束 → best.pth + config_snapshot.yaml + env_fingerprint.txt
-    CK->>CLD: 最终同步
-    SH->>U: 权重命名 {exp_id}_{valF1}_{date}.pth
+    TN-->>U: AutoDL 日志、checkpoint、预测与诊断报告
 ```
 
 **训练链路的关键工程点**
 
 | 点 | 设计 |
 |---|---|
-| Kaggle 9h session 中断 | `train.max_seconds=28800`（8h），到点优雅退出；`train.sh --resume auto` 自动续跑 |
-| `/kaggle/working` 清空 | `checkpoint.py` 每 epoch 调用 `kaggle_sync_dataset.py` 上传到私有 Dataset；session 启动先从 Dataset 拉回 |
-| 双环境路径 | `common/paths.py` 自动探测：Kaggle `/kaggle/working`、AutoDL `/root/autodl-tmp`、本机项目根 |
-| 断点续训完整性 | checkpoint 内含：`model_state` / `optimizer_state` / `scheduler_state` / `epoch` / `rng_state`（python+numpy+torch+cuda）/ `config_snapshot` |
-| 算力记账 | trainer 启动时写入 `docs/compute_ledger.md`：环境、起止时间、GPU 小时 |
+| GPU 执行边界 | 权重加载、forward/loss/backward、demo 与训练只在 AutoDL；本地不作为模型验收环境 |
+| 断点续训 | 原生 `BestCheckPointer.resume_or_load(..., resume=True)` + AutoDL 持久 `train.output_dir`；续跑前核对 `last_checkpoint` |
+| 每 epoch 存盘/验证 | LazyConfig 中 `train.checkpointer.period=train.eval_period=525`，由原生 hooks 执行 |
+| 预训练入口 | 只使用 `train.init_checkpoint` 指向 shape 探针产出的 adapted checkpoint |
+| 路径 | AutoDL 路径只读 `HARDLANE_*` / `UNLANEDET_ROOT` 环境变量，禁止硬编码实例路径 |
 
 ### 5.2 链路②：推理（★ B 榜全流程必须 ≤ 90 分钟）
 
 ```mermaid
 flowchart TD
-    A["T+0 获取 testB 数据<br/>10 段 / 1000 张"] --> B["生成 index_testB.jsonl<br/>断言：分辨率 1366×720、图数 1000"]
+    A["T+0 获取 testB 数据 + 官方清单<br/>不预设段数/帧数"] --> B["生成 manifest_testB.jsonl<br/>断言：清单无重复、图像全存在、gt_path=None"]
     B --> C["selfcheck.sh<br/>干净环境自检：依赖版本 + 1 张图 dry-run"]
     C --> D["run_infer.py<br/>冻结配置 configs/final/infer_b.yaml<br/>冻结权重 best.pth（FP16）"]
     D --> E{"TTA 开关?"}
     E -->|关闭| G
     E -->|开启| F["tta.py<br/>水平翻转 + 多尺度 0.8/1.0/1.25<br/>结果级融合后映射回原尺度"]
-    F --> G["postprocess/pipeline.py<br/>稠密化 → 外推 → 长过滤 → NMS → 阈值 → max_lanes → 裁剪<br/>全部在 1366×720 原图坐标系"]
-    G --> H["export_lines.py<br/>写 .lines.txt，1 位小数，未检出写空文件<br/>逐文件断言：偶数个数值 / ≥4 / 无 NaN / 无越界"]
-    H --> I["pack_submit.py<br/>生成 submit.zip，根目录 submit/<br/>目录树与 testB 逐路径对齐"]
-    I --> J["verify_submit.py 全量校验<br/>解压回放 + 目录树 diff + 包体 <200MB"]
+    F --> G["postprocess/pipeline.py<br/>稠密化 → 外推 → 长过滤 → NMS → 阈值 → max_output_lanes → 裁剪<br/>全部在 1366×720 原图坐标系"]
+    G --> H["HardLaneEvaluator / 推理器<br/>写 raw .lines.txt（诊断精度可为 5 位）"]
+    H --> I["prepare_submit.py<br/>按 manifest 精确枚举 → export_lines 一位小数重写<br/>序列化后去重仍≥2点 → pack → verify"]
+    I --> J["verify_submit.py 全量校验<br/>解压回放 + 目录树 diff + 包体 <200MB<br/>+ 官方 parse→interp→draw 全链 smoke（DECISIONS §17.7）"]
     J --> K{"全绿?"}
     K -->|否| L["按 runbook 回滚：<br/>关闭 TTA / 回退阈值 / 换备用权重"]
     L --> D
@@ -967,22 +1008,24 @@ flowchart TD
     M --> N["提交 + 写入 docs/submit_log.md"]
 ```
 
-**B 榜 90 分钟预算表（内部验收口径，对外承诺 6 小时）**
+**B 榜 90 分钟预算模板（按 1000 张归一化；内部验收口径，对外承诺 6 小时）**
+
+> testB 段数、图数与包体尚未发布。下表不是对 testB=1000 张的事实假设；数据到手后必须先由官方清单生成 manifest，再按实际图数/字节数重算总预算，超 90 分钟则触发降级。
 
 | 步骤 | 预算 | 说明 |
 |---|---|---|
-| 下载 testB（约 1.5GB）+ 解包 | 10 min | 提前测试带宽；失败则换镜像源 |
-| 生成索引 + 分辨率/图数断言 | 3 min | 结构与 A 榜不同时走异常预案（Q5） |
+| 下载 testB + 解包 | 10 min 基准 | 仅为带宽预算占位；按官方包实际字节数重算，失败则换镜像源 |
+| 生成 manifest + 分辨率/图数断言 | 3 min | 按官方清单构造；结构与 A 榜不同时走异常预案（Q5） |
 | `selfcheck.sh` 干净环境自检 | 5 min | 冻结包内自带，防止 R2 |
-| 推理 1000 张（T4×2 / 4090） | 15 min | 单图约 30–80ms；**CPU 降级路径【未实测】，见下方备注** |
+| 推理（每 1000 张，AutoDL 4090） | 15 min | 单图约 30–80ms；实际耗时按 manifest 图数换算；待 AutoDL 实测替换估算 |
 | TTA（若开启，3×） | +15 min | 可选，默认关闭 |
-| 后处理 + 导出 .lines.txt | 5 min | 纯 CPU，1000 张 |
-| 打包 + 校验 + 解压回放 | 10 min | 5 类错误注入自检一并跑 |
+| 后处理 + raw 预测落盘（每 1000 张） | 5 min | AutoDL 推理进程输出；实际文件数取官方 manifest |
+| 一位小数 canonicalize + 打包 + 校验 + 解压回放 | 10 min | `prepare_submit.py` 单入口；禁止直接打包 evaluator 的 5 位输出 |
 | SHA-256 + 人工确认 + 上传 | 15 min | 人工复核不可压缩 |
-| **合计（TTA 关闭）** | **≈ 63 min** | 留 27 min 缓冲 |
-| **合计（TTA 开启）** | **≈ 78 min** | 仍 ≤ 90 min |
+| **归一化合计（TTA 关闭）** | **≈ 63 min / 1000 张基准** | testB 到手后按实际包体与 manifest 重算 |
+| **归一化合计（TTA 开启）** | **≈ 78 min / 1000 张基准** | 重算后仍须 ≤90 min，否则关闭 TTA/触发降级 |
 
-> **CPU 降级路径**（US-09 / R1）：本机 Mac M4 无 CUDA，`infer.sh --cpu` 走 `predictor.py` 的 CPU 分支，batch_size=1、FP32。**【未实测】**：1000 张 CPU 推理耗时尚未实测（原估算「约 60 分钟 / 总流程 ≈110 分钟」是作者未验证的推测，已删除，违反【事实】/【测算】/【推测】标注纪律）。这是 GPU 全挂时的兜底，**必须在 T63 沙盘演练中实测一次并写入 `docs/runbook_b_phase.md`**；在实测数据入账前，不得把 CPU 路径写入 B 榜 90 分钟预算表。
+> **执行边界**：模型推理与权重加载仍只在 AutoDL；本机不承担 CPU 模型兜底。预测落盘后的 canonicalize、Oracle、打包与校验是 CPU 工作，可在本机复核。GPU 不可用时按 B 榜 runbook 切换 AutoDL 实例或备用 checkpoint，不把未测的本地 CPU 推理写入时限承诺。
 
 ### 5.3 链路③：提交与冻结
 
@@ -990,7 +1033,7 @@ flowchart TD
 flowchart TD
     subgraph P1["A 榜期 8/19 – 9/14"]
         A1["本地 val 出 EvalBundle<br/>F1 + CI + 误差 + 条数 + 分桶"]
-        A2{"ablation.is_significant?<br/>段级 CI 下界提升 > 2.0pp"}
+        A2{"ablation.is_significant?<br/>效应量达标 且 paired CI 下界 > 0<br/>+ LOCO 敏感性（§17.3）"}
         A1 --> A2
         A2 -->|否| A3["视为噪声：不提交、不决策"]
         A2 -->|是| A4["assert_single_variable<br/>强制单变量"]
@@ -1061,8 +1104,8 @@ gantt
     T31 赛题 dataloader            :crit, c2, after c1, 1d
     T32 主干抽象层+registry         :c3, after c1, 1d
     T33 主干可得性调研 9/2门禁       :c4, 09-01, 1d
-    T40 trainer+checkpoint+续跑     :crit, c5, after c2, 1d
-    T41 冒烟 3 epoch               :c6, after c5, 0.5d
+    T40 原生train_net+checkpoint续跑 :crit, c5, after c2, 1d
+    T41 双模型1epoch动态门          :c6, after c5, 0.5d
 
     section 里程碑
     M1 评测+数据+dataloader 就绪 9/3 :milestone, m1, 09-03, 0d
@@ -1076,47 +1119,50 @@ gantt
 
 | 依据 | 说明 |
 |---|---|
-| 线 A/B 完全不占 GPU | 评测、打包、EDA、切分、解析全部是 CPU 任务，**本机 Mac M4 即可完成**，同时 Kaggle CPU notebook 无周配额限制可作第二执行位（COMPUTE-P1-01） |
-| 线 C 只依赖 `common/types.py` | dataloader 只依赖 `Lane` 数据结构与 `index_*.jsonl`，不依赖评测层是否完工；T10 完成（1 天）后 T31 即可开工 |
+| 线 A/B 完全不占 GPU | 评测、打包、EDA、切分、解析与预测格式归一化全部是 CPU 任务，**本机 Mac M4 即可完成** |
+| 线 C 只依赖 `common/types.py` | dataloader 代码依赖 `Lane` 数据结构与 manifest；⚠️ v1.4 起叠加 §6.5 开工前置门禁（DECISIONS §18.6）：T17→T11/T12，且 T19→T18、T24→T23，全部完成前 T31 不动工 |
 | 主干调研（T33）零依赖 | 9/2 门禁可独立推进，不阻塞任何代码 |
 | 人力可分时复用 | 线 A/B 是白天写代码的活，线 C 的训练是「提交后等待」的活，时间片天然错开 |
 
 ### 6.2 任务清单（编号 / 工时 / 依赖 / 并行 / 关键路径）
 
-工时单位为**人时**（h）。"并行"列：✔ = 可与其他任务同期进行。*编号体系说明：本表 T00–T72 为**详细任务层**，与 `TASKS.md` 的 W0–W6 **工作流层**是上下位关系（W = 阶段/工作流，T = 具体任务）；实施阶段以本表的 T 编号为准，TASKS.md 的 W 用于阶段汇报。*
+工时单位为**人时**（h）。"并行"列：✔ = 可与其他任务同期进行。*编号体系说明：本表 T00–T81（非连续编号）为**详细任务层**，与 `TASKS.md` 的 W0–W6 **工作流层**是上下位关系（W = 阶段/工作流，T = 具体任务）；实施阶段以本表的 T 编号为准，TASKS.md 的 W 用于阶段汇报。*
 
 | ID | 任务 | 工时 | 依赖 | 并行 | 关键路径 | 交付物 | 时间窗 |
 |---|---|---:|---|---|:---:|---|---|
 | **T00** | 仓库骨架 + Makefile + .gitignore + 目录树初始化 | 4 | — | ✔ | | 仓库可 clone | 9/1 |
-| **T01** | 三环境依赖锁定（`requirements.txt` + `setup_env.sh`） | 6 | T00 | ✔ | | 三环境可建 | 9/1–9/2 |
+| **T01** | 本地 CPU / AutoDL 依赖分责锁定（`requirements.txt` + `scripts/autodl/setup_unlanedet.sh`） | 6 | T00 | ✔ | | 两执行面可复现 | 9/1–9/2 |
 | **T02** | `docs/conventions.md`（坐标系/种子/命名/路径，开发前必读） | 2 | T00 | ✔ | | 约定文档 | 9/1 |
 | **T10** | `common/` 全量：types / geo / io_utils / seed / paths / config / checksum | 10 | T00 | ✔ | ★ | 基础设施可用 | 9/1–9/2 |
-| **T11** | 评测核心：`rasterize.py` + `match.py` + `official_metric.py` | 12 | T10 | ✔ | ★ | `compute_f1` 可用 | 9/2 |
-| **T12** | `selfcheck.py` + `tests/test_metric_selfcheck.py`（GT对GT=1.000、横移 5/10/15px 误差<0.02） | 6 | T11 | ✔ | ★ | `docs/metric_selfcheck.md` | 9/2–9/3 |
-| **T13** | 段级 bootstrap CI | 4 | T11 | ✔ | | CI 可出 | 9/3 |
-| **T14** | 横向误差 + 条数准确率 + 分场景报告 + `evaluate.py` 聚合 | 10 | T11, T23 | ✔ | | `EvalBundle` | 9/3–9/4 |
-| **T15** | `pack_submit.py` + `verify_submit.py` + 5 类错误注入测试 | 10 | T11 | ✔ | | 打包校验全绿 | 9/3–9/4 |
+| **T11** | 评测核心：`rasterize.py` + `matching.py` + `official_metric.py`（⚠️ v1.3 重开：定位降为诊断层，须逐字对齐官方——匈牙利 cost=1−iou / 参数均匀稠密化 (N−1)*5+1 + 逐段 cv2.line / float64 输入 / 异常即抛禁回退，DECISIONS §17.1） | 16 | T10, T17 | ✔ | ★ | 差分对齐完成 | 9/2 |
+| **T12** | `selfcheck.py` + `tests/test_metric_selfcheck.py`（⚠️ v1.3 重开：验收改为**差分测试套件全绿**——真实全集 / IoU 边界 / 线数 0-7 / 空缺文件 / 重复点 / 折返 / 越界 / 匈牙利反例 + Oracle 哈希断言） | 10 | T11, T17 | ✔ | ★ | 差分报告 + `docs/metric_selfcheck.md` | 9/2–9/3 |
+| **T13** | **paired** 段级 bootstrap CI（成对重采样同一批 clip、TP/FP/FN 全局汇总后算 F1、对 ΔF1 做 paired CI + LOCO 敏感性，DECISIONS §17.3；输入 = oracle_runner 的逐 clip TP/FP/FN JSON，§18.2） | 4 | T12, T18, T19 | ✔ | | CI 可出 | 9/3 |
+| **T14** | 横向误差 + 条数准确率 + 分场景报告 + `evaluate.py` 聚合 | 10 | T12, T18, T19, T23 | ✔ | | `EvalBundle` | 9/3–9/4 |
+| **T15** | `pack_submit.py` + `verify_submit.py` + 错误注入测试（≤64 条/图、≤2048 点/条、严格边界、序列化后连续去重、parse→interp→draw 全链 smoke，DECISIONS §17.7/§19） | 12 | T17, T19 | ✔ | | 真实 train 7100 + testA 900 打包校验全绿 | ✅ 9/2 |
 | **T16** | `submit_log.py` A 榜额度账本 | 2 | T15 | ✔ | | `docs/submit_log.md` | 9/4 |
-| **T20** | 三格式解析器 `parse_labels.py` | 8 | T10 | ✔ | | 标签可用 | 9/1–9/2 |
-| **T21** | 三格式一致性全量校验（7100 张，不一致率 <0.1%） | 4 | T20 | ✔ | | badlist | 9/2 |
-| **T22** | EDA + 数据体检报告（`eda.py` + `docs/eda.md`） | 8 | T20 | ✔ | | `docs/eda.md` | 9/2–9/3 |
-| **T23** | 按段切分 + 场景分层 + 段 ID 交集断言 | 6 | T21, T22 | ✔ | ★ | `configs/splits/v1_seed42.yaml` | 9/3 |
-| **T24** | 9 类场景分桶 `scene_bucket.py` | 6 | T22 | ✔ | | `scene_of_clip.json` | 9/3–9/4 |
+| **T17** | **官方 Oracle 冻结 + 独立评测环境**（v1.3 新增，DECISIONS §17.1/§18.1）：score.py / check_submission.py 逐字节冻结 + SHA-256 存证 + Python 3.12 官方 pins 环境 + **哈希断言 `tests/test_official_oracle_hash.py`（9/2 落地；冻结文件不可变，官方新版须新增版本目录）** | 2 | — | ✔ | ★ | Oracle 可调用 | ✅ 9/1（哈希断言 9/2 补齐） |
+| **T18** | **oracle_runner 适配层**（v1.4 新增，DECISIONS §18.2）：调用冻结 score.py 唯一入口——运行前三文件 SHA-256 校验、子进程调用不改写官方算法、输出结构化 JSON（全局 + 逐 clip TP/FP/FN/F1；全局全量单独调用，≠ 逐 clip 平均） | 4 | T17, T19 | ✔ | ★ | `oracle_runner.py` + JSON 契约样例 | 9/2–9/3 |
+| **T19** | **manifest 构建器**（v1.4 显式化，= TASKS T2.6，DECISIONS §17.6/§18.3）：官方清单逐行构造有序 task list + 无重复断言 + 存在性按 split 区分（labeled 才强制 GT；每段 100 帧仅 train/testA，testB 以官方清单为准） | 3 | T20 | ✔ | ★ | `data/processed/manifest_{train,testA}.jsonl` | 9/2 |
+| **T20** | 三格式解析器 `parse_labels.py`（真实 annotations.lane、跨目录布局、palette PNG、方向无关横向误差；§21） | 8 | T10 | ✔ | | ✅ 标签可用（9/2） | 9/1–9/2 |
+| **T21** | 三格式一致性全量校验：text↔JSON 精确 + PNG 10px union IoU≥0.75（7100 张，不一致率 <0.1%） | 4 | T20 | ✔ | | ✅ 1/7100 badlist（9/2） | 9/2 |
+| **T22** | EDA + 数据体检报告（`eda.py` + `docs/eda.md` + 固定 extrema overlay） | 8 | T20 | ✔ | | ✅ 7100 图全量 + split 漂移闭环（9/2） | 9/2 |
+| **T23** | 按段切分：scene 二元特征主目标 + 车道条数直方图同分 tie-break + 稀有保护 + 段 ID 交集断言（DECISIONS §17.2/§18.4/§22） | 6 | T21, T22, T24 | ✔ | ★ | ✅ `v1_seed42.yaml` 二次固化（val 空 GT 35） | 9/2 |
+| **T24** | 多维场景标签：71 段人工标注（weather/illumination/artifact/geometry + 置信度 + 真实帧 ID）+ `scene_bucket.py`；全部 low-confidence/稀有标签二次复核 | 8 | T22 | ✔ | | `scene_labels.json` | 9/2–9/4 |
 | **T25** | 数据双备份 + Kaggle Dataset 上传 + RAW_SHA256 | 5 | T21 | ✔ | | 云端副本 | 9/3 |
 | **T30** | UnLanedet 环境搭建 + demo 推理可视化 | 8 | T01 | ✔ | | demo 通过 | 9/1–9/2 |
-| **T31** | 赛题 dataloader（读 `.lines.txt`，标注映射回 1366×720） | 10 | T10, T20, T30 | ✔ | ★ | 1 epoch 跑通 | 9/2–9/3 |
+| **T31** | 赛题 dataloader + CLRNet/ADNet 双套 config 迁移；输出 `max_gt_lanes/candidate_topk/max_output_lanes/num_classes` 框架字段映射表；262 张零车道 GT 样本不丢弃、训练不崩溃且 loss 有限 | 10 | T10, T20, T30；开工门禁 T12, T18, T19, T23 | ✔ | ★ | 1 epoch + 零车道 smoke 全绿 | 9/2–9/3 |
 | **T32** | `BaseLaneDetector` 抽象层 + registry + 降级链 | 8 | T30 | ✔ | | 主干可插拔 | 9/2–9/3 |
 | **T33** | ~~α-SimADNet / RVLD 可得性调研~~ **已完成**（9/1 晚 weight scout：均未收录，DECISIONS §15.2）；门禁对象改为双路权重核验 + 双套 config 迁移 | 4 | — | ✔ | | `docs/weight_scout_report.md` | ✅ 9/1 |
-| **T40** | `trainer.py` + `checkpoint.py`（每 epoch 存盘 + 云端同步 + 续跑）+ EMA/AMP | 14 | T31, T32 | | ★ | 训练可断点续跑 | 9/3–9/4 |
-| **T41** | 冒烟训练：CLRNet-R50 3 epoch | 3（GPU 2h） | T40 | | ★ | 第一个 loss 曲线 | 9/4 |
-| **T42** | 基线正式训练：36 epoch，主干 = 双路 15ep 筛选赢家（CLRNet-R50 vs ADNet-R34，DECISIONS §15.2；CULane 预训练起步，禁 from-scratch）（4090 ≈ 9–12h / T4×2 ≈ 35.7h） | 6（GPU 12h） | T41, T23 | | ★ | `best.pth` | 9/4–9/5 |
+| **T40** | 收口 pinned UnLanedet 原生训练执行面：`tools/train_net.py` + 两套 LazyConfig + `AMPTrainer` + `PeriodicCheckpointer/BestCheckpointer` + AutoDL 持久目录续跑；禁止另造 `trainer.py/checkpoint.py` | 4 | T31 | | ★ | 静态执行面就绪；AutoDL 可从 `last_checkpoint` 续跑 | 9/3 |
+| **T41** | AutoDL 动态冒烟：CLRNet-R50 与 ADNet-R34 各跑空/非空 forward-loss-backward + 1 epoch train/val | 3（GPU） | T40 | | ★ | 两模型日志、`diagnostic_metric.json`、checkpoint 全部落盘 | 9/3–9/4 |
+| **T42** | 基线正式训练：36 epoch，主干 = 双路 15ep 筛选赢家（CLRNet-R50 vs ADNet-R34，DECISIONS §15.2；CULane 预训练起步，禁 from-scratch）；AutoDL 4090 暂估 2.5–3.5h，首个 1 epoch 后重算 | 6（GPU，待实测） | T41, T23 | | ★ | `model_best.pth` | 9/4–9/5 |
 | **T43** | 基线首评：全量 `EvalBundle` + 横向误差分布报告 | 4 | T42, T14 | | ★ | M2 出分 | **9/5** |
 | **T50** | 后处理套件（resample / extrapolate / filter / nms，各独立开关） | 14 | T43 | ✔ | | 后处理可 A/B | 9/5–9/7 |
-| **T51** | 阈值 / max_lanes / NMS 网格扫描（直接以 F1 为目标） | 6 | T50, T14 | ✔ | | 阈值扫描曲线 | 9/6–9/7 |
+| **T51** | 阈值 / `max_output_lanes` / NMS 网格扫描；取平台区稳健点，全表入台账；同一 val 选优后的普通 CI 仅为调参证据，不得称为无偏确认 | 6 | T50, T14 | ✔ | | 阈值扫描曲线 + 选择偏差注记 | 9/6–9/7 |
 | **T52** | ~~主力候选接入：RVLD + α-SimADNet~~ **已关闭（v1.2）**：UnLanedet 未收录两者（DECISIONS §15.2）；主干由 T42 双路筛选定，ConvNeXt-T 留 T60 备选 | — | — | — | | — | — |
 | **T53** | 退化增强各算子（gamma/雾/雨/反光/阴影/模糊/噪声） | 12 | T31 | ✔ | | `degrade.py` | 9/5–9/7 |
 | **T54** | 复原前置 CLAHE / 自适应 gamma / 暗通道去雾 | 5 | T31 | ✔ | | `restore.py` | 9/6 |
-| **T55** | 分辨率 ablation（960×480 vs 800×320，各 15 epoch） | 4（GPU 30h） | T42 | | | D6 证伪 | 9/6–9/9 |
+| **T55** | 预处理方案组合 A/B：`cut=180 + 800×320` vs `cut=0 + 960×480 letterbox`，各 15 epoch；带坐标 round-trip + overlay；结论只归因整套管线，单因素归因需追加匹配分辨率控制组 | 4（GPU 30h） | T42 | | | 方案组合裁决 | 9/6–9/9 |
 | **T56** | 短板桶定向过采样 `sampler.py` | 5 | T24, T14 | ✔ | | 长尾改善 | 9/8–9/9 |
 | **T57** | TTA（水平翻转 + 多尺度结果级融合） | 6 | T50 | ✔ | | TTA 开关 | 9/8 |
 | **T58** | 台账自动化（ledger / ablation 单变量断言 / compute_ledger） | 8 | T43 | ✔ | | `docs/experiments.csv` | 9/5–9/6 |
@@ -1132,36 +1178,37 @@ gantt
 | **T80** | 消融矩阵可视化（≥5 组，可贴 PPT） | 8 | T65 | ✔ | | `docs/ablation.md` | 9/18–9/20 |
 | **T81** | 答辩 PPT 骨架 + 2 次计时彩排 | 20 | T80 | ✔ | | PPT | 9/20–10/18 |
 
-**合计人时 ≈ 320h**（其中 GPU 机时约 60h，需落在 Kaggle 68.6h 配额 + 4090 预算内）。
+**原始 WBS 合计人时 ≈ 320h**；单人裁剪后的 GPU 机时统一在 AutoDL 记账，首个 1 epoch 返回前不把旧跨平台换算当事实。
 
 > ⚠️ **单人版重排见 §6.5**：用户已拍板「单人 + 200 元」（DECISIONS.md §12–§13）。原 45 任务 / 320h 对单人不可行，已按裁剪方案重排为 ≈100h 的单人关键路径，砍掉多主干对比 / 2 折交叉 / 过采样 / TTA（降级）。
 
 ### 6.3 关键路径（★）
 
 ```
-T00 → T10 → T11 → T12 ┐
-T00 → T10 → T20 → T21 → T23 ┼→ T31 → T40 → T41 → T42 → T43 → T50/T52 → T60
-T00 → T01 → T30 ────────────┘                                          ↓
-                                          T61 → T62 → T63 → T64 → T65 → T70 → T71 → T72
+T00 → T10 → T11 → T12 ────────────────────────┐
+T00 → T10 → T20 → T19 → T18 ─────────────────┤
+T00 → T10 → T20 → T21 → T22 → T24 → T23 ────────┤→ T31 → T40（原生执行面）→ T41（AutoDL 动态门）→ T42 → T43 → T50/T53/T55 → T60
+T00 → T01 → T30 ─────────────────────────────────────────────┘                                              ↓
+                                                  T61 → T62 → T63 → T64 → T65 → T70 → T71 → T72
 ```
 
 **关键路径上的四个不可压缩节点**
 
 | 节点 | 日期 | 为什么不可压缩 |
 |---|---|---|
-| **M1** 评测 + 数据 + dataloader 就绪 | **9/3** | 没有 metric 就没有决策依据；没有 dataloader 就不能训练。两者缺一，后续全部空转 |
+| **M1** Oracle/manifest/切分 + dataloader 就绪 | **9/3** | T12 差分套件、T18 Oracle 适配、T19 manifest、T23 切分与 T31 零车道 smoke 任一未过都禁止进训练 |
 | **M2** 基线出分 | **9/5** | 36 epoch 训练在 4090 上约 9–12h，物理时间不可压缩；且这是所有 ablation 的对照组 |
 | **M3** 定模型 | **9/10** | 需要 ≥4 次有效实验的 CI 下界对比；每次实验含训练 + 评测，最快 1 天 1 轮 |
 | **M4** 冻结 | **9/14** | 冻结前必须完成复现演练 + 2 次沙盘演练（T62/T63 各需 1 天） |
 
-**关键路径上的最大单点风险是 T11→T12（metric 复刻）**。若 metric 与官方偏差 > 2pp，M1 之后的每一个决策都是错的，且无法在过程中察觉。**缓解：T12 的理论值自检（横移 5/10/15px → IoU 0.714/0.500/0.333，误差 <0.02）必须在 9/2 内全绿，否则立即启动 Q4 反演标定（用 1–2 次 A 榜额度）。**
+**评测单点风险已由双层结构降级**：冻结官方 `score.py` 是裁决 Oracle，不再做 Q4/A 榜反演标定；T11 本地 metric 只是诊断层，须经 T12 逐数差分套件守门。M1 的主要风险改为**契约链未闭环**：T18 必须经 T19 manifest 调用 Oracle 并产出全局 + 逐 clip 结构化计数，T13/T14 只消费该输出。
 
 ### 6.4 与赛程对齐检查
 
 | 赛程节点 | 本架构对应里程碑 | 缓冲 |
 |---|---|---|
 | 9/2 主干方案锁定（v2 Q1） | T33 门禁 | 0 天（硬门禁，逾期即降级 adnet） |
-| 9/3 数据与评测就绪 | M1（T12 + T23 + T31） | 0 天 |
+| 9/3 数据与评测就绪 | M1（T12 + T18 + T19 + T23 + T31） | 0 天 |
 | 9/5 基线出分 | M2（T43） | 0 天 |
 | 9/5–9/12 迭代期 | T50–T57（≥4 次有效实验） | 2 天 |
 | 9/12–9/14 定稿与 A 榜终投 | T60–T64 | 0 天 |
@@ -1176,18 +1223,20 @@ T00 → T01 → T30 ────────────┘                     
 
 用户拍板 **单人 + 200 元预算**（DECISIONS.md §12–§13）。原 45 任务 / ≈320h 人工对单人不可行，按裁剪方案重排。
 
-**单人下的"并行"修正**：原 §6.1「三线并行」在单人下**不是真并行编码**，而是——CPU 任务（评测/数据/后处理/打包）在 Mac 上跑、GPU 训练提交后后台等待，时间片天然错开。单人核心约束是**人工编码小时数**，不是 GPU。
+**单人下的"并行"修正**：原 §6.1「三线并行」在单人下**不是真并行编码**，而是——本地只跑 CPU 数据契约/评测/后处理/打包；GPU 权重加载、demo、loss 与训练统一在 AutoDL 提交后后台等待，时间片天然错开。单人核心约束是**人工编码小时数**，不是 GPU。
 
 **单人版关键路径（保留项，按时间序）**
 
+> ✅ **数据/评测/提交开工前置已闭环（DECISIONS §17–§24）**：T17 Oracle 冻结 + 哈希守护 → T11/T12 metric 对齐 + 差分（当前 94 tests；1034 渲染/576 图非 identity）→ T19 manifest → T18 oracle_runner → T20/T21 真实三格式全量（1/7100 badlist）→ T22 EDA → T24 71 段多维标签 → T23 63/8 按段切分 → raw 预测一位小数 canonical 提交链。T31/T40 本地实现门解除，AutoDL 动态验收门仍开（§23–§24）。
+
 ```
-T00 骨架(9/1) → T10 基础设施 → T11 metric复刻 → T12 三组自检(✅9/1全绿)
-  → T20 三格式解析 → T21 一致性 → T22 EDA → T23 按段切分(9/3 M1)
-  → T31 dataloader+双套config → T40 trainer+续跑
+T00 骨架(9/1) → T10 基础设施 → T17 Oracle冻结+哈希守护(✅) → T11 metric对齐(✅ 9/2) → T12 差分套件(✅ 9/2)
+  → T20 三格式解析(✅) → T19 manifest(✅) → T18 oracle_runner(✅) → T21 一致性(✅ 1/7100) → T22 EDA(✅) → T24 场景标注(✅) → T23 按段切分(✅ 二次固化 9/2)
+  → T31 dataloader+双套config → T40 pinned train_net+原生checkpoint续跑 → T41 AutoDL双模型动态门
   → 双路 15ep 筛选(9/3晚–9/4晨 AutoDL, CLRNet-R50 vs ADNet-R34, 兼任 shakedown, DECISIONS §15.2)
   → 赢家 36ep(9/4 开跑) → T43(9/5 M2出分, 触发 DECISIONS §15.1 重估)
-  → T50 后处理套件 → T51 阈值/NMS/max_lanes扫描(J4 三件套) → T55 分辨率2档(960×480 vs 800×320)
-  → T53 退化增强(雾+雨一组) → T43 全量首评
+  → T50 后处理套件 → T51 阈值/NMS/max_output_lanes 扫描(J4 三件套, 网格 {7,8,10,12})
+  → T55 分辨率方案组合(cut_height×输入比例, §17.5) → T53 退化增强(雾+雨一组) → T43 全量首评
   → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
   → T70 B榜首提(9/16) → T72 终提交(9/17 15:00)
 ```
@@ -1216,7 +1265,7 @@ T00 骨架(9/1) → T10 基础设施 → T11 metric复刻 → T12 三组自检(�
 # ── 运行时 ──
 python==3.10.13
 
-# ── 深度学习（CUDA 11.8，Kaggle T4 与 AutoDL 4090 通用）──
+# ── 深度学习（CUDA 11.8，AutoDL 4090；本地不作模型验收）──
 --index-url https://download.pytorch.org/whl/cu118
 torch==2.1.2+cu118
 torchvision==0.16.2+cu118
@@ -1264,9 +1313,9 @@ tensorboard==2.15.2        # 或 wandb==0.16.3（需联网，建议禁用）
 
 | 约束 | 理由 |
 |---|---|
-| `opencv-python-headless` 而非 `opencv-python` | 云环境无 GUI，headless 避免 `libGL.so.1` 缺失导致 import 失败（Kaggle / AutoDL 常见坑） |
+| `opencv-python-headless` 而非 `opencv-python` | AutoDL 环境无 GUI，headless 避免 `libGL.so.1` 缺失导致 import 失败 |
 | scipy 锁定 1.11.4 | B 样条实现在 1.12+ 有数值细节变化；**评测端与后处理端同版本**是 P0-A01 复刻精度的前提 |
-| torch 固定 `+cu118` | 不带 CUDA 后缀的 wheel 在 Kaggle T4 上可能拉到 CPU 版，导致训练静默跑在 CPU |
+| torch 固定 `+cu118` | 避免 AutoDL 环境解析到 CPU 版，导致训练静默跑在 CPU |
 | 禁止 `pip install -U` | 升级会破坏 `requirements.txt` 的精确锁；`setup_env.sh` 中一律 `pip install -r requirements.txt --no-deps` 后校验 fingerprint |
 | 第三方 repo 一律 vendored + 固定 commit | 防止上游提交破坏复现链路（R3/R5） |
 | 权重 FP16 导出 | `export_fp16()` 返回字节数，用于 200MB 包体核算（P1-C21 / R12） |
@@ -1285,10 +1334,10 @@ tensorboard==2.15.2        # 或 wandb==0.16.3（需联网，建议禁用）
 | x | 向右为正，整数域 `[0, 1365]` |
 | y | 向下为正，整数域 `[0, 719]` |
 | 单位 | **原图绝对像素，禁止归一化**；`export_lines.py` 出口断言：必须存在 > 1.0 的坐标值 |
-| dtype | 内存 `float32`；写文件 **1 位小数** |
+| dtype | 内存 `float32`（送评测 Oracle 前转 float64，官方为 float64 路径，§17.1）；写文件 **1 位小数**（项目策略，官方措辞为「建议」，§17.7） |
 | 点序 | `Lane.points` 按 **y 升序** |
 | 后处理坐标系 | **一律在 1366×720 原图坐标系**（见 §4.5），防止 NMS 阈值语义随分辨率漂移 |
-| 越界处理 | `Lane.clip()` 做**线段级裁剪**，禁止逐点 clamp（后者会让折线在边界堆积、变形） |
+| 越界处理 | `Lane.clip()` 做**线段级裁剪**，禁止逐点 clamp（后者会让折线在边界堆积、变形）；内部取严禁止越界（x ≤ 1365、y ≤ 719；官方语义为截断非拒绝，DECISIONS §17.7） |
 
 ### 8.2 随机种子
 
@@ -1315,7 +1364,7 @@ def seed_everything(seed: int = 42, deterministic: bool = True) -> None:
 | 训练 | `train.seed = 42`；多变种子对比实验用 `{101, 202, 303}` 并在台账标注 |
 | DataLoader | 训练 `num_workers=4` + `worker_init_fn` 派生种子；**最终推理强制 `num_workers=0`** |
 
-### 8.3 路径约定（三环境自动适配）
+### 8.3 路径约定（本地 CPU / AutoDL 分责）
 
 ```python
 # src/common/paths.py
@@ -1334,7 +1383,7 @@ SUBMIT_ROOT # outputs/submits/
 | 规则 | 说明 |
 |---|---|
 | 禁止硬编码绝对路径 | 一律走 `paths.py` |
-| Kaggle 唯一可写目录 | `/kaggle/working`；**每个 epoch 结束必须同步到 Kaggle Dataset** |
+| AutoDL 训练输出 | 只写 `HARDLANE_OUTPUT_ROOT` 指向的持久目录；每 epoch 原生存盘，续跑前核对 `last_checkpoint` |
 | 数据只读 | `data/raw/` 在任何环境下只读，修改产物一律写 `data/processed/` |
 | 本机定位 | 仅做数据准备、评测脚本开发、可视化、打包校验；**不用于训练** |
 
@@ -1348,9 +1397,9 @@ SUBMIT_ROOT # outputs/submits/
 | 预测目录 | `outputs/preds/<exp_id>/<split>/` | `outputs/preds/001_baseline/val/` |
 | 报告目录 | `outputs/reports/<exp_id>/` | |
 | 提交包 | `outputs/submits/submit_<YYYYmmdd_HHMM>.zip` | `submit_20260916_0342.zip` |
-| 图像 ID | `<相对路径不含扩展名>` | `testA/clip_0007/00042` |
-| 段 ID | `clip_XXXX`（与官方目录名一致） | `clip_0007` |
-| 场景名 | 全小写下划线，取自 `SCENES` 常量 | `low_light` |
+| 图像 ID | `<clip>/<frame>`（由 manifest 派生，DECISIONS §17.6） | `v239132710_1_0_1110/00042` |
+| 段 ID | 与官方目录名一致 | `v239132710_1_0_1110` |
+| 场景标签 | 多维（weather / illumination / artifact / geometry，见 §4.2），取值全小写下划线 | `low_light` |
 
 ### 8.5 日志与台账格式
 
@@ -1378,15 +1427,16 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 | 规则 | 强制方式 |
 |---|---|
 | 每次实验只改一个变量 | `assert_single_variable()` 不通过则 `ledger.py` 拒绝写入 |
+| 训练型 A/B 随机性 | 廉价筛选必须使用相同 seed/初始化；进入最终定稿的改动必须补 `{101,202,303}` 多 seed 复核，不得用 clip bootstrap 替代训练随机性 |
 | 结论必须附 CI 下界 | `val_f1_ci_low` 为空则该行标记为 `INVALID` |
-| `delta_vs_baseline` < 2.0pp | 自动标注 `NOISE`，禁止据此提交 A 榜 |
+| `delta_vs_baseline` 未达效应量门槛 或 paired CI 下界 ≤ 0 | 自动标注 `NOISE`，禁止据此提交 A 榜（§17.3 双门槛：效应量 + paired CI 下界 > 0 + LOCO） |
 | 未入台账的训练 | 视作无效实验，其权重不得进入冻结流程 |
 
-**算力台账** `docs/compute_ledger.md`（每周一核对 Kaggle 30h 重置）：
+**算力台账** `docs/compute_ledger.md`（每个 AutoDL 实例/租期结算时核对）：
 
 ```markdown
-| 日期 | 环境 | 用途 | 起止 | GPU小时 | 周余额 | 备注 |
-| 9/1 | Kaggle T4x2 | 环境搭建+吞吐实测 | 10:00-11:00 | 1.0 | 29.0/30 | 实测 1 epoch = 47.2min |
+| 日期 | 环境 | 用途 | 起止 | GPU小时 | 预算余额 | 备注 |
+| 待 AutoDL 首跑 | AutoDL 4090 | 探针+双模型 smoke+1 epoch | 待记录 | 待记录 | 200 元预算帽内 | 必须填真实 sec/iter、显存与 eval 耗时 |
 ```
 
 **A 榜提交账本** `docs/submit_log.md`（总额度 ≤12 次，v1 D7）：
@@ -1404,9 +1454,9 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 | # | 问题 | 阻塞什么 | 建议动作与截止 | 责任人 |
 |---|---|---|---|---|
 | **Q-A1** | ~~α-SimADNet / RVLD 可得性~~ **已关闭（9/1 晚，DECISIONS §15.2）**：UnLanedet 未收录；现门禁 = 双路权重核验 + 双套 1366×720 config 迁移 | T42 双路筛选、T60 定模型 | **9/3 前**完成权重加载核验（R34 链接错位风险见 DECISIONS §15.2）与 config 迁移 | 架构师 |
-| **Q-A2** | 算力预算（100 / 200 / 300 元 4090）（v2 Q7 / v1 Q1） | T42 基线训练时长（12h vs 35.7h）、实验次数 | **9/2 前拍板**；按 DECISIONS.md §10 测算：先用满 Kaggle 免费 68.5 T4×2-h，剩余只需补购 4090 ≈27h = **67~80 元即覆盖全部计划**；**200 元含约一倍冗余**；300 元为 2× 安全缓冲（针对吞吐测算不确定 R10）。未批则砍全部 P1，只保 P0，目标下调至 80 | 用户 |
-| **Q-A3** | 官方 metric 的 B 样条细节：阶数 k、稠密化采样间距、按弧长还是按参数采样、端点处理（v2 Q4） | **T12 能否全绿，进而决定全部后续决策是否可信** | 9/3 前查官方 baseline 代码；无则用 1–2 次 A 榜额度做反演标定 | 架构师 + PM |
-| **Q-A4** | 官方是否提供每段场景标签？（v2 Q3） | T24 场景分桶、T23 场景分层、S6 条件化 CLAHE | 9/3 前确认；不可得则人工标注 90 段（1 人 2h 内可完成） | PM |
+| **Q-A2** | ~~算力预算~~ **已关闭：200 元；GPU 实验环境为 AutoDL** | T42 基线训练时长、实验次数 | 首个 1 epoch 后按真实 sec/iter 与 eval 耗时重算；旧 Kaggle/T4 换算不作当前执行依据 | 用户 |
+| ~~Q-A3~~ | ~~官方 metric 的 B 样条细节：阶数 k、稠密化采样间距、按弧长还是按参数采样、端点处理~~ | **已关闭（v1.3，DECISIONS §17.1）**：官方 score.py 随提交样例到手并冻结为 Oracle（SHA-256 存证），反演标定彻底取消 | 差分对齐转入 T11/T12 重开项 | 架构师 |
+| ~~Q-A4~~ | ~~官方是否提供每段场景标签？~~ | **已关闭（v1.3，DECISIONS §17.2）**：官方不提供（db_info.yaml 无、Json scenes 7100/7100 全空）→ 人工标注 71 段多维标签（1–2h） | 落地为 T24（多维分桶）与 §4.2 schema | PM |
 | **Q-A5** | B 榜数据目录结构是否与 A 榜一致？是否给场景信息？（v2 Q5） | T63 沙盘演练的异常注入设计、T70 首提路径 | 9/14 前查官方说明；**T63 必须覆盖「结构与 A 榜不同」的异常分支** | PM |
 
 ### 9.2 影响优先级但不阻塞开工
@@ -1417,13 +1467,13 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 | Q-B2 | solution.zip 是否有大小上限？是否必须含权重？（v2 Q6） | P1-C21 双模型集成可行性、权重 FP32/FP16 选择 | 9/10 |
 | Q-B3 | 是否单人参赛？每周可投入小时数？（v1 Q2 / v2 Q8） | 排期并行度、W3 迭代期实验次数 | 9/3 |
 | Q-B4 | 报名是否已完成（截止 9/14）？（v1 Q8） | 全局前置条件 | 立即 |
-| Q-B5 | Kaggle 免费额度实际有效速率、4090 是否确为 T4×2 的 3×？（v2 Q9） | 全表排期重算 | 9/3（1 小时实测） |
+| Q-B5 | AutoDL 4090 在 1366×720 两模型上的真实 sec/iter、显存与 eval 耗时 | 全表排期重算 | 首个 1 epoch 动态门 |
 
 ### 9.3 架构师向交付总监提出的三个建议
 
 1. **把 metric 复刻当作独立的、最先验收的「第 0 号实验」。** 它不是准备工作，它是**整个项目的测量仪器**。仪器不准，16 天全部白干。建议在 9/2 结束前对 `T12` 做一次独立验收（GT对GT = 1.000 + 横移标定误差 < 0.02），不通过不进入下一阶段。
 
-2. **算力预算请按 ≥200 元批准（100 元为计划下限，300 元为 2× 安全缓冲）。** 经 DECISIONS.md §10 重算：先用满 Kaggle 免费额度后，补购 4090 仅需 ≈27h（67~80 元）即可覆盖**全部计划**（含 2 折交叉确认）；200 元提供约一倍冗余。工程主张不变——**多出一次实验 = 多一个「某改动到底有没有用」的确定答案**，而这个答案在答辩（占 30%）里必然被问到。原「150 元」估算未先扣 Kaggle 免费额度，已修正。
+2. **GPU 预算 200 元已批准，执行位固定 AutoDL。** 当前 15ep≈1h、36ep≈2.5–3.5h 只是规划估算；首个 1 epoch 必须回填真实吞吐、显存与 eval 耗时，再决定租期与实验数，禁止继续沿用旧 Kaggle/T4 折算作事实。
 
 3. **B 榜作战请预留「双人复核」而非单人操作。** 41 小时窗口 + 跨夜 + 一票否决的 SHA-256 上报，是典型的高压易错场景。建议 `docs/runbook_b_phase.md` 中每一个关键时点都标注操作人与复核人，即使复核人只是在边上看着。**R1/R2 的风险等级是「致命」，值得这点人力成本。**
 
@@ -1446,16 +1496,15 @@ gpu_source,changed_variable,delta_vs_baseline,conclusion,submit_time
 | 退化增强各算子独立开关 | ✅ | §4.4 `DegradeConfig`（8 个独立概率） |
 | 图像复原前置可切换（CLAHE/gamma/去雾） | ✅ | §4.4 `RestoreConfig` + `scene_whitelist` 条件化 |
 | 后处理各步骤可开关 | ✅ | §4.4 `PostConfig` |
-| 置信度阈值与 NMS、max_lanes | ✅ | §4.4 + `count_calib.sweep_count_params` |
+| 置信度阈值与 NMS、`max_output_lanes` | ✅ | §4.4 + `count_calib.sweep_count_params` |
 | 支持单变量 A/B + 配置 diff | ✅ | §4.4 `config_diff` / `assert_single_variable` |
 | 模块化可插拔（主干/数据集/增强/后处理） | ✅ | §1.3 + §2.1 边界铁律 |
-| 双环境可移植 + checkpoint 持久化 | ✅ | §5.1（续跑 + Kaggle Dataset 同步）+ §8.3 `paths.py` |
+| 本地/AutoDL 边界 + checkpoint 持久化 | ✅ | §5.1（AutoDL 原生 `train_net.py` / checkpointer / `--resume`）+ §8.3 环境变量契约 |
 | 三条主链路 Mermaid | ✅ | §5.1 训练 / §5.2 推理 / §5.3 提交 |
-| 推理全流程 ≤ 90 分钟 | ✅ | §5.2 预算表（63–78 min，含 CPU 降级 110 min） |
+| 推理全流程 ≤ 90 分钟 | ✅ | §5.2 预算表（AutoDL 估算 63–78 min；须以动态实测替换） |
 | 任务分解：编号+工时+依赖+并行+关键路径 | ✅ | §6.2（45 个任务）+ §6.3 |
 | 并行方案（解决 9/7 才出分问题） | ✅ | §6.1 三线并行 Gantt + 可行性论证 |
 | 与赛程对齐（9/3 基线就绪 / 9/10 定模型 / 9/14 冻结 / 9/16–17 B榜） | ✅ | §6.4 |
 | 依赖包列表（含版本约束） | ✅ | §7 |
 | 共享约定（坐标系/种子/路径/命名/日志/台账） | ✅ | §8 |
 | 待明确事项 | ✅ | §9 |
-

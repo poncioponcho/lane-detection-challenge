@@ -16,9 +16,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 import numpy as np
+import pytest
 
 from submit.export_lines import export_lines, lane_to_line, assert_valid_coords
-from submit.pack_submit import pack_submit, read_expected
+from submit.pack_submit import _normalize_rel, pack_submit, read_expected
+from submit.prepare_submit import (canonicalize_prediction_dir,
+                                   prepare_submission)
 from submit.verify_submit import verify_submit, validate_line
 from common.checksum import file_meta
 
@@ -54,7 +57,51 @@ def test_export_validation():
             assert False, f"should raise: {msg}"
         except ValueError:
             pass
+    # Distinct source points can collapse at the mandated one-decimal output.
+    with pytest.raises(ValueError, match="after serialization"):
+        lane_to_line([[100.01, 700.01], [100.04, 700.04]])
     print("[ok] export_lines: strict validation (5 error classes)")
+
+
+@pytest.mark.parametrize("line, error", [
+    ("100.0 700.0 100.0 700.0", "after consecutive-deduplication"),
+    ("1,2 3,4 5,6 7,8", "non-numeric"),
+    ("100 700 200 500", "not 1-decimal"),
+    ("100.0 700.0 1366.0 500.0", "out of bounds"),
+    ("100.0 700.0 200.0 720.0", "out of bounds"),
+])
+def test_verify_line_matches_official_strict_failures(line, error):
+    assert error in validate_line(line)
+
+
+def test_verify_rejects_lane_and_point_resource_overflow(tmp_path):
+    rel = "clip/00000.lines.txt"
+    pred = tmp_path / "pred"
+    target = pred / rel
+    target.parent.mkdir(parents=True)
+
+    target.write_text("100.0 700.0 200.0 500.0\n" * 65, encoding="utf-8")
+    archive = pack_submit(pred, [rel], tmp_path / "too_many_lanes.zip")
+    ok, report = verify_submit(archive, [rel])
+    assert not ok and "too many lanes 65" in report
+
+    points = " ".join(f"{100 + index * 0.1:.1f} 700.0" for index in range(2049))
+    target.write_text(points + "\n", encoding="utf-8")
+    archive = pack_submit(pred, [rel], tmp_path / "too_many_points.zip")
+    ok, report = verify_submit(archive, [rel])
+    assert not ok and "too many points 2049" in report
+
+
+def test_zip_with_collapsed_lane_fails_final_gate(tmp_path):
+    rel = "clip/00000.lines.txt"
+    pred = tmp_path / "pred"
+    target = pred / rel
+    target.parent.mkdir(parents=True)
+    target.write_text("100.0 700.0 100.0 700.0\n", encoding="utf-8")
+    archive = pack_submit(pred, [rel], tmp_path / "submit.zip")
+    ok, report = verify_submit(archive, [rel])
+    assert not ok
+    assert "after consecutive-deduplication" in report
 
 
 def test_pack_verify_roundtrip():
@@ -79,6 +126,148 @@ def test_pack_verify_roundtrip():
         with zipfile.ZipFile(zip_path) as zf:
             assert all(n.startswith("submit/") for n in zf.namelist())
     print("[ok] pack -> verify roundtrip PASS (incl. empty no-lane file)")
+
+
+def test_official_image_paths_normalize_without_weakening_path_safety(tmp_path):
+    assert _normalize_rel("/JPEGImages/clip_a/00003.jpg") == \
+        "clip_a/00003.lines.txt"
+    assert _normalize_rel("JPEGImages/clip_a/00003.jpeg") == \
+        "clip_a/00003.lines.txt"
+    assert _normalize_rel("./clip_a/00003.lines.txt") == \
+        "clip_a/00003.lines.txt"
+    for unsafe in ("../../clip_a/00003.jpg", "/clip_a/00003.jpg"):
+        with pytest.raises(ValueError, match="unsafe expected path"):
+            _normalize_rel(unsafe)
+
+    expected_list = tmp_path / "expected.txt"
+    expected_list.write_text("../../clip_a/00003.jpg\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="unsafe expected path"):
+        pack_submit(tmp_path, read_expected(expected_list), tmp_path / "bad.zip")
+
+    official = "/JPEGImages/clip_a/00003.jpg"
+    pred = tmp_path / "pred"
+    build_pred_dir(pred, ["clip_a/00003.lines.txt"])
+    archive = pack_submit(pred, [official], tmp_path / "official-list.zip")
+    ok, report = verify_submit(archive, [official])
+    assert ok, report
+
+
+def test_prepare_submission_converts_five_decimals_then_packs_and_verifies(tmp_path):
+    rel = "clip_a/00003.lines.txt"
+    raw = tmp_path / "raw" / rel
+    raw.parent.mkdir(parents=True)
+    raw.write_text(
+        "100.12345 700.12345 200.56789 500.56789 300.99999 300.00001\n",
+        encoding="utf-8",
+    )
+    canonical = tmp_path / "canonical"
+    archive = tmp_path / "submit.zip"
+    report = prepare_submission(raw.parents[1], canonical, [rel], archive)
+
+    assert report["status"] == "pass"
+    assert report["conversion"]["lanes"] == 1
+    expected_text = "100.1 700.1 200.6 500.6 301.0 300.0\n"
+    assert (canonical / rel).read_text(encoding="utf-8") == expected_text
+    with zipfile.ZipFile(archive) as zf:
+        assert zf.read(f"submit/{rel}").decode("utf-8") == expected_text
+    assert verify_submit(archive, [rel])[0]
+
+
+def test_canonicalize_rejects_rounding_collapse_with_relative_path(tmp_path):
+    rel = "clip_a/00003.lines.txt"
+    raw = tmp_path / "raw" / rel
+    raw.parent.mkdir(parents=True)
+    raw.write_text(
+        "100.01000 700.01000 100.04000 700.04000\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=r"clip_a/00003\.lines\.txt.*serialization"):
+        canonicalize_prediction_dir(
+            raw.parents[1], tmp_path / "canonical", [rel]
+        )
+
+
+def test_canonicalize_requires_exact_raw_set_and_rejects_stale_output(tmp_path):
+    rel = "clip_a/00003.lines.txt"
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    with pytest.raises(FileNotFoundError, match="missing raw prediction"):
+        canonicalize_prediction_dir(raw_dir, tmp_path / "canonical", [rel])
+
+    report = canonicalize_prediction_dir(
+        raw_dir, tmp_path / "canonical-empty", [rel], missing_as_empty=True
+    )
+    assert report["missing_as_empty"] == [rel]
+    assert (tmp_path / "canonical-empty" / rel).read_bytes() == b""
+
+    extra = raw_dir / "clip_a/99999.lines.txt"
+    extra.parent.mkdir(parents=True)
+    extra.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="extra files"):
+        canonicalize_prediction_dir(
+            raw_dir, tmp_path / "canonical-extra", [rel], missing_as_empty=True
+        )
+
+    extra.unlink()
+    canonical = tmp_path / "canonical-stale"
+    stale = canonical / "clip_b/00000.lines.txt"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="stale files"):
+        canonicalize_prediction_dir(
+            raw_dir, canonical, [rel], missing_as_empty=True
+        )
+
+
+def test_prepare_submission_nonidentity_oracle_rehearsal(tmp_path):
+    from data.manifest import build_manifest, write_manifest
+
+    lane_root = tmp_path / "Lane"
+    raw_root = tmp_path / "raw"
+    rows = []
+    for index, frame in enumerate(("00000", "00003")):
+        image = lane_root / "JPEGImages" / "clip_a" / f"{frame}.jpg"
+        gt = lane_root / "anno_txt" / "clip_a" / f"{frame}.lines.txt"
+        pred = raw_root / "clip_a" / f"{frame}.lines.txt"
+        image.parent.mkdir(parents=True, exist_ok=True)
+        gt.parent.mkdir(parents=True, exist_ok=True)
+        pred.parent.mkdir(parents=True, exist_ok=True)
+        image.write_bytes(b"jpeg")
+        gt.write_text("100 700 200 500 300 300 400 100\n", encoding="utf-8")
+        offset = 0 if index == 0 else 100
+        pred.write_text(
+            " ".join(
+                f"{value:.5f}"
+                for value in (
+                    100 + offset, 700, 200 + offset, 500,
+                    300 + offset, 300, 400 + offset, 100,
+                )
+            ) + "\n",
+            encoding="utf-8",
+        )
+        rows.append(f"/JPEGImages/clip_a/{frame}.jpg")
+
+    task_list = lane_root / "data/train.txt"
+    task_list.parent.mkdir(parents=True)
+    task_list.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    records = build_manifest(
+        task_list, lane_root, "train", enforce_verified_frame_count=False
+    )
+    manifest = tmp_path / "manifest.jsonl"
+    write_manifest(manifest, records)
+
+    result = prepare_submission(
+        raw_root,
+        tmp_path / "canonical",
+        [record.pred_rel_path for record in records],
+        tmp_path / "submit.zip",
+        manifest=manifest,
+        gt_dir=lane_root / "anno_txt",
+        official_python=sys.executable,
+        enforce_official_env=False,
+    )
+    counts = result["oracle"]["global"]
+    assert (counts["tp"], counts["fp"], counts["fn"]) == (1, 1, 1)
+    assert counts["f1"] == pytest.approx(0.5)
 
 
 def test_verify_catches_errors():

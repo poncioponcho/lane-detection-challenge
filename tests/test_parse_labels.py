@@ -19,7 +19,7 @@ import cv2
 from common.io_utils import (parse_txt_line, read_lines_txt, write_lines_txt,
                              read_json_lanes, read_instance_png)
 from data.parse_labels import parse_labels
-from data.check_label_consistency import check_image
+from data.check_label_consistency import check_image, lane_sets_exact
 
 W, H = 1366, 720
 
@@ -95,6 +95,14 @@ def test_json_variants():
         assert len(r3) == 3
         for r in (r1, r2, r3):
             assert np.allclose(r[0][0], lanes[0][0], atol=1e-4)
+        official = d / "official.json"
+        official.write_text(json.dumps({
+            "annotations": {"lane": [
+                {"id": i, "lane_id": i, "points": lane.tolist()}
+                for i, lane in enumerate(lanes)
+            ]}
+        }))
+        assert len(read_json_lanes(official)) == 3
     print("[ok] json: 3 schema variants parsed")
 
 
@@ -115,6 +123,42 @@ def test_png_extraction():
     print("[ok] png: 3 lanes extracted, centerline error < 5px")
 
 
+def test_palette_png_extraction():
+    lanes = make_lanes()
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "palette.png"
+        mask = np.zeros((H, W, 3), dtype=np.uint8)
+        colors = [(0, 0, 128), (0, 128, 0), (128, 0, 0)]
+        for lane, color in zip(lanes, colors):
+            cv2.polylines(mask, [np.round(lane).astype(np.int32)], False, color, 8)
+        cv2.imwrite(str(p), mask)
+        back = read_instance_png(p)
+        assert len(back) == 3
+
+
+def test_official_directory_layout():
+    lanes = make_lanes()
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d) / "Lane"
+        image = root / "JPEGImages" / "clip" / "00000.jpg"
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"jpeg")
+        write_lines_txt(root / "anno_txt" / "clip" / "00000.lines.txt", lanes)
+        import json
+        jp = root / "Json" / "clip" / "00000.jpg.json"
+        jp.parent.mkdir(parents=True)
+        jp.write_text(json.dumps({"annotations": {"lane": [
+            {"points": lane.tolist()} for lane in lanes
+        ]}}))
+        ap = root / "Annotations" / "clip" / "00000.png"
+        ap.parent.mkdir(parents=True)
+        render_png(lanes, ap)
+        bundle = parse_labels(image)
+        assert not bundle.missing
+        assert bundle.png_mask.dtype == bool
+        assert len(bundle.lines_lanes) == len(bundle.json_lanes) == len(bundle.png_lanes) == 3
+
+
 def test_consistency_ok():
     lanes = make_lanes()
     with tempfile.TemporaryDirectory() as d:
@@ -131,6 +175,10 @@ def test_consistency_ok():
         assert res.ok, f"consistency should pass: {res.note}"
         # matched = total pairs across comparisons: 3 lanes x (json + png)
         assert res.matched == 6, f"expected 6 matched pairs, got {res.matched}"
+        reversed_res = check_image(
+            "img-reversed", [lane[::-1] for lane in lanes], lanes, lanes
+        )
+        assert reversed_res.ok, reversed_res.note
     print("[ok] consistency: 3 formats agree (all green)")
 
 
@@ -143,6 +191,11 @@ def test_consistency_mismatch():
         res = check_image("img", lanes, lanes, lanes[:1])
         assert not res.ok, "count mismatch should be flagged"
         assert "png count" in res.note
+        assert not check_image("missing", lanes, None, None, ["json", "png"]).ok
+        assert lane_sets_exact(lanes, [lane.copy() for lane in lanes])
+        shifted = [lane.copy() for lane in lanes]
+        shifted[0][0, 0] += 0.1
+        assert not lane_sets_exact(lanes, shifted)
     print("[ok] consistency: count mismatch flagged")
 
 

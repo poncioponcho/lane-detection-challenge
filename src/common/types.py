@@ -11,6 +11,9 @@ from typing import Optional, List
 
 import numpy as np
 
+CANVAS_W = 1366
+CANVAS_H = 720
+
 
 @dataclass
 class Lane:
@@ -30,7 +33,7 @@ class ImageAnnotation:
     """All lanes for one image."""
     image_id: str
     lanes: List[Lane]
-    img_size: tuple = (1366, 720)   # (W, H)
+    img_size: tuple = (CANVAS_W, CANVAS_H)   # (W, H)
     clip_id: Optional[str] = None
 
 
@@ -108,6 +111,12 @@ def mean_lateral_error(lane_a: np.ndarray, lane_b: np.ndarray,
         return float("inf")
     if y_samples is None:
         y_samples = np.linspace(y_lo, y_hi, 20)
+    # np.interp requires ascending sample coordinates. Official annotations
+    # commonly store lanes bottom-to-top (descending y), while centerlines
+    # extracted from masks are top-to-bottom. Make the diagnostic direction
+    # invariant instead of silently producing endpoint-sized errors.
+    a = a[np.argsort(a[:, 1], kind="stable")]
+    b = b[np.argsort(b[:, 1], kind="stable")]
     xa = np.interp(y_samples, a[:, 1], a[:, 0])
     xb = np.interp(y_samples, b[:, 1], b[:, 0])
     return float(np.mean(np.abs(xa - xb)))

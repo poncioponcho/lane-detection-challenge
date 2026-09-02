@@ -1,11 +1,21 @@
 # =====================================================================
-# 项目常量唯一事实源（代码侧）
+# 项目常量唯一事实源（代码侧） · v5
 # 治理规则（DECISIONS.md §14）：
 #   1. 目标/预算/队伍规模等决策常量，只在本文件与 DECISIONS.md 中定义；
 #      PRD / ARCHITECTURE / TASKS / overview 一律引用，不得另设数值。
 #   2. 改常量必须先改 DECISIONS.md（裁决），再同步本文件，并在提交信息中
 #      注明 DECISIONS 章节号。
-#   3. 评测物理常量与官方 metric 对齐（tests/test_metric_selfcheck.py 全绿）。
+#   3. 评测物理常量与官方 metric 对齐（Oracle = src/eval/official_oracle/score.py）。
+# v3 变更（2026-09-01，DECISIONS §17 传导）：
+#   - eval 改双层结构（官方 Oracle 冻结 + 本地诊断层）；
+#   - validation 闸门重定义（paired bootstrap + 效应量/CI 双门槛 + LOCO）；
+#   - data 增 max_lanes 三常量与 cut_height 待裁标记。
+# v4 变更（2026-09-02，DECISIONS §18 传导）：
+#   - eval.densify_step 改名 interp_n（官方插值倍率固定 5，非弧长步长，§18.6）；
+#   - data max_lanes 三常量改框架中性名 max_gt_lanes / candidate_topk / max_output_sweep（§18.5）；
+#   - validation 增随机性控制纪律（筛选同 seed / 定稿多 seed，§18.7）。
+# v5 变更（2026-09-02，DECISIONS §23 传导）：
+#   - 记录 UnLanedet 实际字段映射，撤回 ADNet `num_queries` 的预设名称。
 # =====================================================================
 
 # ---- 目标（DECISIONS.md §1 裁决机制 + §15.1 滚动重估；9/2 门禁已于 9/1 晚提前触发） ----
@@ -23,15 +33,21 @@ budget:
 team:
   size: 1                      # 单人（Q2 已拍板）；Q5 报名已完成；Q6 可线下出席答辩
 
-# ---- 评测物理常量（官方 metric 对齐，T11/T12 自检全绿） ----
+# ---- 评测（DECISIONS §17.1 双层结构：Oracle = 裁决唯一入口 / 本地 metric = 诊断层） ----
 eval:
   canvas_wh: [1366, 720]       # 评测画布 (W, H)
-  line_width: 30               # cv2 描边宽度（有效宽度≈31px，IoU=0.5 边界≈10.3px）
+  line_width: 30               # cv2 描边宽度（有效宽度≈31px；真实斜向车道线 IoU=0.5 横移容差实测 11–15px，§17.9）
   line_type: 8                 # 8-connected，无抗锯齿
   iou_thr: 0.5                 # TP 判定阈值（严格大于）
   spline_k: 3                  # B 样条阶数（k≤3）
-  densify_step: 5.0            # 样条稠密化采样步长（px）
-  tp_lateral_boundary_px: 10.3 # 实测 IoU=0.5 横向误差边界（理想模型 10px，cv2 实测 10.3px）
+  interp_n: 5                  # 官方插值倍率（参数均匀 (N-1)*interp_n+1 点 + 逐段 cv2.line）；固定常量，非弧长步长（DECISIONS §18.6，旧 densify_step 弧长语义作废）
+  tp_lateral_boundary_px: 10.3 # 垂直线 IoU=0.5 边界实测（理想模型 10px，cv2 thickness=30 有效宽≈31px）
+  oracle:
+    script: src/eval/official_oracle/score.py  # 冻结官方脚本，逐字节不可改（改动即触发哈希断言红灯）
+    sha256: b2f4c9b21de1083de8a420c106262e799947fac37c938994f7d160b8c62de0d2
+    env_python: "3.12"         # 独立评测环境（与训练环境经 .lines.txt + manifest 解耦，训练侧不降级）
+    env_pins: {numpy: "2.1.3", scipy: "1.15.3", opencv-python: "4.12.0.88"}  # 官方 requirements.txt pins
+  local_metric_role: diagnostic  # 诊断/网格扫描专用；须过差分测试套件方可参与过程性判断（§17.1）
 
 # ---- 模型与主干（DECISIONS.md §15.2 收口，§16.4 归位；权重事实源 docs/weight_scout_report.md） ----
 model:
@@ -41,15 +57,27 @@ model:
   backbone_screen: [clrnet_r50, adnet_r34]  # 双路 15ep 筛选（§15.2，9/3 晚–9/4 晨 AutoDL）；判定：|ΔF1|<1.5pp 取 clrnet_r50
   backbone_upgrade: clrnet_convnext_t       # 9/10（T60 定模型）升级备选（UnLanedet CULane 80.21）；DLA-34 无权重勿配置
 
-# ---- 数据与输入（DECISIONS.md §15.4 收口） ----
+# ---- 数据与输入（DECISIONS.md §15.4 收口；§17.4/§17.5 修订） ----
 data:
-  input_size: [800, 320]       # 网络输入 (W,H)，与 ARCHITECTURE §4 DataConfig 同源；T55 另有 960×480 等 preset 对比
+  input_size: [800, 320]       # 网络输入 (W,H)，与 ARCHITECTURE §4.5 DataConfig 同源；T55 另有 preset 对比
+  cut_height: null             # 【待 §17.5 方案组合 A/B 裁决】旧先验 330 已作废（实测截断 ≥5% GT 线）；候选：180（+800×320 直缩）/ 0（+960×480 letterbox）
+  max_gt_lanes: 8              # 训练侧 GT 容量上限（loss assignment / target padding）；GT 实测 max=7 + 余量（§17.4/§18.5）
+  candidate_topk: 12           # 推理候选保留量（> 输出上限，避免过早截断）
+  max_output_sweep: [7, 8, 10, 12]  # 后处理最终输出截断扫描网格（val 上定，不与训练容量绑死）
+  # §23 实际映射：CLRNet max_lanes=8 / num_classes=9 / num_priors=192；
+  # ADNet max_lanes=8 / anchors_num=start_points_num=300；两者 nms_topk=12。
 
-# ---- 验证与统计纪律 ----
+# ---- 验证与统计纪律（DECISIONS §17.3 重定义：paired bootstrap + 双门槛 + LOCO） ----
 validation:
   split: by_clip               # 按视频段 hold-out，禁止按图随机切
-  val_clips: 8                 # hold-out 段数（默认 8，区间 6–10，EDA 后按场景覆盖定，固化到 configs/splits/v1_seed42.yaml）
-  decision_thr_pp: 2.0         # 消融判定阈值：CI 下界提升须 > 2.0pp（含 J4 网格扫描采纳条件）
+  val_clips: 8                 # hold-out 段数（默认 8，区间 6–10；按多维场景标签分层，§17.2）
+  bootstrap: paired_clip       # paired 段级 bootstrap：成对重采样同一批 clip、TP/FP/FN 全局汇总后算 F1、对 ΔF1 做 paired CI（禁止每段 F1 平均 / 禁止比较独立 CI）
+  gate_effect_size_pp: 0.5     # 效应量门槛·默认（后处理/TTA 类）；退化增强与分辨率类实验取 1.0（在 exp yaml 中设定）
+  gate_ci_low_pp: 0.0          # 不确定性门槛：paired CI 下界 > 0（取代旧「CI 下界 +2.0pp」）
+  gate_loco: true              # 附加 leave-one-clip-out 敏感性（8 段样本少，bootstrap 不当绝对保证）
   noise_band_pp: 1.7           # 同批现测噪声带（±1.7pp 内视为噪声）
   seeds: [101, 202, 303]       # 多种子对比实验（ARCHITECTURE §8.2 同源）；默认训练 seed=42
   train_seed: 42               # 默认训练种子（ARCHITECTURE §8.2 同源）
+  # 随机性控制（DECISIONS §18.7）：廉价筛选固定相同 seed/初始化
+  # （paired bootstrap 只覆盖样本不确定性，不覆盖训练随机性）；
+  # 进入最终定稿的改动再按 seeds 多 seed 复核。

@@ -15,9 +15,9 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from .matching import compute_f1, compute_f1_from_masks, match_image, pair_iou
-from .rasterize import (DEFAULT_CANVAS, DEFAULT_DENSIFY_STEP, DEFAULT_LINE_TYPE,
-                        DEFAULT_LINE_WIDTH, DEFAULT_SPLINE_K, rasterize_lane,
-                        rasterize_lanes)
+from .rasterize import (DEFAULT_CANVAS, DEFAULT_DENSIFY_STEP, DEFAULT_INTERP_N,
+                        DEFAULT_LINE_TYPE, DEFAULT_LINE_WIDTH, DEFAULT_SPLINE_K,
+                        parse_lines_txt, rasterize_lane, rasterize_lanes)
 
 __all__ = [
     "compute_f1",
@@ -26,12 +26,14 @@ __all__ = [
     "pair_iou",
     "rasterize_lane",
     "rasterize_lanes",
+    "parse_lines_txt",
     "evaluate_dir",
     "DEFAULT_CANVAS",
     "DEFAULT_LINE_WIDTH",
     "DEFAULT_LINE_TYPE",
     "DEFAULT_SPLINE_K",
     "DEFAULT_DENSIFY_STEP",
+    "DEFAULT_INTERP_N",
 ]
 
 # A loader turns one file path into a list of (N,2) float lane point-arrays.
@@ -46,7 +48,8 @@ def evaluate_dir(pred_dir: str, gt_dir: str,
                  line_width: int = DEFAULT_LINE_WIDTH,
                  line_type: int = DEFAULT_LINE_TYPE,
                  spline_k: int = DEFAULT_SPLINE_K,
-                 densify_step: float = DEFAULT_DENSIFY_STEP) -> Dict[str, float]:
+                 interp_n: int = DEFAULT_INTERP_N,
+                 densify_step: float | None = None) -> Dict[str, float]:
     """Evaluate a prediction directory against a GT directory.
 
     Parameters
@@ -81,5 +84,6 @@ def evaluate_dir(pred_dir: str, gt_dir: str,
     return compute_f1(
         pred_lanes, gt_lanes,
         iou_thr=iou_thr, canvas_wh=canvas_wh, line_width=line_width,
-        line_type=line_type, spline_k=spline_k, densify_step=densify_step,
+        line_type=line_type, spline_k=spline_k, interp_n=interp_n,
+        densify_step=densify_step,
     )

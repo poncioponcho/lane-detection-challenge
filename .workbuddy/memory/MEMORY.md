@@ -14,7 +14,7 @@
 
 - **BSD grep（bash 里的 grep）对中文+`\|` 交替模式会静默返回零命中**（连纯 ASCII 子模式都不匹配），必须用内置 Grep 工具（ripgrep）做中文内容检索。
 - `software-*` 系列 subagent 调 TaskList 必崩（Tools 列表为空）；多 Agent 并行易触发 429 限流。长文档定向修订由主 Agent 直接 Edit 更稳。
-- 本地 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1，python 3.13.12）。
+- 本地 CPU 开发 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1 / pytest 9.1.1，python 3.13.12）。沙箱内复核须显式 `--basetemp=/private/tmp/<dedicated>`；2026-09-02 §24 后现测 **94 passed**。GPU 权重/模型/推理/训练实验只在 AutoDL，绝不以本地静态检查冒充。独立 Oracle 临时环境 `/private/tmp/lane-oracle-py312`（Python 3.12.13 + 官方精确 pins）；最终裁决不得使用训练环境。
 - **`.gitignore` 目录模式陷阱**：无前导斜杠的 `data/` 会匹配**任意层级**同名目录（误伤 `src/data/` 源码）；忽略根目录必须写 `/data/`（锚定）。
 
 ## 已闭环的技术事实（勿重新推导）
@@ -23,5 +23,14 @@
 - F1 恒等式 `F1=2·TP/(P+G)`；检对:抑FP 边际价值 = 2.40×；放宽阈值充要条件 = 新线匹配率 > F1/2≈41.6%（DECISIONS §9）。
 - 已拍板（DECISIONS §12 + §15.2）：报名完成（daniel1547）/ 可线下答辩 / **单人** / 预算 200 元；框架 UnLanedet；**baseline 主干 = 双路 15ep 筛选赢家（CLRNet-R50 vs ADNet-R34，CULane 预训练起步禁 from-scratch）**；ConvNeXt-T（CULane 80.21）为 9/10 升级备选。
 - 单人裁剪（§13）：砍多主干对比 / K-fold / 过采样 / 时序（不做且不问）；TTA 与复原前置降级。人工 ≈95–105h。
-- UnLanedet 权重调研（`docs/weight_scout_report.md`，2026-09-01）：同框架 CULane 复现 ConvNeXt-T 80.21 > CLRNet-R50 79.30 > CLRerNet-R34 79.20 > CLRNet-R34 78.99 > ADNet 77.88；**无 DLA-34、无 RVLD/α-SimADNet**；权重均 GitHub Releases（tag=Weights）可得；注入 = detectron2 LazyConfig `MODEL.WEIGHTS` opts；CLRNet-R34 行链接文件名带 r50 疑错位须核验；配置迁移清单见报告问题 4/5。
-- 目标滚动重估（§15.1）首次已触发：工作 82.0 / 冲刺 84.0 / 预测 ≈80.3 / 缺口 ≈3.7pp；剩余节点 9/5、9/10。J4 网格扫描防过拟合三件套（§9）。git 本地仓已建（远程备份待用户确认）。
+- UnLanedet 权重调研（`docs/weight_scout_report.md`，2026-09-02 复核）：同框架 CULane 报告水位不变；**无 DLA-34、无 RVLD/α-SimADNet**。CLRNet generic/named-r50 两资产映射矛盾，必须 AutoDL shape/load 探针裁决；真实训练权重入口是 `train.init_checkpoint`，不是残留帮助文字里的 `MODEL.WEIGHTS`。
+- 目标滚动重估（§15.1）首次已触发：工作 82.0 / 冲刺 84.0 / 预测 ≈80.3 / 缺口 ≈3.7pp；剩余节点 9/5、9/10。J4 网格扫描防过拟合三件套（§9）。
+- **git 远程已闭环**：私有仓 `poncioponcho/lane-detection-challenge`（PRIVATE），origin/main 与 main 同步，每轮 commit 后 `git push`。GitHub MCP 无建仓权限（403），走本地 `gh` + SSH。
+- **A 榜实测门槛（2026-09-01 20:01 首次自动抓取，`docs/a_bang_snapshot.md`）**：第 1 名 0.79076 / 第 2 0.78566 / 第 3 0.78422；83 队注册 / **28 队有提交**。→ 与 default.yaml 能力预测 0.803 冲突（预测中位已超当前第一）。**§15.1 二次重估待用户拍板，文档与 yaml 均未改**。每日 20:00 自动快照已建（9/14 失效）。
+- **2026-09-02 开工前置已全部闭环**：T11/T12 metric 对齐+差分、T19 manifest、T18 oracle_runner、T24 71 段场景人工标签、T23 clip-level 切分均完成。`configs/splits/v1_seed42.yaml` 固化 63 train / 8 val 段（6300/800 图），标签 SHA `0ed561e4…f948`；训练前门禁解除。
+- **真实三格式 T20/T21 已闭环（DECISIONS §21）**：JSON=`annotations.lane[]` 且标签跨目录；PNG 是 palette BGR instance 图，禁取单通道；`mean_lateral_error` 必须对 y 排序。裁决门=text↔JSON 点级精确 + PNG 10px union IoU≥0.75。全量 text↔JSON 7100/7100 全等、262 空 GT 同空、badlist 1/7100=0.0141%（底边极短二点线，保留不删）。
+- **T22 EDA/切分二次固化（DECISIONS §22）**：7100 图/24435 线，空 GT 3.690%，越界/非有限/去重塌缩均 0；330 crop 触及 16.08% 线，clip 空图率 0–56%，weather 与 illumination 完全混杂。旧 scene-only val 空 GT=0；现以逐图车道数直方图作 scene 完全同分 tie-break，scene 目标不变，新 val 空 GT=35/800。split SHA `715eb8a0…fd4ab`，后续实验禁止再改 split。
+- **T2.1/T2.2 只在 AutoDL 动态验收（DECISIONS §23）**：本地已落地 manifest-backed HardLaneDataset、CLRNet-R50/ADNet-R34 config、pinned UnLanedet patch、三权重 load/shape 探针、双模型空/非空 loss+backward/demo smoke 和 1 epoch runner；本地仅验证数据数量 train/val=6300/800、空 GT=227/35、短线保留、语法/patch/89 tests。待 AutoDL 返回真实 JSON/日志前任务保持进行中。
+- **预测提交入口（DECISIONS §24）**：`HardLaneEvaluator` 的 5 位诊断预测禁止直接交给 `pack_submit`；统一走 `prepare_submit.py`，按 manifest 精确枚举并经 `export_lines(ndigits=1)` canonicalize，再 pack→verify，labeled rehearsal 可追加 Oracle。缺失默认失败、显式才作空；多余/stale/traversal/舍入塌缩均拒绝。非 identity 契约测试结果 `TP/FP/FN=1/1/1,F1=0.5`。
+- **T40 已收口（DECISIONS §24）**：不开发自研 `engine/trainer.py/checkpoint.py`；使用 pinned UnLanedet `tools/train_net.py`、两套 LazyConfig、原生 AMP/PeriodicCheckpointer/BestCheckpointer 与 AutoDL 持久目录 `--resume`。动态证据仍等 AutoDL。
+- **非 identity 跨环境审计已闭环（DECISIONS §19，2026-09-02）**：本地 metric（cv2 5.0/scipy 1.18/numpy 2.5）vs 官方 pins 跨环境，1034 渲染用例 + 576 图整图差分逐比特/逐图零分歧（TP=1488/FP=812/FN=521/F1=0.690647，case SHA `6d3b1061…fbc96f`，复跑 `scripts/run_nonidentity_diff.py`）→ **本地诊断 metric 放行训练期扫描；成绩只认 Oracle 全局单次调用，per-clip 禁止平均**（逐图均值偏离全局 −0.99pp）。提交双防线落地：export 序列化后去重<2 拒绝 + verify 独立复核（逗号/严格 1 位小数/去重<2/边界 >1365·>719/≤64条/≤2048点/全链 smoke）；manifest image_path 四要素校验；`interp_lane` 去重已移除（数组/JSON 失败语义=Oracle）；画布常量收口 `common.types.CANVAS_W/H`。该批次 66 tests，§20 后 74，§21 后 76，§22 后当前 80；原致命 zip 已 FAIL。

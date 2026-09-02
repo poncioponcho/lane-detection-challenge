@@ -1,0 +1,1205 @@
+{
+  "schema_version": 1,
+  "annotation_scope": "71 training clips; labels are for split/diagnostics only, never test-time conditional inference",
+  "annotation_method": "Five deterministic contact-sheet frames per clip at 0/25/50/75/100%; dense second review for every initially low-confidence or singleton-feature clip",
+  "label_values": {
+    "weather": [
+      "rain",
+      "fog",
+      "snow",
+      "clear",
+      "mixed",
+      "unknown"
+    ],
+    "illumination": [
+      "normal",
+      "low_light",
+      "backlight",
+      "mixed",
+      "unknown"
+    ],
+    "artifact": [
+      "glare",
+      "shadow"
+    ],
+    "geometry": [
+      "curve",
+      "crossroad"
+    ],
+    "confidence": [
+      "high",
+      "low"
+    ]
+  },
+  "quality_control": {
+    "initial_low_confidence_clips": [
+      "v566817042_1_0_728"
+    ],
+    "rare_feature_max_holders": 5,
+    "second_reviewed_clips": [
+      "v546797496_1_0_409",
+      "v546797496_1_0_459",
+      "v546797496_1_0_596",
+      "v546797496_1_0_646",
+      "v566817042_1_0_728",
+      "v576104564_1_0_10448"
+    ],
+    "singleton_features": {
+      "weather:mixed": [
+        "v566817042_1_0_728"
+      ]
+    },
+    "rare_features": {
+      "artifact:glare": [
+        "v546797496_1_0_409",
+        "v546797496_1_0_459",
+        "v546797496_1_0_596",
+        "v546797496_1_0_646",
+        "v576104564_1_0_10448"
+      ],
+      "weather:mixed": [
+        "v566817042_1_0_728"
+      ]
+    },
+    "review_notes": {
+      "v546797496_1_0_409": "Dense review confirms intermittent emergency-light bloom in heavy fog; artifact=glare retained.",
+      "v546797496_1_0_459": "Dense review confirms intermittent emergency-light bloom in heavy fog; artifact=glare retained.",
+      "v546797496_1_0_596": "Dense review confirms strong emergency-light bloom in heavy fog; artifact=glare retained.",
+      "v546797496_1_0_646": "Dense review confirms persistent strong emergency-light bloom in heavy fog; artifact=glare retained.",
+      "v566817042_1_0_728": "Dense 11-frame review confirms persistent snow/frost accumulation beside the road together with heavy fog; final weather=mixed. Direction arrows at the approach confirm crossroad.",
+      "v576104564_1_0_10448": "Dense review confirms persistent oncoming-headlight bloom at night; artifact=glare retained."
+    },
+    "absent_positive_values": [
+      "weather:snow",
+      "weather:unknown",
+      "illumination:backlight",
+      "illumination:mixed",
+      "illumination:unknown",
+      "artifact:shadow"
+    ],
+    "completed_at": "2026-09-02"
+  },
+  "labels": {
+    "v239132710_1_0_1110": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_1831": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_2462": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_460": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_571": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_5898": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_7018": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v239132710_1_0_924": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_1109": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_1463": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_1599": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve",
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_260": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_3826": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_6551": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_6630": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v444733262_1_0_6730": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_0": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_100": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_150": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_409": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [
+        "glare"
+      ],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_459": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [
+        "glare"
+      ],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_596": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [
+        "glare"
+      ],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v546797496_1_0_646": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [
+        "glare"
+      ],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_160": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_210": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_299": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_349": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_464": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_533": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_633": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v566817042_1_0_728": {
+      "weather": "mixed",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00030",
+        "00060",
+        "00090",
+        "00120",
+        "00150",
+        "00180",
+        "00210",
+        "00240",
+        "00270",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_10051": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_10129": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_10398": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_10448": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [
+        "glare"
+      ],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_10859": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_11229": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_11555": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_11660": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve",
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_11718": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "curve",
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_15819": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_16046": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_17052": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_17161": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_17589": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v576104564_1_0_368": {
+      "weather": "clear",
+      "illumination": "low_light",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1085": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1185": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1335": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_145": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1490": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve",
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1619": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1819": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_1919": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2019": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2169": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2269": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2369": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2469": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2569": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2669": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v644768616_1_0_2769": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "curve",
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v722354306_1_0_1047": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v722354306_1_0_1156": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v722354306_1_0_830": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v722354306_1_0_997": {
+      "weather": "fog",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v777679069_1_0_1818": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v777679069_1_0_2068": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v777679069_1_0_2721": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v777679069_1_0_3948": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    },
+    "v777679069_1_0_4356": {
+      "weather": "rain",
+      "illumination": "normal",
+      "artifact": [],
+      "geometry": [
+        "crossroad"
+      ],
+      "confidence": "high",
+      "spot_frames": [
+        "00000",
+        "00075",
+        "00150",
+        "00222",
+        "00297"
+      ]
+    }
+  }
+}

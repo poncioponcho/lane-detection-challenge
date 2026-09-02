@@ -1,0 +1,195 @@
+{
+  "name": "v1_seed42",
+  "train_clips": [
+    "v239132710_1_0_1110",
+    "v239132710_1_0_2462",
+    "v239132710_1_0_460",
+    "v239132710_1_0_571",
+    "v239132710_1_0_924",
+    "v444733262_1_0_1463",
+    "v444733262_1_0_260",
+    "v444733262_1_0_3826",
+    "v444733262_1_0_6551",
+    "v444733262_1_0_6730",
+    "v546797496_1_0_0",
+    "v546797496_1_0_409",
+    "v546797496_1_0_459",
+    "v546797496_1_0_596",
+    "v566817042_1_0_160",
+    "v566817042_1_0_299",
+    "v566817042_1_0_349",
+    "v566817042_1_0_533",
+    "v566817042_1_0_633",
+    "v566817042_1_0_728",
+    "v576104564_1_0_10398",
+    "v576104564_1_0_10448",
+    "v576104564_1_0_10859",
+    "v576104564_1_0_11229",
+    "v576104564_1_0_11555",
+    "v576104564_1_0_11660",
+    "v576104564_1_0_11718",
+    "v576104564_1_0_15819",
+    "v576104564_1_0_16046",
+    "v576104564_1_0_17052",
+    "v576104564_1_0_17161",
+    "v576104564_1_0_17589",
+    "v576104564_1_0_368",
+    "v644768616_1_0_1185",
+    "v644768616_1_0_1335",
+    "v644768616_1_0_145",
+    "v644768616_1_0_1619",
+    "v644768616_1_0_1819",
+    "v644768616_1_0_1919",
+    "v644768616_1_0_2019",
+    "v239132710_1_0_1831",
+    "v444733262_1_0_1599",
+    "v644768616_1_0_2169",
+    "v644768616_1_0_2269",
+    "v644768616_1_0_2369",
+    "v644768616_1_0_2469",
+    "v644768616_1_0_2669",
+    "v722354306_1_0_1156",
+    "v722354306_1_0_830",
+    "v722354306_1_0_997",
+    "v777679069_1_0_1818",
+    "v777679069_1_0_2068",
+    "v777679069_1_0_4356",
+    "v546797496_1_0_150",
+    "v566817042_1_0_210",
+    "v566817042_1_0_464",
+    "v576104564_1_0_10051",
+    "v576104564_1_0_10129",
+    "v644768616_1_0_1490",
+    "v644768616_1_0_2569",
+    "v644768616_1_0_2769",
+    "v722354306_1_0_1047",
+    "v777679069_1_0_3948"
+  ],
+  "val_clips": [
+    "v239132710_1_0_5898",
+    "v239132710_1_0_7018",
+    "v444733262_1_0_1109",
+    "v546797496_1_0_100",
+    "v644768616_1_0_1085",
+    "v777679069_1_0_2721",
+    "v444733262_1_0_6630",
+    "v546797496_1_0_646"
+  ],
+  "seed": 42,
+  "scene_labels_path": "data/processed/scene_labels.json",
+  "audit": {
+    "objective_squared_prevalence_deviation": 0.023761406466970843,
+    "objective_max_prevalence_deviation": 0.06338028169014087,
+    "secondary_lane_hist_squared_deviation": 0.0013255858212656217,
+    "secondary_lane_hist_max_deviation": 0.026971830985915494,
+    "search_trials": 100000,
+    "singleton_protected_clips": [
+      "v566817042_1_0_728"
+    ],
+    "feature_counts": {
+      "artifact:glare": {
+        "all": 5,
+        "train": 4,
+        "val": 1,
+        "val_status": "measured"
+      },
+      "artifact:none": {
+        "all": 66,
+        "train": 59,
+        "val": 7,
+        "val_status": "measured"
+      },
+      "geometry:crossroad": {
+        "all": 36,
+        "train": 32,
+        "val": 4,
+        "val_status": "measured"
+      },
+      "geometry:curve": {
+        "all": 22,
+        "train": 20,
+        "val": 2,
+        "val_status": "measured"
+      },
+      "geometry:none": {
+        "all": 18,
+        "train": 16,
+        "val": 2,
+        "val_status": "measured"
+      },
+      "illumination:low_light": {
+        "all": 31,
+        "train": 27,
+        "val": 4,
+        "val_status": "measured"
+      },
+      "illumination:normal": {
+        "all": 40,
+        "train": 36,
+        "val": 4,
+        "val_status": "measured"
+      },
+      "weather:clear": {
+        "all": 31,
+        "train": 27,
+        "val": 4,
+        "val_status": "measured"
+      },
+      "weather:fog": {
+        "all": 18,
+        "train": 16,
+        "val": 2,
+        "val_status": "measured"
+      },
+      "weather:mixed": {
+        "all": 1,
+        "train": 1,
+        "val": 0,
+        "val_status": "N/A"
+      },
+      "weather:rain": {
+        "all": 21,
+        "train": 19,
+        "val": 2,
+        "val_status": "measured"
+      }
+    },
+    "lane_count_histograms": {
+      "all": {
+        "0": 262,
+        "1": 58,
+        "2": 524,
+        "3": 3740,
+        "4": 1281,
+        "5": 652,
+        "6": 356,
+        "7": 227
+      },
+      "train": {
+        "0": 227,
+        "1": 44,
+        "2": 466,
+        "3": 3319,
+        "4": 1139,
+        "5": 562,
+        "6": 320,
+        "7": 223
+      },
+      "val": {
+        "0": 35,
+        "1": 14,
+        "2": 58,
+        "3": 421,
+        "4": 142,
+        "5": 90,
+        "6": 36,
+        "7": 4
+      }
+    },
+    "algorithm": "seeded_random_search_plus_one_swap_v2",
+    "objective_definition": "sum of squared absolute val-vs-all prevalence deviations over non-singleton scene features; image-level lane-count histogram deviation is a lexicographic tie-breaker",
+    "scene_labels_sha256": "0ed561e42167a0fa20c3ec5c35df646d59dc5c790e7272188dafedd84c5ff948",
+    "source_manifest_sha256": "a57067e263f97abe56bd385a419c33d415b32ac93f4b3392e26ef55d511a8c59",
+    "lane_count_histograms_sha256": "d05d855adabbd89739a9750c1d2c6ea7e64b987895a0e767dedc8df5a6afed06"
+  }
+}

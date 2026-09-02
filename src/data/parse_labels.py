@@ -19,7 +19,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from common.io_utils import (read_instance_png, read_json_lanes,
+from common.io_utils import (read_instance_png, read_json_lanes, read_lane_mask,
                               read_lines_txt)
 
 
@@ -30,7 +30,28 @@ class LabelBundle:
     lines_lanes: Optional[List[np.ndarray]] = None
     json_lanes: Optional[List[np.ndarray]] = None
     png_lanes: Optional[List[np.ndarray]] = None
+    png_mask: Optional[np.ndarray] = None
     missing: List[str] = field(default_factory=list)   # formats not found
+
+
+def _competition_paths(image_path: Path) -> tuple[Path, Path, Path] | None:
+    """Resolve the official JPEGImages/anno_txt/Json/Annotations layout."""
+    parts = image_path.parts
+    try:
+        marker = parts.index("JPEGImages")
+    except ValueError:
+        return None
+    relative = Path(*parts[marker + 1:])
+    if len(relative.parts) != 2:
+        return None
+    lane_root = Path(*parts[:marker])
+    clip, image_name = relative.parts
+    stem = Path(image_name).stem
+    return (
+        lane_root / "anno_txt" / clip / f"{stem}.lines.txt",
+        lane_root / "Json" / clip / f"{image_name}.json",
+        lane_root / "Annotations" / clip / f"{stem}.png",
+    )
 
 
 def _find_sibling(base: Path, suffixes) -> Optional[Path]:
@@ -50,7 +71,7 @@ def _find_sibling(base: Path, suffixes) -> Optional[Path]:
 
 
 def parse_labels(image_path: str | Path,
-                 img_size=None) -> LabelBundle:
+                 img_size=None, *, extract_png_instances: bool = True) -> LabelBundle:
     """Load every label format that exists for one image.
 
     image_path: path to the IMAGE (e.g. .../clip_0007/00042.jpg). Label files
@@ -61,15 +82,22 @@ def parse_labels(image_path: str | Path,
         raise FileNotFoundError(image_path)
 
     bundle = LabelBundle(image_id=str(p.with_suffix("")))
-    base = p  # sibling search base = image path itself
+    official = _competition_paths(p)
+    if official is None:
+        lines_path = _find_sibling(p, (".lines.txt",))
+        json_path = _find_sibling(p, (".json",))
+        png_path = _find_sibling(p, (".png",))
+    else:
+        lines_path, json_path, png_path = official
+        lines_path = lines_path if lines_path.is_file() else None
+        json_path = json_path if json_path.is_file() else None
+        png_path = png_path if png_path.is_file() else None
 
-    lines_path = _find_sibling(base, (".lines.txt",))
     if lines_path is not None:
         bundle.lines_lanes = read_lines_txt(lines_path)
     else:
         bundle.missing.append("lines.txt")
 
-    json_path = _find_sibling(base, (".json",))
     if json_path is not None:
         try:
             bundle.json_lanes = read_json_lanes(json_path)
@@ -79,9 +107,10 @@ def parse_labels(image_path: str | Path,
     else:
         bundle.missing.append("json")
 
-    png_path = _find_sibling(base, (".png",))
     if png_path is not None and png_path != Path(image_path):
-        bundle.png_lanes = read_instance_png(png_path, img_size=img_size)
+        bundle.png_mask = read_lane_mask(png_path)
+        if extract_png_instances:
+            bundle.png_lanes = read_instance_png(png_path, img_size=img_size)
     else:
         bundle.missing.append("png")
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable, List, Union
 
 
@@ -33,16 +33,32 @@ def read_expected(path: Union[str, Path, None]) -> List[str]:
         s = raw.strip()
         if not s or s.startswith("#"):
             continue
-        s = s.lstrip("./")
         out.append(s)
     return out
 
 
 def _normalize_rel(rel: str) -> str:
-    rel = rel.strip().lstrip("./")
-    if not rel.endswith(".lines.txt"):
-        rel = rel + ".lines.txt"
-    return rel
+    """Normalize a checklist row to ``<clip>/<frame>.lines.txt`` safely."""
+    rel = rel.strip().replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
+    # Official task lists conventionally prefix image paths with one slash.
+    if rel.startswith("/JPEGImages/"):
+        rel = rel[1:]
+    path = PurePosixPath(rel)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"unsafe expected path: {rel!r}")
+    if path.parts and path.parts[0] == "JPEGImages":
+        path = PurePosixPath(*path.parts[1:])
+    if path.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+        path = path.with_suffix(".lines.txt")
+    elif not path.name.endswith(".lines.txt"):
+        path = PurePosixPath(str(path) + ".lines.txt")
+    if len(path.parts) != 2 or not path.parts[0] or path.name == ".lines.txt":
+        raise ValueError(
+            f"expected <clip>/<frame>.lines.txt or JPEGImages equivalent, got {rel!r}"
+        )
+    return path.as_posix()
 
 
 def pack_submit(pred_dir: Union[str, Path],

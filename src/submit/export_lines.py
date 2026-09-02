@@ -16,7 +16,7 @@ from typing import List, Sequence, Union
 
 import numpy as np
 
-CANVAS_W, CANVAS_H = 1366, 720
+from common.types import CANVAS_H, CANVAS_W
 
 
 def assert_valid_coords(arr: np.ndarray,
@@ -38,10 +38,23 @@ def assert_valid_coords(arr: np.ndarray,
 
 
 def lane_to_line(points, ndigits: int = 1) -> str:
-    """Serialize one lane to a .lines.txt line with full validation."""
+    """Serialize one lane and validate the *serialized* official geometry.
+
+    Distinct float coordinates can collapse after one-decimal formatting. The
+    official parser removes consecutive duplicates and rejects a lane with
+    fewer than two remaining points, so this guard must run after formatting.
+    """
     arr = np.asarray(points, dtype=np.float64).reshape(-1, 2)
     assert_valid_coords(arr)
-    return " ".join(f"{v:.{ndigits}f}" for v in arr.reshape(-1))
+    tokens = [f"{value:.{ndigits}f}" for value in arr.reshape(-1)]
+    serialized = np.asarray(tokens, dtype=np.float64).reshape(-1, 2)
+    keep = np.concatenate(([True], np.any(serialized[1:] != serialized[:-1], axis=1)))
+    if int(keep.sum()) < 2:
+        raise ValueError(
+            "lane has fewer than 2 points after serialization and "
+            "consecutive-deduplication"
+        )
+    return " ".join(tokens)
 
 
 def export_lines(lanes: Sequence, path: Union[str, Path],

@@ -3,8 +3,8 @@
 Checks (each is a hard gate; any failure -> ok=False):
   1. single top-level directory named `root` (default "submit");
   2. file set == expected set (no missing, no extra), case-sensitive paths;
-  3. per-file .lines.txt: even tokens, >=4 values, 1 decimal, no NaN/Inf,
-     absolute-pixel coords within 1366x720 (never normalized);
+  3. per-file .lines.txt: official parse/interpolate/draw smoke, <=64 lanes,
+     <=2048 points/lane, 1 decimal, no NaN/Inf, strict frame bounds;
   4. total uncompressed size < max_bytes (default 200 MB).
 
 Returns (ok: bool, report: str). Also writes the report to `report_path` if
@@ -13,13 +13,21 @@ given (ARCHITECTURE §3: outputs/reports/verify_<ts>.md).
 from __future__ import annotations
 
 import zipfile
+import re
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 
-CANVAS_W, CANVAS_H = 1366, 720
+from common.types import CANVAS_H, CANVAS_W
+from eval.rasterize import (interp_lane, rasterize_interpolated,
+                            remove_consecutive_duplicates)
+from submit.pack_submit import _normalize_rel
+
 MAX_BYTES = 200 * 1024 * 1024
+MAX_LANES_PER_IMAGE = 64
+MAX_POINTS_PER_LANE = 2048
+_ONE_DECIMAL = re.compile(r"^-?\d+\.\d$")
 
 
 def validate_line(s: str) -> Optional[str]:
@@ -27,7 +35,7 @@ def validate_line(s: str) -> Optional[str]:
     s = s.strip()
     if not s:
         return None                          # empty line = no lane, allowed
-    tokens = s.replace(",", " ").split()
+    tokens = s.split()
     if len(tokens) % 2 != 0:
         return f"odd token count {len(tokens)}"
     if len(tokens) < 4:
@@ -38,13 +46,27 @@ def validate_line(s: str) -> Optional[str]:
         return "non-numeric token"
     if not np.isfinite(vals).all():
         return "NaN/Inf"
-    if any(abs(v - round(v, 1)) > 1e-6 for v in vals):
+    if any(_ONE_DECIMAL.fullmatch(token) is None for token in tokens):
         return "not 1-decimal"
+    points = vals.reshape(-1, 2)
+    if len(points) > MAX_POINTS_PER_LANE:
+        return f"too many points {len(points)} > {MAX_POINTS_PER_LANE}"
+    cleaned = remove_consecutive_duplicates(points)
+    if len(cleaned) < 2:
+        return "fewer than 2 points after consecutive-deduplication"
     x, y = vals[0::2], vals[1::2]
-    if x.min() < 0 or x.max() > CANVAS_W or y.min() < 0 or y.max() > CANVAS_H:
+    if (x.min() < 0 or x.max() > CANVAS_W - 1 or
+            y.min() < 0 or y.max() > CANVAS_H - 1):
         return f"out of bounds x[{x.min():.1f},{x.max():.1f}] y[{y.min():.1f},{y.max():.1f}]"
     if float(vals.max()) < 2.0:
         return "coords look normalized (all < 2px)"
+    try:
+        # Full-chain smoke on the exact serialized coordinates. This mirrors
+        # official parse -> interp_lane -> draw_lane_mask failure semantics.
+        dense = interp_lane(np.asarray(cleaned, dtype=np.float64))
+        rasterize_interpolated(dense)
+    except Exception as exc:
+        return f"official geometry smoke failed: {type(exc).__name__}: {exc}"
     return None
 
 
@@ -55,7 +77,7 @@ def verify_submit(zip_path: Union[str, Path],
                   report_path: Optional[Union[str, Path]] = None,
                   ) -> Tuple[bool, str]:
     zip_path = Path(zip_path)
-    expected = sorted({r.strip().lstrip("./") for r in expected if r.strip()})
+    expected = sorted({_normalize_rel(r) for r in expected if r.strip()})
     errors: List[str] = []
     seen: List[str] = []
 
@@ -93,6 +115,11 @@ def verify_submit(zip_path: Union[str, Path],
                 errors.append(f"unexpected non-lines.txt entry: {n}")
                 continue
             text = data.decode("utf-8", errors="replace")
+            nonempty_lines = sum(bool(line.strip()) for line in text.splitlines())
+            if nonempty_lines > MAX_LANES_PER_IMAGE:
+                errors.append(
+                    f"{rel}: too many lanes {nonempty_lines} > {MAX_LANES_PER_IMAGE}"
+                )
             for i, line in enumerate(text.splitlines(), 1):
                 err = validate_line(line)
                 if err:

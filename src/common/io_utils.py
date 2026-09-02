@@ -126,6 +126,12 @@ def parse_json_lanes(obj) -> List[np.ndarray]:
     else:
         raise ValueError(f"unsupported label root type {type(obj).__name__}")
 
+    # Competition schema: {"annotations": {"lane": [{"points": ...}, ...]}}
+    if isinstance(container, dict) and "lane" in container:
+        container = container["lane"]
+    if not isinstance(container, list):
+        raise ValueError(f"lane container must be a list, got {type(container).__name__}")
+
     lanes = []
     for item in container:
         if isinstance(item, dict) and "points" in item:
@@ -186,8 +192,14 @@ def read_instance_png(path: str | Path, img_size=None,
     mask = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if mask is None:
         raise IOError(f"cannot read instance png: {path}")
-    if mask.ndim == 3:                       # tolerate accidentally-saved RGB
-        mask = mask[..., 0]
+    if mask.ndim == 3:
+        # Official PNGs are palette images expanded by OpenCV to BGR. Lane
+        # instances are distinct non-black colors; selecting channel 0 loses
+        # red/green-only instances and can silently return zero lanes.
+        if mask.shape[2] < 3:
+            raise ValueError(f"unsupported instance png channels: {path}")
+        bgr = mask[..., :3].astype(np.uint32)
+        mask = bgr[..., 0] | (bgr[..., 1] << 8) | (bgr[..., 2] << 16)
     if mask.ndim != 2:
         raise ValueError(f"instance png must be single channel: {path}")
 
@@ -210,3 +222,15 @@ def read_instance_png(path: str | Path, img_size=None,
     # deterministic order: left-to-right by mean x
     lanes.sort(key=lambda l: float(l[:, 0].mean()))
     return lanes
+
+
+def read_lane_mask(path: str | Path) -> np.ndarray:
+    """Read a palette/grayscale annotation PNG as a boolean lane-union mask."""
+    mask = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if mask is None:
+        raise IOError(f"cannot read lane mask: {path}")
+    if mask.ndim == 2:
+        return mask != 0
+    if mask.ndim == 3:
+        return np.any(mask != 0, axis=2)
+    raise ValueError(f"lane mask must be 2D or color: {path}")

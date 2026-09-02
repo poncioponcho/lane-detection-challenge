@@ -1,9 +1,9 @@
 """Lane matching and the F1 aggregate.
 
-Per-image pipeline:
+Per-image pipeline (aligned with the frozen official Oracle):
   1. rasterize every predicted and ground-truth lane to a binary mask,
   2. build the P x G IoU matrix,
-  3. one-to-one assign via the Hungarian algorithm (maximizing total IoU),
+  3. one-to-one assign with cost ``1 - IoU`` (maximizing total IoU),
   4. a pair is a True Positive iff its IoU > `iou_thr` (default 0.5).
 
 Global metric (verified identity, see DECISIONS.md §9):
@@ -17,7 +17,8 @@ from typing import Dict, List, Tuple
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from .rasterize import rasterize_lanes
+from .rasterize import (DEFAULT_CANVAS, DEFAULT_INTERP_N, DEFAULT_LINE_TYPE,
+                        DEFAULT_LINE_WIDTH, DEFAULT_SPLINE_K, rasterize_lanes)
 
 
 def pair_iou(pred_points, gt_points, **raster_kwargs) -> float:
@@ -52,13 +53,10 @@ def match_image(pred_masks: List[np.ndarray], gt_masks: List[np.ndarray],
     if P == 0 or G == 0:
         return 0, P, G
     iou = iou_matrix(pred_masks, gt_masks)
-    valid = iou > iou_thr
-    if not valid.any():
-        return 0, P, G
-    # Finite large cost for invalid pairs so the optimizer avoids them.
-    cost = np.where(valid, -iou, 1e6)
-    row, col = linear_sum_assignment(cost)
-    tp = sum(1 for r, c in zip(row, col) if iou[r, c] > iou_thr)
+    # The Oracle maximizes total IoU first, including below-threshold pairs,
+    # and applies the TP threshold only after assignment.
+    row, col = linear_sum_assignment(1.0 - iou)
+    tp = int((iou[row, col] > iou_thr).sum())
     return tp, P, G
 
 
@@ -67,36 +65,46 @@ def compute_f1_from_masks(pred_masks_by_img: Dict[str, List[np.ndarray]],
                           iou_thr: float = 0.5) -> Dict[str, float]:
     """Aggregate F1 from pre-rasterized masks keyed by image_id."""
     TP = P = G = 0
-    for img_id in pred_masks_by_img:
-        pred_m = pred_masks_by_img[img_id]
-        gt_m = gt_masks_by_img.get(img_id, [])
+    # Official evaluation is list/GT driven: a missing prediction is empty,
+    # while an extra prediction file not present in the task list is ignored.
+    for img_id, gt_m in gt_masks_by_img.items():
+        pred_m = pred_masks_by_img.get(img_id, [])
         tp, p, g = match_image(pred_m, gt_m, iou_thr=iou_thr)
         TP += tp
         P += p
         G += g
     f1 = (2.0 * TP / (P + G)) if (P + G) > 0 else 0.0
-    return {"F1": f1, "TP": int(TP), "P": int(P), "G": int(G)}
+    return {
+        "F1": f1,
+        "TP": int(TP),
+        "FP": int(P - TP),
+        "FN": int(G - TP),
+        "P": int(P),
+        "G": int(G),
+    }
 
 
 def compute_f1(pred_lanes: Dict[str, List[np.ndarray]],
                gt_lanes: Dict[str, List[np.ndarray]],
                iou_thr: float = 0.5,
-               canvas_wh: tuple = (1366, 720),
-               line_width: int = 30,
-               line_type: int = 8,
-               spline_k: int = 3,
-               densify_step: float = 5.0) -> Dict[str, float]:
+               canvas_wh: tuple = DEFAULT_CANVAS,
+               line_width: int = DEFAULT_LINE_WIDTH,
+               line_type: int = DEFAULT_LINE_TYPE,
+               spline_k: int = DEFAULT_SPLINE_K,
+               interp_n: int = DEFAULT_INTERP_N,
+               densify_step: float | None = None) -> Dict[str, float]:
     """Full metric from in-memory lane point-lists.
 
     `pred_lanes` / `gt_lanes`: dict image_id -> list of (N,2) float point arrays.
 
-    All rasterization parameters are exposed so the A-board can be used to
-    inverse-calibrate any deviation from the official implementation (see
-    DECISIONS.md §9.1 Q-A3).
+    Final decisions still use the frozen Oracle. ``densify_step`` survives
+    only as a compatibility alias for the official integer ``interp_n``.
     """
     raster_kwargs = dict(canvas_wh=canvas_wh, line_width=line_width,
                          line_type=line_type, spline_k=spline_k,
-                         densify_step=densify_step)
+                         interp_n=interp_n)
+    if densify_step is not None:
+        raster_kwargs["densify_step"] = densify_step
     pred_masks = {k: rasterize_lanes(v, **raster_kwargs) for k, v in pred_lanes.items()}
     gt_masks = {k: rasterize_lanes(v, **raster_kwargs) for k, v in gt_lanes.items()}
     return compute_f1_from_masks(pred_masks, gt_masks, iou_thr=iou_thr)
