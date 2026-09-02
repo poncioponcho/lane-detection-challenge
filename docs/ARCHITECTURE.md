@@ -1372,7 +1372,7 @@ def seed_everything(seed: int = 42, deterministic: bool = True) -> None:
 # src/common/paths.py
 ENV_KAGGLE   = Path("/kaggle/working")      # session 结束清空 → 必须同步到 /kaggle/input 或 Dataset
 ENV_KAGGLE_IN= Path("/kaggle/input")        # 只读，挂载数据
-ENV_AUTODL   = Path("/root/autodl-tmp")     # AutoDL 数据盘，持久
+ENV_CLOUD    = Path("/hy-tmp")              # GPU 云数据盘（恒源云=/hy-tmp，AutoDL=/root/autodl-tmp），持久；运行时以 HARDLANE_* 环境变量为准
 ENV_LOCAL    = Path(__file__).resolve().parents[2]   # 项目根
 
 DATA_ROOT   # data/

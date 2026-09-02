@@ -4,14 +4,16 @@
 
 ## 1. 路径与环境
 
-选用带可用 PyTorch/CUDA 的 AutoDL 镜像，并按实际挂载位置填写绝对路径：
+选用带可用 PyTorch/CUDA 的 GPU 云镜像，把下方 `DATA_DISK` 换成实例实际数据盘挂载点
+（恒源云通常为 `/hy-tmp`，AutoDL 为 `/root/autodl-tmp`），再填写绝对路径：
 
 ```bash
-export HARDLANE_PROJECT_ROOT=/root/autodl-tmp/lane-detection-challenge
-export HARDLANE_DATA_ROOT=/root/autodl-tmp/datasets/HardLane/Lane
-export UNLANEDET_ROOT=/root/autodl-tmp/UnLanedet
-export HARDLANE_WEIGHTS_ROOT=/root/autodl-tmp/weights/unlanedet
-export HARDLANE_OUTPUT_ROOT=/root/autodl-tmp/lane-outputs
+export DATA_DISK=/hy-tmp   # ← 换成恒源云实例数据盘挂载点（df -h 查看）
+export HARDLANE_PROJECT_ROOT=$DATA_DISK/lane-detection-challenge
+export HARDLANE_DATA_ROOT=$DATA_DISK/datasets/HardLane/Lane
+export UNLANEDET_ROOT=$DATA_DISK/UnLanedet
+export HARDLANE_WEIGHTS_ROOT=$DATA_DISK/weights/unlanedet
+export HARDLANE_OUTPUT_ROOT=$DATA_DISK/lane-outputs
 export HARDLANE_PYTHON=python
 ```
 
