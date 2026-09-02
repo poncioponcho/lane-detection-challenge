@@ -84,7 +84,7 @@ if ! "$PYTHON_BIN" -c '
 import sys
 import torch
 import torchvision
-assert sys.version_info[:2] == (3, 10), f"expected Python 3.10, got {sys.version}"
+assert sys.version_info[:2] in {(3, 8), (3, 9), (3, 10), (3, 11)}, f"expected Python 3.8/3.9/3.10/3.11, got {sys.version}"
 assert torch.__version__.startswith("2.1.2"), f"expected torch 2.1.2, got {torch.__version__}"
 assert torchvision.__version__.startswith("0.16.2"), f"expected torchvision 0.16.2, got {torchvision.__version__}"
 assert torch.version.cuda == "11.8", f"expected torch CUDA 11.8, got {torch.version.cuda}"
