@@ -2,10 +2,10 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.8（单人版 + §24 预测提交链/T40 收口）** |
+| 文档版本 | **v2.9（单人版 + §25 AutoDL 可恢复流水线）** |
 | 状态 | **active**（执行跟踪唯一入口；进度以本文勾选列为准） |
-| 版本链 | v1 → … → v2.7（§23 AutoDL/UnLanedet 执行面）→ **v2.8**（§24 预测提交链/T40 收口） |
-| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§24｜ `docs/ARCHITECTURE.md` v2.0 §6.5（单人关键路径） |
+| 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ **v2.9**（§25 全种子/历史最优回放/交接包） |
+| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§25｜ `docs/ARCHITECTURE.md` v2.1 §6.5（单人关键路径） |
 | 常量取值 | 目标 **82.0（工作）/ 84.0（冲刺）** / 预算 200 元 / 单人，一律以 `configs/default.yaml`（v4）为准，本文只引用（§15.1 重估后） |
 | 更新日期 | 2026-09-02（周三）｜距 A 榜截止 12 天｜距 B 榜截止 15 天 |
 
@@ -59,7 +59,7 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T1.1 | **metric 对齐官方实现（DECISIONS §17.1）**：本地诊断层已逐字义对齐——匈牙利 `cost=1−iou`、参数均匀稠密化 `(N−1)*5+1` + 逐段 `cv2.line`、float64 输入、异常即抛（禁线性回退）；官方 score.py 冻结为 Oracle（`src/eval/official_oracle/`，SHA-256 `b2f4c9b2…2de0d2`） | T1.2 差分套件全绿；本地 metric 仅作诊断/扫描，最终裁决仍一律走 Oracle | P0 | ✅ 9/2 |
-| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **94 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
+| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **106 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
 | ✅ | T1.3 | 预测交付唯一入口 `prepare_submit.py`：任意精度 raw → 一位小数 canonical → pack → verify → labeled 时可选 Oracle；精确文件集/安全路径/资源上限/严格边界/序列化后去重/全链几何 smoke | 5 位预测确实被重写为 1 位；舍入塌缩、缺失、多余、canonical 陈旧文件、traversal 均拒绝；非 identity 全链 Oracle=`TP/FP/FN=1/1/1,F1=0.5`；真实 train/testA 旧 smoke 保持 PASS（DECISIONS §24） | P0 | ✅ 9/2 |
 | ✅ | T1.4 | 按视频段 hold-out 切分本地验证集（8 段）：scene 二元特征为主目标、逐图车道条数直方图为同分 tie-break；seed=42 下 100,000 候选 + 单交换；`weather:mixed` 强制留 train | `src/data/split_by_clip.py` + 10 项测试；`configs/splits/v1_seed42.yaml` 固化 63/8 段、6300/800 图、段 ID 零交集；scene 最大偏差仍 0.06338，val 空 GT 35 张（4.375%），标签/manifest/条数直方图 SHA-256 入配置 | P0 | ✅ 9/2 |
 | ⬜ | T1.5 | A 榜首提（只烧 1 次额度验链路） | 平台返回有效分数，与本地 val 差值入台账 | P1 | 9/5 |
@@ -72,7 +72,7 @@
 |---|---|---|---|---|---|
 | ✅ | T2.0 | 三格式解析 + 一致性校验（ARCHITECTURE T20/T21）：支持真实 `annotations.lane[]`、跨目录布局、palette instance PNG、多方向点序；lossless text↔JSON 精确比对 + PNG 10px union IoU 门 | 7100/7100 text↔JSON 点数组全等（24435 线）；262 空 GT 三格式同空；PNG union IoU min/P1/median=0.7282/0.8860/0.9117；badlist 1/7100=0.0141% <0.1%，极短二点线保留不删；`tests/test_parse_labels.py` 8 项，审计 `docs/label_consistency_audit_20260902.md` | P0 | ✅ 9/2 |
 | 🔵 | T2.1 | **AutoDL 专用** UnLanedet 落地 + 三 checkpoint shape/load 探针：固定 commit `0392184…4c`，同时核验 CLRNet 两个疑似错位文件与 ADNet-R34；本地禁下载/加载大权重 | 本地已备 setup/probe/config 执行面；待 AutoDL 输出两主干 compatible/missing/unexpected/shape-mismatch、实际 R50 文件名、adapted checkpoint SHA 与 demo 可视化后完成 | P0 | 9/3 |
-| 🔵 | T2.2 | manifest 驱动 `HardLaneDataset` + 双套 config（1366×720；palette 原始索引；保留空图和 2/3 点线；稳定连续去重）；T40 已收口为 pinned `tools/train_net.py` + 原生 AMP/checkpointer/`--resume`，权重只经 `train.init_checkpoint` 注入；CLRNet decode `top_k` 解耦为 `test_parameters.nms_topk` | 本地已完成 CPU 契约/配置/脚本静态测试；待 **AutoDL** 跑通 CLRNet/ADNet 各空/非空 batch forward+loss+backward、demo、预处理 overlay、1 epoch train+val，并验证持久目录 `last_checkpoint` 续跑。字段映射固定：CLRNet target=8/classes=9/priors=192/candidate=12；ADNet target=8/anchors=300/candidate=12；最终输出仍扫 {7,8,10,12} | P0 | 9/3 白天 |
+| 🔵 | T2.2 | manifest 驱动 `HardLaneDataset` + 双套 config（1366×720；palette 原始索引；保留空图和 2/3 点线；稳定连续去重）；T40 已收口为 pinned `tools/train_net.py` + 原生 AMP/checkpointer/`--resume`，权重只经 `train.init_checkpoint` 注入；CLRNet decode `top_k` 解耦为 `test_parameters.nms_topk` | 本地 106 tests 已完成 CPU 契约/配置/编排验证；`run_pipeline.sh gate` 待 **AutoDL** 跑通双模型空/非空 loss+backward、demo、1ep+val、525→526 resume 和历史最优回放。全局 seed=42，周期 checkpoint 保留 40 个，禁止跨 commit 续跑。字段映射：CLRNet target=8/classes=9/priors=192/candidate=12；ADNet target=8/anchors=300/candidate=12 | P0 | 9/3 白天 |
 | ⬜ | T2.3 | baseline：**双路 15ep 廉价筛选（CLRNet-R50 vs ADNet-R34，CULane 权重 fine-tune）→ 赢家 36ep**（DECISIONS §15.2；筛选兼任管线 shakedown；AutoDL 4090 各 ≈6h + 36ep ≈13h；判定：\|ΔF1\|<1.5pp 取 CLRNet-R50） | **9/5 出分（M2）**：val F1@0.5 首个数据点（入门线 0.75）+ 主干裁决入台账 → **立即触发 §15.1 重估**；⚠️ fine-tune 预案（DECISIONS §16.3）：若出现过拟合形态（train 降 / val 降），第一调节项 = LR 降档（1/5–1/10）+ 缩短 schedule，排除后再查 bug；**随机性控制（§18.7）：双路筛选固定相同 seed/初始化（paired bootstrap 只覆盖样本不确定性，不覆盖训练随机性），进入最终定稿的改动再按 {101,202,303} 多 seed 复核** | P0 | 9/3 晚–9/5 |
 | ❌ | T2.4 | ~~多主干横向对比（ADNet/CondLaneNet/UFLD/RESA）~~ | **已砍**（DECISIONS §13：20h 人工超单人容量；α-SimADNet/RVLD 原版接入分支已于 9/1 晚关闭——UnLanedet 未收录两者；主干由 T2.3 双路筛选定，见 DECISIONS §15.2） | ~~P1~~ | — |
 | ✅ | T2.5 | **多维场景标签人工标注（§17.2/§18.4）**：71 段 × weather / illumination / artifact / geometry + confidence + 真实抽查帧号；每段 5 帧接触表，low-confidence 与稀有特征（持有段≤5）全部二审 | `data/processed/scene_labels.json`（已从 `/data/` 忽略规则中单独放行）；6 个稀有持有段完成密集二审；分布 clear/fog/mixed/rain=31/18/1/21，low-light/normal=31/40；唯一 mixed 段确认雾+积雪并留 train；审计见 `docs/scene_split_audit_20260902.md` | P0 | ✅ 9/2 |
@@ -159,7 +159,7 @@
 
 - **预算**：200 元（已拍板）。GPU 实验事实环境为 AutoDL；租用时长以首个 1 epoch 实测吞吐重算，旧 Kaggle 免费额度测算不再作为当前执行计划。
 - **本地机**：Mac M4 / 24GB / 磁盘 81GB——只做 CPU 数据契约、评测、后处理、预测格式归一化与打包；不加载大权重、不做模型推理/训练。
-- **AutoDL 纪律**：输出只写持久目录；每 epoch 原生 checkpoint + eval；租期结束/关机前核对 `last_checkpoint`、`model_best.pth`、日志和预测已落盘。模型动态证据不得用本地 CPU 结果替代。
+- **AutoDL 纪律**：输出只写持久目录；每 epoch checkpoint + eval；不单信 `model_best.pth`，只认历史 best iteration 对应 checkpoint 的独立回放证据。租期结束/关机前下载 `handoff_baseline.tar.gz` 及 SHA 报告。模型动态证据不得用本地 CPU 结果替代。
 - **依赖锁定**：`pip freeze` 存档（TOP3 复现要求）；本地 venv：`envs/lane`（numpy 2.5.2 / opencv 5.0.0 / scipy 1.18.1）。
 
 ---

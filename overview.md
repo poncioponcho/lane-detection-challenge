@@ -1,8 +1,8 @@
 # 恶劣场景下的车道线检测挑战赛 · 方案与架构总览
 
-> 生成：2026-09-01｜更新：2026-09-02（§24 预测提交链/T40 收口）｜ 目标：**B 榜 F1 进前三**（讯飞 AI 开发者大赛，中国矿业大学赛道）
-> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§24）与 `configs/default.yaml` 为准）
-> 文档族：`TASKS.md`（v2.8 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.0 active）
+> 生成：2026-09-01｜更新：2026-09-02（§25 AutoDL 可恢复流水线）｜ 目标：**B 榜 F1 进前三**（讯飞 AI 开发者大赛，中国矿业大学赛道）
+> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§25）与 `configs/default.yaml` 为准）
+> 文档族：`TASKS.md`（v2.9 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.1 active）
 
 ---
 
@@ -76,7 +76,7 @@ L6 治理层   DECISIONS 仲裁 + 文档状态管理（2026-09-01 §14 立制）
 
 **三条主链路**：训练 → 推理 → 提交，各有时序图；B 榜全流程目标 ≤90 分钟（硬上限 6h）。
 
-**执行边界**：GPU 权重加载、模型推理、forward/loss/backward 与训练统一在 AutoDL；本地只做 CPU 数据契约、Oracle、后处理、预测一位小数归一化、打包与校验。训练用 pinned UnLanedet `tools/train_net.py` + 原生 checkpointer/`--resume`，输出写 AutoDL 持久目录（DECISIONS §23–§24）。
+**执行边界**：GPU 权重加载、模型推理、forward/loss/backward 与训练统一在 AutoDL；本地只做 CPU 数据契约、Oracle、后处理、预测一位小数归一化、打包与校验。AutoDL 用 `run_pipeline.sh` 分 gate/screen/baseline 可恢复执行；历史最优必须经 checkpoint iteration 核对和独立回放，不单信 resume 后的 `model_best.pth`（DECISIONS §23–§25）。
 
 ---
 

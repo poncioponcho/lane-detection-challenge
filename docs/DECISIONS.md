@@ -753,3 +753,29 @@ lossless 的 `.lines.txt`↔JSON 做 lane/点逐元素精确比对；PNG 属有�
 **裁决**：ARCHITECTURE 中旧 `engine/trainer.py + engine/checkpoint.py + Kaggle Dataset 同步 + EMA` 是未落地的过时规格。实际训练固定为 pinned UnLanedet `tools/train_net.py`，由两套 LazyConfig 配置 `train.init_checkpoint / output_dir / max_iter / amp / checkpointer / eval_period`，直接使用上游 `AMPTrainer`、`PeriodicCheckpointer` 与 `BestCheckpointer`。checkpoint 落到 `HARDLANE_OUTPUT_ROOT` 指向的 AutoDL 持久目录，以原生 `--resume` / `last_checkpoint` 续跑。
 
 本地仍只验 CPU 契约与静态执行面；上述 checkpoint、resume、forward/loss/backward 与 1 epoch 的完成证据必须来自 AutoDL，不得用本地结果替代。
+
+---
+
+## 二十五、AutoDL 全种子、历史最优权重与可恢复流水线裁决（2026-09-02）
+
+### 25.1 只设 dataloader seed 不构成训练可复现
+
+Pinned UnLanedet `default_setup()` 从 `train.seed` 设置全局 RNG；缺省时传入随机 seed，会污染重新初始化的 HardLane head 与随机增强。两套 config 及训练 runner 必须同时锁定 `train.seed=42` 和 `train.cudnn_benchmark=False`；这是双路 15ep 筛选可比的必要条件。
+
+### 25.2 `model_best.pth` 在跨进程 resume 后不可信
+
+Pinned 上游 `BestCheckpointer` 的 `best_metric/best_iter` 是 hook 内存状态，不进入 checkpoint。进程重启后它忘记历史 best，下一次 eval 可用更差权重覆盖 `model_best.pth`。
+
+**裁决**：
+
+- 每 epoch 保留周期 checkpoint，`max_to_keep=40` 覆盖完整 36ep baseline；
+- `validate_run.py` 从完整 `metrics.json` 取历史 best metric iteration；上游 final eval 在 `after_train` 中以 N 记指标，实际对应 checkpoint iteration N−1，其余中间 eval 同号。必须根据 `launches.jsonl` 边界映射后再读 checkpoint 内部 iteration，不信文件名；
+- `evaluate_selected.py` 对选中权重独立 eval-only，800 文件集与 F1 必须重现；
+- `select_screen_winner.py` 将上述回放证据及 SHA 作为筛选硬门；
+- 36ep 赢家必须从 adapted CULane 权重 fresh 启动新 cosine schedule，不得续接已耗尽的 15ep schedule。
+
+### 25.3 可恢复与交接边界
+
+`run_pipeline.sh {gate|screen|baseline}` 是 AutoDL 编排入口：已通过阶段可跳过，有 `last_checkpoint` 则同 commit 续跑，非空无 checkpoint 目录拒绝覆盖。若权重已到 max_iter 但 final eval 未落盘，用最后 checkpoint 做真实 eval-only 恢复并显式标记，禁止用旧 diagnostic 冒充 final。训练前必须无 tracked-file 改动，probe/smoke/run/replay 证据均绑定 project HEAD 与 adapted checkpoint SHA，同一 run 禁止跨 commit 续跑。每阶段自动生成带逐文件 SHA 清单的 handoff tar；baseline 包必须含真实历史最优 checkpoint，关机前下载 tar 及其 SHA 报告。
+
+本地动态验收：全套 **106 passed**。该数字仅证明 CPU 契约/编排逻辑；AutoDL CUDA 门状态仍为未执行。

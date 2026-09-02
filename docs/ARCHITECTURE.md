@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.0** |
+| 文档版本 | **v2.1** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v1.9（§23 AutoDL/UnLanedet 执行面）→ **v2.0**（§24 预测提交链 + 原生训练执行面收口） |
+| 版本链 | v1.0 → … → v2.0（§24 预测提交链）→ **v2.1**（§25 AutoDL 全种子 + 历史最优回放 + 交接包） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.0 传导 §18–§24） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -23,6 +23,7 @@
 > **v1.8 变更记录**（2026-09-02，DECISIONS §22）：① T22 全量 EDA 落地 `eda.py`/结构化报告/8 类固定 overlay；② 量化 330 crop 触及 16.08% 线、clip 空图率 0–56%、weather/illumination 完全混杂；③ 修复 scene-only 同分候选令 val 空 GT=0 的漏洞，以车道条数直方图作次级 tie-break，scene 主目标逐位不变，新 val 空 GT=35/800；④ split 二次固化，当前测试 80。
 > **v1.9 变更记录**（2026-09-02，DECISIONS §23）：① GPU 模型验收环境明确为 AutoDL，本地仅做 CPU 契约/静态验证；② manifest-backed `HardLaneDataset` 保留空图、2/3 点线与 palette 索引；③ 两套 LazyConfig 与 pinned UnLanedet patch 落地，CLRNet GT 容量和候选 top-k 解耦；④ 权重入口修正为 `train.init_checkpoint`；⑤ 三权重 shape/load、双模型空/非空 loss+backward、demo 与 1 epoch 均以 AutoDL 证据为完成门。
 > **v2.0 变更记录**（2026-09-02，DECISIONS §24）：① 增加 `prepare_submit.py`，将 evaluator 的任意精度原始预测统一经一位小数导出器重写后才允许打包；② 以非 identity 合成预测贯通 canonicalize→pack→verify→Oracle；③ T40 从未实现的自研 trainer/checkpoint 方案收口为 pinned UnLanedet `tools/train_net.py` + LazyConfig + 原生 AMP/PeriodicCheckpointer/BestCheckpointer，训练与续跑动态验收只在 AutoDL。
+> **v2.1 变更记录**（2026-09-02，DECISIONS §25）：① 两套 config 显式锁定全局 seed=42/cudnn benchmark off；② 不再盲信 resume 后的 `model_best.pth`，保留 40 个周期权重并以 metrics 历史 best iteration + checkpoint 内部 iteration + eval-only 回放三重裁决；③ `run_pipeline.sh` 编排 gate/screen/baseline 可恢复执行，并生成带 SHA 的关机交接包。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1 双轨滚动机制；当前工作目标 82.0、冲刺线 84.0，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
@@ -968,7 +969,7 @@ sequenceDiagram
     loop 每个 epoch（525 iter）
         TR->>DS: next batch（含空 GT 与 2/3 点短线）
         TR->>TR: forward + loss + AMP backward
-        CK->>DISK: PeriodicCheckpointer 存盘（最多保留 3 个）
+        CK->>DISK: PeriodicCheckpointer 存盘（最多保留 40 个）
         TN->>EV: val 推理 + diagnostic_metric.json
         EV-->>CK: val metric
         CK->>DISK: BestCheckpointer 更新 model_best.pth
@@ -982,7 +983,8 @@ sequenceDiagram
 | 点 | 设计 |
 |---|---|
 | GPU 执行边界 | 权重加载、forward/loss/backward、demo 与训练只在 AutoDL；本地不作为模型验收环境 |
-| 断点续训 | 原生 `BestCheckPointer.resume_or_load(..., resume=True)` + AutoDL 持久 `train.output_dir`；续跑前核对 `last_checkpoint` |
+| 断点续训 | 原生 `BestCheckPointer.resume_or_load(..., resume=True)` + AutoDL 持久 `train.output_dir`；只允许同 project commit 续跑，非空无 `last_checkpoint` 目录拒绝覆盖 |
+| 历史最优 | 上游 best hook 不持久化历史；以 `metrics.json` best iteration → checkpoint 内部 iteration → eval-only 回放裁决，禁止单信 `model_best.pth` |
 | 每 epoch 存盘/验证 | LazyConfig 中 `train.checkpointer.period=train.eval_period=525`，由原生 hooks 执行 |
 | 预训练入口 | 只使用 `train.init_checkpoint` 指向 shape 探针产出的 adapted checkpoint |
 | 路径 | AutoDL 路径只读 `HARDLANE_*` / `UNLANEDET_ROOT` 环境变量，禁止硬编码实例路径 |
@@ -1227,7 +1229,7 @@ T00 → T01 → T30 ────────────────────
 
 **单人版关键路径（保留项，按时间序）**
 
-> ✅ **数据/评测/提交开工前置已闭环（DECISIONS §17–§24）**：T17 Oracle 冻结 + 哈希守护 → T11/T12 metric 对齐 + 差分（当前 94 tests；1034 渲染/576 图非 identity）→ T19 manifest → T18 oracle_runner → T20/T21 真实三格式全量（1/7100 badlist）→ T22 EDA → T24 71 段多维标签 → T23 63/8 按段切分 → raw 预测一位小数 canonical 提交链。T31/T40 本地实现门解除，AutoDL 动态验收门仍开（§23–§24）。
+> ✅ **数据/评测/提交开工前置已闭环（DECISIONS §17–§25）**：T17 Oracle 冻结 + 哈希守护 → T11/T12 metric 对齐 + 差分（当前 106 tests；1034 渲染/576 图非 identity）→ T19 manifest → T18 oracle_runner → T20/T21 真实三格式全量（1/7100 badlist）→ T22 EDA → T24 71 段多维标签 → T23 63/8 按段切分 → raw 预测一位小数 canonical 提交链。T31/T40 本地实现门解除，历史最优回放与交接门已固化，AutoDL CUDA 动态验收门仍开（§23–§25）。
 
 ```
 T00 骨架(9/1) → T10 基础设施 → T17 Oracle冻结+哈希守护(✅) → T11 metric对齐(✅ 9/2) → T12 差分套件(✅ 9/2)

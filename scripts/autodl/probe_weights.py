@@ -322,6 +322,7 @@ def main() -> None:
         "status": "pass",
         "execution_environment": "AutoDL CUDA",
         "pinned_unlanedet_commit": PINNED_UNLANEDET_COMMIT,
+        "project_git_head": git_head(project_root),
         "unlanedet_head": git_head(unlanedet_root),
         "python": sys.version,
         "platform": platform.platform(),

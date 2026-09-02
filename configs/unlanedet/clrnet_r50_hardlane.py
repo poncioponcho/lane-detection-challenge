@@ -209,9 +209,11 @@ train = OmegaConf.create(
             "find_unused_parameters": False,
             "fp16_compression": False,
         },
-        "checkpointer": {"period": iterations_per_epoch, "max_to_keep": 3},
+        "checkpointer": {"period": iterations_per_epoch, "max_to_keep": 40},
         "eval_period": iterations_per_epoch,
         "log_period": 20,
         "device": "cuda",
+        "seed": 42,
+        "cudnn_benchmark": False,
     }
 )

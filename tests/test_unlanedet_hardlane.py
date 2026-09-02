@@ -133,6 +133,9 @@ def test_autodl_configs_and_scripts_encode_execution_contract():
         assert 'max_gt_lanes = 8' in source
         assert 'candidate_topk = 12' in source
         assert '"init_checkpoint"' in source
+        assert '"seed": 42' in source
+        assert '"cudnn_benchmark": False' in source
+        assert '"max_to_keep": 40' in source
         assert "MODEL.WEIGHTS" not in source
     assert 'num_priors = 192' in clr
     assert 'num_classes = max_gt_lanes + 1' in clr

@@ -14,7 +14,7 @@
 
 - **BSD grep（bash 里的 grep）对中文+`\|` 交替模式会静默返回零命中**（连纯 ASCII 子模式都不匹配），必须用内置 Grep 工具（ripgrep）做中文内容检索。
 - `software-*` 系列 subagent 调 TaskList 必崩（Tools 列表为空）；多 Agent 并行易触发 429 限流。长文档定向修订由主 Agent 直接 Edit 更稳。
-- 本地 CPU 开发 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1 / pytest 9.1.1，python 3.13.12）。沙箱内复核须显式 `--basetemp=/private/tmp/<dedicated>`；2026-09-02 §24 后现测 **94 passed**。GPU 权重/模型/推理/训练实验只在 AutoDL，绝不以本地静态检查冒充。独立 Oracle 临时环境 `/private/tmp/lane-oracle-py312`（Python 3.12.13 + 官方精确 pins）；最终裁决不得使用训练环境。
+- 本地 CPU 开发 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1 / pytest 9.1.1，python 3.13.12）。沙箱内复核须显式 `--basetemp=/private/tmp/<dedicated>`；2026-09-02 §25 后现测 **106 passed**。GPU 权重/模型/推理/训练实验只在 AutoDL，绝不以本地静态检查冒充。独立 Oracle 临时环境 `/private/tmp/lane-oracle-py312`（Python 3.12.13 + 官方精确 pins）；最终裁决不得使用训练环境。
 - **`.gitignore` 目录模式陷阱**：无前导斜杠的 `data/` 会匹配**任意层级**同名目录（误伤 `src/data/` 源码）；忽略根目录必须写 `/data/`（锚定）。
 
 ## 已闭环的技术事实（勿重新推导）
@@ -33,4 +33,5 @@
 - **T2.1/T2.2 只在 AutoDL 动态验收（DECISIONS §23）**：本地已落地 manifest-backed HardLaneDataset、CLRNet-R50/ADNet-R34 config、pinned UnLanedet patch、三权重 load/shape 探针、双模型空/非空 loss+backward/demo smoke 和 1 epoch runner；本地仅验证数据数量 train/val=6300/800、空 GT=227/35、短线保留、语法/patch/89 tests。待 AutoDL 返回真实 JSON/日志前任务保持进行中。
 - **预测提交入口（DECISIONS §24）**：`HardLaneEvaluator` 的 5 位诊断预测禁止直接交给 `pack_submit`；统一走 `prepare_submit.py`，按 manifest 精确枚举并经 `export_lines(ndigits=1)` canonicalize，再 pack→verify，labeled rehearsal 可追加 Oracle。缺失默认失败、显式才作空；多余/stale/traversal/舍入塌缩均拒绝。非 identity 契约测试结果 `TP/FP/FN=1/1/1,F1=0.5`。
 - **T40 已收口（DECISIONS §24）**：不开发自研 `engine/trainer.py/checkpoint.py`；使用 pinned UnLanedet `tools/train_net.py`、两套 LazyConfig、原生 AMP/PeriodicCheckpointer/BestCheckpointer 与 AutoDL 持久目录 `--resume`。动态证据仍等 AutoDL。
+- **AutoDL 流水线铁律（DECISIONS §25）**：全局 `train.seed=42`，`cudnn_benchmark=False`，周期 checkpoint 保留 40 个。上游 best hook 不持久化历史，故不单信 resume 后的 `model_best.pth`；必须用 metrics 历史 best iteration 定位 checkpoint 并 eval-only 回放。唯一编排入口是 `run_pipeline.sh gate|screen|baseline`，36ep 必须 fresh 启动新 schedule；关机前下载 handoff tar + SHA。
 - **非 identity 跨环境审计已闭环（DECISIONS §19，2026-09-02）**：本地 metric（cv2 5.0/scipy 1.18/numpy 2.5）vs 官方 pins 跨环境，1034 渲染用例 + 576 图整图差分逐比特/逐图零分歧（TP=1488/FP=812/FN=521/F1=0.690647，case SHA `6d3b1061…fbc96f`，复跑 `scripts/run_nonidentity_diff.py`）→ **本地诊断 metric 放行训练期扫描；成绩只认 Oracle 全局单次调用，per-clip 禁止平均**（逐图均值偏离全局 −0.99pp）。提交双防线落地：export 序列化后去重<2 拒绝 + verify 独立复核（逗号/严格 1 位小数/去重<2/边界 >1365·>719/≤64条/≤2048点/全链 smoke）；manifest image_path 四要素校验；`interp_lane` 去重已移除（数组/JSON 失败语义=Oracle）；画布常量收口 `common.types.CANVAS_W/H`。该批次 66 tests，§20 后 74，§21 后 76，§22 后当前 80；原致命 zip 已 FAIL。

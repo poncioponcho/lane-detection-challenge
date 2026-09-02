@@ -1,4 +1,4 @@
-# T2.1/T2.2 AutoDL 验收手册
+# AutoDL 训练与验收手册
 
 第 1–5 节只在 AutoDL CUDA 实例执行。本地已经完成纯 CPU 数据契约和静态测试，但不构成模型验收；第 6 节的格式归一化/Oracle 可在 CPU 环境复核。
 
@@ -47,32 +47,42 @@ python "$HARDLANE_PROJECT_ROOT/scripts/autodl/smoke_dataloader_and_loss.py"
 
 成功门：train/val 数量 6300/800、空 GT 227/35；CLRNet 和 ADNet 各一个空图与非空图 batch 的全部 loss/gradient 有限；target capacity=8、candidate top-k=12；生成两类图像：未经训练的 checkpoint demo（只验链路）和 GT 预处理坐标 overlay（验坐标 round-trip）。证据在 `$HARDLANE_OUTPUT_ROOT/smoke/`。
 
-## 5. 各跑 1 epoch train + val
+## 5. 分阶段流水线（推荐唯一入口）
 
 ```bash
-bash "$HARDLANE_PROJECT_ROOT/scripts/autodl/run_one_epoch.sh" clrnet_r50
-bash "$HARDLANE_PROJECT_ROOT/scripts/autodl/run_one_epoch.sh" adnet_r34
+bash "$HARDLANE_PROJECT_ROOT/scripts/autodl/run_pipeline.sh" gate
 ```
 
-检查两个 run 目录均有 `train.log`、checkpoint、`last_checkpoint`、`val/diagnostic_metric.json` 与 `val/predictions/`。用原生 `--resume` 做一次最小续跑，确认 iteration 从 checkpoint 后继续。训练期 metric 是项目诊断层；最终裁决仍须将预测交给冻结官方 Oracle。
+`gate` 依次执行 setup、权重映射探针、空/非空 batch loss+backward smoke，然后两模型各训 525 iter，再各续跑到 526 iter。续跑成功必须从 iteration 525 开始，不能重回 0。每个 run 完成后会：
 
-以 CLRNet 为例，从 525 iter 的 checkpoint 续跑 1 iter（ADNet 换对应 config/run_dir）：
+- 核对 checkpoint 顶层/trainer iteration 和 optimizer state；
+- 核对 800 张预测文件、2655 条 GT 及 TP/FP/FN/F1 恒等式；
+- 从全历史 `metrics.json` 定位 best metric iteration，再按上游 final-eval 的 N→N−1 规则映射 checkpoint 内部 iteration；
+- 对该权重独立 eval-only 回放，F1 必须与历史 best 精确相等。
+
+门禁通过后跑双路 15 epoch 筛选：
 
 ```bash
-cd "$UNLANEDET_ROOT"
-python tools/train_net.py --resume \
-  --config-file "$HARDLANE_PROJECT_ROOT/configs/unlanedet/clrnet_r50_hardlane.py" \
-  --num-gpus 1 \
-  "train.max_iter=526" \
-  "train.eval_period=526" \
-  "train.checkpointer.period=526" \
-  "train.output_dir=$HARDLANE_OUTPUT_ROOT/one_epoch/clrnet_r50" \
-  "dataloader.evaluator.output_basedir=$HARDLANE_OUTPUT_ROOT/one_epoch/clrnet_r50/val"
+bash "$HARDLANE_PROJECT_ROOT/scripts/autodl/run_pipeline.sh" screen
 ```
 
-日志必须明确从 iteration 525 恢复，而非重新加载 `train.init_checkpoint` 后从 0 开始。
+只有两路 `selected_best_eval/eval_evidence.json` 都为 pass，筛选器才会按历史 best F1 决策；`|Delta F1| < 0.015` 选 CLRNet，否则选更高者。最后跑赢家 36 epoch：
+
+```bash
+bash "$HARDLANE_PROJECT_ROOT/scripts/autodl/run_pipeline.sh" baseline
+```
+
+36 epoch 的首次启动必须从 adapted CULane checkpoint 开启新 cosine schedule，不续接已经跑完的 15 epoch schedule；若自身中断，则在同一 run 目录从 `last_checkpoint` 恢复。
+
+三条命令均可安全重跑：已通过阶段会跳过，有 `last_checkpoint` 的中断 run 会续跑；若 checkpoint 刚到 max_iter 而 final eval 在断电前未落盘，runner 会用该最后权重做 eval-only 恢复，并将带 `_recovered_final_eval` 标记的实测行追加到指标历史。非空但无 checkpoint 的目录会拒绝覆盖。为保证可复现，训练要求项目 tracked files 干净，且同一 run 禁止跨 commit 续跑。两套 config 和 runner 都锁定 `train.seed=42`、`cudnn_benchmark=False`和 `max_to_keep=40`。
+
+> 上游 `BestCheckpointer` 不保存 `best_metric/best_iter`，进程恢复后可能用更差权重覆盖 `model_best.pth`。因此本项目不把该文件名当真值；依靠保留的周期 checkpoint + 内部 iteration + 独立回放裁决。
 
 只有第 3–5 节证据全部返回，T2.1/T2.2 才能从进行中改为完成。
+
+### 关机前交接包
+
+每个 pipeline 阶段都会自动生成 `$HARDLANE_OUTPUT_ROOT/handoff_<stage>.tar.gz` 及其 `.json` SHA 报告。`baseline` 包含权重探针/smoke/门禁/筛选/决策证据、日志、回放预测，以及赢家 36ep 真实历史最优 checkpoint。关机前必须将 tar.gz 和 `.json` 一起下载，不要只看 `model_best.pth`。
 
 ## 6. 原始预测转提交格式（不可跳过）
 
