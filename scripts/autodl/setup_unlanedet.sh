@@ -85,7 +85,7 @@ import cv2
 import scipy
 import albumentations
 import imgaug
-from unlanedet.layers.ops import nms, nms_ad_
+from unlanedet.layers.ops import nms_impl, nms_ad_impl, nms_sr_impl
 
 assert sys.version_info[:2] in {(3, 8), (3, 9), (3, 10), (3, 11)}, sys.version
 assert torch.__version__.startswith("2.1.2"), torch.__version__
@@ -97,8 +97,11 @@ assert numpy.__version__.startswith("1.26"), numpy.__version__
 assert scipy.__version__.startswith("1.11"), scipy.__version__
 assert albumentations.__version__ == "0.4.6", albumentations.__version__
 
+# The ops package exports wrapper FUNCTIONS (ops/nms.py) whose __file__ is the
+# .py, not the kernel. The compiled kernels are built inplace into the repo at
+# unlanedet/layers/ops/*.so; check those directly.
 ops_root = os.path.join(os.environ["UNLANEDET_ROOT"], "unlanedet", "layers", "ops")
-so_files = [nms.__file__, nms_ad_.__file__]
+so_files = [nms_impl.__file__, nms_ad_impl.__file__, nms_sr_impl.__file__]
 for f in so_files:
     assert os.path.isfile(f) and f.endswith(".so"), f
 src_files = [f for f in glob.glob(os.path.join(ops_root, "**", "*"), recursive=True)
