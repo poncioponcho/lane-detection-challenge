@@ -82,11 +82,6 @@ fi
 "$PYTHON_BIN" -m pip install \
   "numpy==1.26.4" "scipy==1.11.4" "opencv-python-headless==4.9.0.80" \
   "Pillow>=10,<12"
-# imgaug==0.4.0 pulls the GUI build opencv-python, which shares the cv2/ dir with headless and
-# shadows our pinned headless build. Drop the GUI variant and force-reinstall headless so the
-# pinned 4.9.0.80 is the only cv2 provider.
-"$PYTHON_BIN" -m pip uninstall -y opencv-python >/dev/null 2>&1 || true
-"$PYTHON_BIN" -m pip install --force-reinstall --no-deps "opencv-python-headless==4.9.0.80"
 
 if ! "$PYTHON_BIN" -c '
 import sys
@@ -117,4 +112,9 @@ export MAX_JOBS="${MAX_JOBS:-4}"
 
 "$PYTHON_BIN" -c \
   'import unlanedet; from unlanedet.layers.ops import nms, nms_ad_; print("UnLanedet imports and CUDA ops: OK")'
+# imgaug==0.4.0 (and UnLanedet's own deps) pull the GUI build opencv-python, which shares the
+# cv2/ dir with headless and shadows our pinned headless build. Run this LAST so the pinned
+# 4.9.0.80 is the only cv2 provider regardless of what the editable UnLanedet install pulled in.
+"$PYTHON_BIN" -m pip uninstall -y opencv-python >/dev/null 2>&1 || true
+"$PYTHON_BIN" -m pip install --force-reinstall --no-deps "opencv-python-headless==4.9.0.80"
 echo "Pinned UnLanedet AutoDL setup complete: $PINNED_UNLANEDET_COMMIT"
