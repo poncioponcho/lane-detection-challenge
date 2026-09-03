@@ -1,5 +1,5 @@
 diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_head.py
-index bab776c..fb401a1 100644
+index bab776c..330b98b 100644
 --- a/unlanedet/model/CLRNet/clr_head.py
 +++ b/unlanedet/model/CLRNet/clr_head.py
 @@ -231,6 +231,18 @@ class CLRHead(nn.Module):
@@ -38,15 +38,17 @@ index bab776c..fb401a1 100644
 +                top_k=self.cfg.test_parameters.nms_topk)
              keep = keep[:num_to_keep]
              predictions = predictions[keep]
+ 
 diff --git a/unlanedet/model/CondlaneNet/head.py b/unlanedet/model/CondlaneNet/head.py
+index 647fc84..3a5a074 100644
 --- a/unlanedet/model/CondlaneNet/head.py
 +++ b/unlanedet/model/CondlaneNet/head.py
-@@ -9,6 +9,6 @@ import torch
+@@ -9,7 +9,7 @@ import torch.nn.functional as F
  from ..module.core.lane import Lane
  from ...layers import Conv2d,get_norm,Activation
-
+ 
 -torch.autograd.set_detect_anomaly(True)
 +torch.autograd.set_detect_anomaly(False)
-
- def compute_locations2(shape, device):
  
+ def compute_locations2(shape, device):
+     pos = torch.arange(
