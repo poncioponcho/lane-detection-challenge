@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
 
@@ -342,9 +343,18 @@ class HardLaneEvaluator(DatasetEvaluator):
 
     def evaluate(self, predictions):
         if len(predictions) != len(self.data_infos):
-            raise ValueError(
-                f"prediction count {len(predictions)} != manifest count {len(self.data_infos)}"
-            )
+            raise ValueError(f"prediction count {len(predictions)} != manifest count {len(self.data_infos)}")
+        # The evaluator runs inside train_net's process whose CWD (and thus
+        # sys.path seed) is the UnLanedet repo root, so neither the project
+        # root ("src" package) nor src/ itself ("common" package) is importable
+        # by default (observed as ModuleNotFoundError: No module named
+        # 'common' in the gate final eval). Mirror the probe/smoke pattern and
+        # add both roots up front.
+        src_root = Path(__file__).resolve().parent
+        project_root = str(src_root.parent)
+        for path in (project_root, str(src_root)):
+            if path not in sys.path:
+                sys.path.insert(0, path)
         from src.eval.matching import compute_f1
 
         prediction_by_image = {}
