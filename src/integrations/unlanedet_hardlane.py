@@ -50,6 +50,22 @@ CANVAS_W = 1366
 CANVAS_H = 720
 
 
+def _sample_tensors_finite(sample: dict) -> bool:
+    """True when every transformed tensor in the sample is finite (no NaN/Inf).
+
+    ToTensor outputs are CPU tensors with no autograd, so ``.numpy()`` is safe
+    and keeps this module importable without PyTorch (local CPU contract).
+    """
+    for key in ("img", "lane_line", "seg"):
+        tensor = sample.get(key)
+        if tensor is None:
+            continue
+        values = tensor.numpy() if hasattr(tensor, "numpy") else np.asarray(tensor)
+        if not np.isfinite(values).all():
+            return False
+    return True
+
+
 def _require_unlanedet() -> None:
     if _UNLANEDET_IMPORT_ERROR is not None:
         raise RuntimeError(
@@ -222,6 +238,16 @@ class HardLaneDataset(BaseDataset):
             sum(info["is_empty"] for info in self.data_infos),
         )
 
+    def _build_raw_sample(self, data_info: dict, image, mask):
+        """Pristine pre-transforms sample; processes() mutates its input in
+        place (sample["img"] is replaced by the normalized tensor), so every
+        augmentation attempt must start from a freshly built dict."""
+        sample = data_info.copy()
+        sample["img"] = image[self.cut_height :, :, :]
+        if self.training:
+            sample["mask"] = mask[self.cut_height :, :]
+        return sample
+
     def __getitem__(self, idx):
         data_info = self.data_infos[idx]
         image = cv2.imread(data_info["img_path"], cv2.IMREAD_COLOR)
@@ -230,15 +256,30 @@ class HardLaneDataset(BaseDataset):
         if tuple(image.shape[:2]) != (CANVAS_H, CANVAS_W):
             raise ValueError(f"unexpected image shape {image.shape}: {data_info['img_path']}")
 
-        sample = data_info.copy()
-        sample["img"] = image[self.cut_height :, :, :]
+        mask = None
         if self.training:
             mask = read_palette_indices(data_info["mask_path"])
             if tuple(mask.shape) != (CANVAS_H, CANVAS_W):
                 raise ValueError(f"unexpected mask shape {mask.shape}: {data_info['mask_path']}")
-            sample["mask"] = mask[self.cut_height :, :]
 
-        sample = self.processes(sample)
+        sample = self.processes(self._build_raw_sample(data_info, image, mask))
+        if self.training and not _sample_tensors_finite(sample):
+            # Rarely, a degenerate random-augmentation draw (e.g. Affine pushing
+            # a short lane fully out of the image) makes GenerateLaneLine emit
+            # NaN targets; that NaN then poisons the loss (observed as an
+            # AddmmBackward0 NaN on gate iter 0). Re-draw with fresh RNG state;
+            # each attempt is effectively an independent draw.
+            exhausted = True
+            for _ in range(5):
+                sample = self.processes(self._build_raw_sample(data_info, image, mask))
+                if _sample_tensors_finite(sample):
+                    exhausted = False
+                    break
+            if exhausted:
+                LOGGER.warning(
+                    "HardLane sample %s stayed non-finite after 6 augmentation draws",
+                    data_info["image_id"],
+                )
         sample["meta"] = DC(
             {
                 "full_img_path": data_info["img_path"],
