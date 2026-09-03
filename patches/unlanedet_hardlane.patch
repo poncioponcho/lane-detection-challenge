@@ -38,4 +38,15 @@ index bab776c..fb401a1 100644
 +                top_k=self.cfg.test_parameters.nms_topk)
              keep = keep[:num_to_keep]
              predictions = predictions[keep]
+diff --git a/unlanedet/model/CondlaneNet/head.py b/unlanedet/model/CondlaneNet/head.py
+--- a/unlanedet/model/CondlaneNet/head.py
++++ b/unlanedet/model/CondlaneNet/head.py
+@@ -9,6 +9,6 @@ import torch
+ from ..module.core.lane import Lane
+ from ...layers import Conv2d,get_norm,Activation
+
+-torch.autograd.set_detect_anomaly(True)
++torch.autograd.set_detect_anomaly(False)
+
+ def compute_locations2(shape, device):
  

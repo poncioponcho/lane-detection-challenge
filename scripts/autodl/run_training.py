@@ -328,10 +328,14 @@ def main() -> None:
         patch_source = (
             unlanedet_root / "unlanedet/model/CLRNet/clr_head.py"
         ).read_text(encoding="utf-8")
+        condlane_head_source = (
+            unlanedet_root / "unlanedet/model/CondlaneNet/head.py"
+        ).read_text(encoding="utf-8")
         if (
             "top_k=self.cfg.test_parameters.nms_topk" not in patch_source
             or ".astype(bool)" not in patch_source
             or "predictions[..., 4].clamp(0.01, 0.99)" not in patch_source
+            or "torch.autograd.set_detect_anomaly(False)" not in condlane_head_source
         ):
             raise SystemExit("required HardLane UnLanedet patch is not applied")
         environment = inspect_cuda_python(python_bin)
