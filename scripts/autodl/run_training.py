@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import platform
@@ -31,6 +32,23 @@ CONFIGS = {
 }
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
+
+
+def override(key: str, value) -> str:
+    """Format one LazyConfig CLI override for UnLanedet's pinned apply_overrides.
+
+    pinned unlanedet/config/lazy.py calls ast.literal_eval(value) with no
+    SyntaxError fallback, so bare path strings like train.output_dir=/hy-tmp/...
+    crash the launch. Values that already parse as Python literals (ints, bools)
+    pass through bare; anything else is single-quoted so literal_eval yields the
+    original string.
+    """
+    text = str(value)
+    try:
+        ast.literal_eval(text)
+    except (ValueError, SyntaxError):
+        return f"{key}='{text}'"
+    return f"{key}={text}"
 
 
 def required_absolute_env(name: str) -> Path:
@@ -201,11 +219,11 @@ def recover_final_evaluation(
         str(config),
         "--num-gpus",
         "1",
-        f"train.init_checkpoint={checkpoint}",
-        f"train.output_dir={recovery_dir}",
-        f"dataloader.evaluator.output_basedir={recovery_dir / 'val'}",
-        "train.seed=42",
-        "train.cudnn_benchmark=False",
+        override("train.init_checkpoint", checkpoint),
+        override("train.output_dir", recovery_dir),
+        override("dataloader.evaluator.output_basedir", recovery_dir / "val"),
+        override("train.seed", 42),
+        override("train.cudnn_benchmark", False),
     ]
     command_path = recovery_dir / "eval_command.json"
     command_path.write_text(
@@ -404,14 +422,19 @@ def main() -> None:
         command.append("--resume")
     command.extend(
         [
-            f"train.max_iter={target_iter}",
-            f"train.eval_period={ITERATIONS_PER_EPOCH if target_iter % ITERATIONS_PER_EPOCH == 0 else target_iter}",
-            f"train.checkpointer.period={ITERATIONS_PER_EPOCH}",
-            "train.checkpointer.max_to_keep=40",
-            f"train.output_dir={run_dir}",
-            f"dataloader.evaluator.output_basedir={run_dir / 'val'}",
-            "train.seed=42",
-            "train.cudnn_benchmark=False",
+            override("train.max_iter", target_iter),
+            override(
+                "train.eval_period",
+                ITERATIONS_PER_EPOCH
+                if target_iter % ITERATIONS_PER_EPOCH == 0
+                else target_iter,
+            ),
+            override("train.checkpointer.period", ITERATIONS_PER_EPOCH),
+            override("train.checkpointer.max_to_keep", 40),
+            override("train.output_dir", run_dir),
+            override("dataloader.evaluator.output_basedir", run_dir / "val"),
+            override("train.seed", 42),
+            override("train.cudnn_benchmark", False),
         ]
     )
     launch = {
