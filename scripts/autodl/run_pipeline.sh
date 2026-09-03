@@ -34,6 +34,14 @@ json_passes_for_head() {
 
 bash "$project/scripts/autodl/setup_unlanedet.sh"
 
+# UnLanedet's pinned modelzoo configs (e.g. config/clrnet/resnet34_culane.py via
+# modelzoo.get_config) load "config/common/train.py" through a CWD-relative path,
+# so every downstream step (weight probe, dataloader/loss smoke, gate/screen/
+# baseline training, eval) must run from the UnLanedet repo root. All challenge-
+# side paths below are env-var absolute (git -C / $project / $output), so this
+# chdir cannot break them; it only fixes the pinned repo's relative lookups.
+cd "$UNLANEDET_ROOT"
+
 weight_report="$output/weight_probe.json"
 if [[ -f "$weight_report" ]] && json_passes_for_head "$weight_report" && \
    [[ -f "$HARDLANE_WEIGHTS_ROOT/adapted_clrnet_r50_hardlane.pth" ]] && \
