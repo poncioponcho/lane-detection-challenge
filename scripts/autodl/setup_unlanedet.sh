@@ -68,17 +68,25 @@ else
   exit 2
 fi
 
-"$PYTHON_BIN" -m pip install --upgrade pip setuptools wheel ninja
+"$PYTHON_BIN" -m pip install --upgrade pip "setuptools<81" wheel ninja
 # Pin the exact PyTorch/TorchVision build the project is validated against. AutoDL official
 # images only ship 2.2.1 / 2.0.0 / 2.5.1 etc. (no 2.1.2), so reinstall here regardless of the
 # base image. cu118 runtime is backward compatible with cu121 drivers on the 3090.
 "$PYTHON_BIN" -m pip install \
   "torch==2.1.2+cu118" "torchvision==0.16.2+cu118" \
   --index-url https://download.pytorch.org/whl/cu118
-"$PYTHON_BIN" -m pip install -r "$UNLANEDET_ROOT/requirements.txt"
+# albumentations==0.4.6 is an sdist whose setup.py imports pkg_resources, removed from setuptools
+# >=81. Pin setuptools<81 (above) and disable build isolation so the build uses the env's
+# setuptools (still provides pkg_resources) instead of pip's isolated latest build of setuptools.
+"$PYTHON_BIN" -m pip install --no-build-isolation -r "$UNLANEDET_ROOT/requirements.txt"
 "$PYTHON_BIN" -m pip install \
   "numpy==1.26.4" "scipy==1.11.4" "opencv-python-headless==4.9.0.80" \
   "Pillow>=10,<12"
+# imgaug==0.4.0 pulls the GUI build opencv-python, which shares the cv2/ dir with headless and
+# shadows our pinned headless build. Drop the GUI variant and force-reinstall headless so the
+# pinned 4.9.0.80 is the only cv2 provider.
+"$PYTHON_BIN" -m pip uninstall -y opencv-python >/dev/null 2>&1 || true
+"$PYTHON_BIN" -m pip install --force-reinstall --no-deps "opencv-python-headless==4.9.0.80"
 
 if ! "$PYTHON_BIN" -c '
 import sys
