@@ -261,6 +261,23 @@ class HardLaneDataset(BaseDataset):
             mask = read_palette_indices(data_info["mask_path"])
             if tuple(mask.shape) != (CANVAS_H, CANVAS_W):
                 raise ValueError(f"unexpected mask shape {mask.shape}: {data_info['mask_path']}")
+            # HardLane palette ids can exceed the seg head's class budget: the
+            # pinned GenerateLaneLine feeds raw mask values into the seg NLL loss
+            # (clr_head.py), whose class count is num_classes = max_gt_lanes + 1
+            # = 9. Ids 9/10 appear in 51/7100 images and made nll_loss trigger a
+            # device-side assert once shuffling sampled one of them (observed as
+            # "CUDA error: device-side assert triggered" at gate iter 5). Collapse
+            # overflowing ids into background: seg is auxiliary supervision and
+            # the primary lane-line GT comes from anno_txt, so no line-level
+            # label is lost.
+            num_seg_classes = int(self.cfg.num_classes)
+            if mask.max(initial=0) >= num_seg_classes:
+                LOGGER.warning(
+                    "HardLane mask %s has seg ids >= num_classes(%d); collapsing to background",
+                    data_info["image_id"],
+                    num_seg_classes,
+                )
+                mask = np.where(mask >= num_seg_classes, 0, mask).astype(np.uint8, copy=False)
 
         sample = self.processes(self._build_raw_sample(data_info, image, mask))
         if self.training and not _sample_tensors_finite(sample):
