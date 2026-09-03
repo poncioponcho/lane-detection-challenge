@@ -16,6 +16,7 @@ from run_training import (
     assert_tracked_worktree_clean,
     git_head,
     inspect_cuda_python,
+    override,
     required_absolute_env,
     stream_command,
 )
@@ -129,9 +130,12 @@ def main() -> None:
         str(config),
         "--num-gpus",
         "1",
-        f"train.init_checkpoint={checkpoint}",
-        f"train.output_dir={eval_dir}",
-        f"dataloader.evaluator.output_basedir={eval_dir / 'val'}",
+        # Path values must reuse run_training.override: the pinned
+        # apply_overrides literal_evals every value, so bare paths crash with
+        # SyntaxError (same failure mode fixed for train launches in dc49dea).
+        override("train.init_checkpoint", checkpoint),
+        override("train.output_dir", eval_dir),
+        override("dataloader.evaluator.output_basedir", eval_dir / "val"),
         "train.seed=42",
         "train.cudnn_benchmark=False",
     ]
