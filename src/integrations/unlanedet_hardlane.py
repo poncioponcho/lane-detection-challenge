@@ -13,6 +13,23 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
+# imgaug==0.4.0 (pinned by UnLanedet's requirements) still references numpy
+# aliases that were removed in numpy>=1.24 (np.bool etc.) at call time -- e.g.
+# dtype=np.bool in augmenters/meta.py. The project pins numpy==1.26.4, so
+# restore the removed alias family here. This module is imported by every
+# AutoDL LazyConfig, so the shim executes in each train/eval process before
+# DataLoader workers fork and hit the augmentation path.
+for _alias, _target in (
+    ("bool", bool),
+    ("int", int),
+    ("float", float),
+    ("complex", complex),
+    ("object", object),
+    ("str", str),
+):
+    if not hasattr(np, _alias):
+        setattr(np, _alias, _target)
+
 try:  # AutoDL dependency; intentionally absent from the local CPU venv.
     import cv2
     from unlanedet.data.base_dataset import BaseDataset
