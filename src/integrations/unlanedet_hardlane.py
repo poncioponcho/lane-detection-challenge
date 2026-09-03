@@ -270,7 +270,11 @@ class HardLaneDataset(BaseDataset):
             # overflowing ids into background: seg is auxiliary supervision and
             # the primary lane-line GT comes from anno_txt, so no line-level
             # label is lost.
-            num_seg_classes = int(self.cfg.num_classes)
+            # adnet's param_config has no num_classes (no seg head); fall back
+            # to max_lanes + 1, which equals the clrnet value (9).
+            num_seg_classes = int(
+                self.cfg.get("num_classes", int(self.cfg.max_lanes) + 1)
+            )
             if mask.max(initial=0) >= num_seg_classes:
                 LOGGER.warning(
                     "HardLane mask %s has seg ids >= num_classes(%d); collapsing to background",
