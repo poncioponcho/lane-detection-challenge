@@ -2,7 +2,7 @@ diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_hea
 index bab776c..fb401a1 100644
 --- a/unlanedet/model/CLRNet/clr_head.py
 +++ b/unlanedet/model/CLRNet/clr_head.py
-@@ -231,6 +231,12 @@ class CLRHead(nn.Module):
+@@ -231,6 +231,17 @@ class CLRHead(nn.Module):
              predictions[:, :,
                          2:5] += reg[:, :, :3]  # also reg theta angle here
              predictions[:, :, 5] = reg[:, :, 3]  # length
@@ -11,7 +11,14 @@ index bab776c..fb401a1 100644
 +            # division overflows fp16 to inf, poisoning the refine loop with inf
 +            # prior coords and NaN reg loss (observed as AddmmBackward0 NaN on
 +            # gate iter 0). |tan| >= tan(0.01*pi) ~ 0.031 keeps the quotient < 2e4.
-+            predictions[..., 4] = predictions[..., 4].clamp(0.01, 0.99)
++            # Must rebuild out-of-place via torch.cat: the [6]/[7]/[8] writes
++            # below are in-place, so an indexed clamp write would bump the base
++            # version counter and break ClampBackward1's saved input view
++            # (observed as "modified by an inplace operation" on gate iter 0).
++            theta = predictions[..., 4].clamp(0.01, 0.99)
++            predictions = torch.cat(
++                [predictions[..., :4], theta.unsqueeze(-1), predictions[..., 5:]],
++                dim=-1)
  
              def tran_tensor(t):
                  return t.unsqueeze(2).clone().repeat(1, 1, self.n_offsets)
