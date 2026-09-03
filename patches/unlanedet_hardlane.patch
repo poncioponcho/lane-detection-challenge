@@ -1,7 +1,22 @@
 diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_head.py
+index bab776c..fb401a1 100644
 --- a/unlanedet/model/CLRNet/clr_head.py
 +++ b/unlanedet/model/CLRNet/clr_head.py
-@@ -289,6 +289,6 @@ class CLRHead(nn.Module):
+@@ -231,6 +231,12 @@ class CLRHead(nn.Module):
+             predictions[:, :,
+                         2:5] += reg[:, :, :3]  # also reg theta angle here
+             predictions[:, :, 5] = reg[:, :, 3]  # length
++            # HardLane patch: clamp the refined theta so fp16 autocast cannot
++            # degenerate torch.tan(...): theta near 0/1 makes |tan| ~1e-5 and the
++            # division overflows fp16 to inf, poisoning the refine loop with inf
++            # prior coords and NaN reg loss (observed as AddmmBackward0 NaN on
++            # gate iter 0). |tan| >= tan(0.01*pi) ~ 0.031 keeps the quotient < 2e4.
++            predictions[..., 4] = predictions[..., 4].clamp(0.01, 0.99)
+ 
+             def tran_tensor(t):
+                 return t.unsqueeze(2).clone().repeat(1, 1, self.n_offsets)
+@@ -288,7 +294,7 @@ class CLRHead(nn.Module):
+             # if the prediction does not start at the bottom of the image,
              # extend its prediction until the x is outside the image
              mask = ~((((lane_xs[:start] >= 0.) & (lane_xs[:start] <= 1.)
 -                       ).cpu().numpy()[::-1].cumprod()[::-1]).astype(np.bool))
@@ -9,7 +24,7 @@ diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_hea
              lane_xs[end + 1:] = -2
              lane_xs[:start][mask] = -2
              lane_ys = self.prior_ys[lane_xs >= 0]
-@@ -445,6 +445,6 @@ class CLRHead(nn.Module):
+@@ -445,7 +451,7 @@ class CLRHead(nn.Module):
                  nms_predictions,
                  scores,
                  overlap=self.cfg.test_parameters.nms_thres,
@@ -17,3 +32,4 @@ diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_hea
 +                top_k=self.cfg.test_parameters.nms_topk)
              keep = keep[:num_to_keep]
              predictions = predictions[keep]
+ 

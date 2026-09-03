@@ -331,6 +331,7 @@ def main() -> None:
         if (
             "top_k=self.cfg.test_parameters.nms_topk" not in patch_source
             or ".astype(bool)" not in patch_source
+            or "predictions[..., 4].clamp(0.01, 0.99)" not in patch_source
         ):
             raise SystemExit("required HardLane UnLanedet patch is not applied")
         environment = inspect_cuda_python(python_bin)
