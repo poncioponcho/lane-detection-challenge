@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import json
 import sys
@@ -108,6 +109,138 @@ def test_read_manifest_rows_checks_order_split_and_paths(tmp_path):
         MODULE.read_manifest_rows(manifest, "train")
 
 
+def test_split_registry_separates_labeled_from_prediction_only():
+    assert MODULE.SUPPORTED_SPLITS == {"train", "val", "testA", "testB"}
+    assert MODULE.is_labeled_split("train") and MODULE.is_labeled_split("val")
+    assert not MODULE.is_labeled_split("testA")
+    assert not MODULE.is_labeled_split("testB")
+
+
+def test_read_manifest_rows_accepts_unlabeled_split(tmp_path):
+    manifest = tmp_path / "testA.jsonl"
+    row = _row(split="testA")
+    row["gt_path"] = None
+    manifest.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    rows = MODULE.read_manifest_rows(manifest, "testA")
+    assert len(rows) == 1
+    assert rows[0]["gt_path"] is None
+
+
+def test_read_manifest_rows_rejects_gt_leak_into_unlabeled_split(tmp_path):
+    manifest = tmp_path / "testA.jsonl"
+    manifest.write_text(json.dumps(_row(split="testA")) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="carries gt_path"):
+        MODULE.read_manifest_rows(manifest, "testA")
+
+
+def test_read_manifest_rows_rejects_null_gt_for_labeled_split(tmp_path):
+    manifest = tmp_path / "train.jsonl"
+    row = _row(split="train")
+    row["gt_path"] = None
+    manifest.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="null gt_path"):
+        MODULE.read_manifest_rows(manifest, "train")
+
+
+def _make_dataset(tmp_path, labeled, create_image=True):
+    dataset = MODULE.HardLaneDataset.__new__(MODULE.HardLaneDataset)
+    dataset.data_root = str(tmp_path)
+    dataset.split = "train" if labeled else "testA"
+    dataset.labeled = labeled
+    dataset.cfg = None
+    image_dir = tmp_path / "JPEGImages" / "clip"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    if create_image:
+        (image_dir / "00003.jpg").write_bytes(b"")
+    manifest = tmp_path / ("train.jsonl" if labeled else "testA.jsonl")
+    row = _row(split=dataset.split)
+    if not labeled:
+        row["gt_path"] = None
+    manifest.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    dataset.manifest_path = str(manifest)
+    return dataset
+
+
+def test_dataset_load_annotations_skips_gt_and_mask_for_unlabeled(tmp_path):
+    dataset = _make_dataset(tmp_path, labeled=False)
+    dataset.load_annotations()
+    info = dataset.data_infos[0]
+    assert info["labeled"] is False
+    # Must be [] not None: GenerateLaneLine iterates lanes even when not training.
+    assert info["lanes"] == []
+    assert info["anno_path"] is None and info["mask_path"] is None
+
+
+def test_dataset_load_annotations_still_requires_gt_for_labeled(tmp_path):
+    dataset = _make_dataset(tmp_path, labeled=True)
+    with pytest.raises(FileNotFoundError, match="manifest GT missing"):
+        dataset.load_annotations()
+
+
+def test_repository_testA_manifest_is_unlabeled_and_ordered():
+    root = Path(__file__).parents[1]
+    rows = MODULE.read_manifest_rows(root / "data/processed/manifest_testA.jsonl", "testA")
+    assert len(rows) == 900
+    assert {row["split"] for row in rows} == {"testA"}
+    assert all(row["gt_path"] is None for row in rows)
+
+
+class _FakeLane:
+    """CLRNet lane object: callable over normalized y, returns x fractions."""
+
+    def __init__(self, x):
+        self.x = float(x)
+
+    def __call__(self, ys):
+        return np.full(len(ys), self.x, dtype=np.float64)
+
+
+def _make_evaluator(tmp_path, labeled, lane_lists=None):
+    evaluator = MODULE.HardLaneEvaluator.__new__(MODULE.HardLaneEvaluator)
+    evaluator.output_basedir = str(tmp_path / "out")
+    evaluator.cfg = types.SimpleNamespace(
+        sample_y=[300.0, 400.0, 500.0], ori_img_h=720.0, ori_img_w=1366.0
+    )
+    evaluator.metric = "F1"
+    evaluator.data_infos = [
+        {
+            "image_id": "clip/00003",
+            "labeled": labeled,
+            # Unlabeled rows still carry [] (not None) so GenerateLaneLine's
+            # non-training path can iterate them; "labeled" is the discriminator.
+            "lanes": [[(683.0, 300.0), (683.0, 500.0)]] if labeled else [],
+        }
+    ]
+    return evaluator
+
+
+def test_evaluator_exports_predictions_without_f1_for_unlabeled(tmp_path):
+    evaluator = _make_evaluator(tmp_path, labeled=False)
+    result = evaluator.evaluate([[_FakeLane(0.5)]])
+    assert result == {}
+    prediction = tmp_path / "out" / "predictions" / "clip" / "00003.lines.txt"
+    assert prediction.is_file()
+    summary = json.loads((tmp_path / "out" / "unlabeled_summary.json").read_text())
+    assert summary["status"] == "predictions_only"
+    assert summary["images"] == 1
+    assert not (tmp_path / "out" / "diagnostic_metric.json").exists()
+
+
+def test_evaluator_still_scores_labeled_after_unlabeled_support(tmp_path):
+    evaluator = _make_evaluator(tmp_path, labeled=True)
+    result = evaluator.evaluate([[_FakeLane(0.5)]])
+    assert "F1" in result
+    assert (tmp_path / "out" / "diagnostic_metric.json").is_file()
+    assert not (tmp_path / "out" / "unlabeled_summary.json").exists()
+
+
+def test_evaluator_rejects_mixed_labeled_and_unlabeled_rows(tmp_path):
+    evaluator = _make_evaluator(tmp_path, labeled=False)
+    evaluator.data_infos.append({"image_id": "clip/00004", "labeled": True, "lanes": []})
+    with pytest.raises(ValueError, match="mixed labeled/unlabeled"):
+        evaluator.evaluate([[_FakeLane(0.5)], [_FakeLane(0.5)]])
+
+
 def test_repository_manifests_match_autodl_contract():
     root = Path(__file__).parents[1]
     train = MODULE.read_manifest_rows(
@@ -120,6 +253,33 @@ def test_repository_manifests_match_autodl_contract():
     assert not {row["clip_id"] for row in train}.intersection(
         row["clip_id"] for row in val
     )
+
+
+def _literal_module_constant(source: str, name: str):
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"{name} not found as a module-level literal")
+
+
+def test_infer_testA_script_matches_unlabeled_split_contract():
+    root = Path(__file__).parents[1]
+    source = (root / "scripts/autodl/infer_testA.py").read_text(encoding="utf-8")
+    assert _literal_module_constant(source, "UNLABELED_SPLITS") == MODULE.UNLABELED_SPLITS
+    # The eval must actually be redirected at the unlabeled split...
+    for key in (
+        "dataloader.test.dataset.manifest_path",
+        "dataloader.test.dataset.split",
+        "dataloader.evaluator.output_basedir",
+        "train.init_checkpoint",
+    ):
+        assert f'override("{key}"' in source
+    # ...and must refuse to believe a score computed without ground truth.
+    assert "diagnostic_metric.json" in source
+    assert "predictions_only" in source
 
 
 def test_autodl_configs_and_scripts_encode_execution_contract():

@@ -50,6 +50,19 @@ LOGGER = logging.getLogger(__name__)
 CANVAS_W = 1366
 CANVAS_H = 720
 
+# Splits whose manifest rows carry a GT path (train/val) versus the competition
+# prediction-only splits (testA/testB). Unlabeled rows have gt_path = None and
+# must not be required to ship anno_txt/Annotations files: the released
+# testA set (900 images / 9 clips) ships JPEGImages only.
+LABELED_SPLITS = {"train", "val"}
+UNLABELED_SPLITS = {"testA", "testB"}
+SUPPORTED_SPLITS = LABELED_SPLITS | UNLABELED_SPLITS
+
+
+def is_labeled_split(split: str) -> bool:
+    """Whether a split name carries lane-line ground truth."""
+    return split in LABELED_SPLITS
+
 
 def _sample_tensors_finite(sample: dict) -> bool:
     """True when every transformed tensor in the sample is finite (no NaN/Inf).
@@ -172,13 +185,20 @@ def read_manifest_rows(path: str | Path, expected_split: str) -> list[dict]:
             if row["image_id"] != expected_id or expected_id in seen:
                 raise ValueError(f"duplicate/inconsistent image_id at line {line_number}")
             image_path = _safe_relative_path(row["image_path"], "JPEGImages")
-            gt_path = _safe_relative_path(row["gt_path"], "anno_txt")
             if image_path.parts[1] != row["clip_id"] or image_path.stem != row["frame_id"]:
                 raise ValueError(f"inconsistent image_path at line {line_number}")
             if row["pred_rel_path"] != f"{row['clip_id']}/{row['frame_id']}.lines.txt":
                 raise ValueError(f"inconsistent pred_rel_path at line {line_number}")
-            if gt_path.parts[1] != row["clip_id"] or gt_path.name != f"{row['frame_id']}.lines.txt":
-                raise ValueError(f"inconsistent gt_path at line {line_number}")
+            if is_labeled_split(expected_split):
+                if row["gt_path"] is None:
+                    raise ValueError(f"labeled split {expected_split!r} has null gt_path at line {line_number}")
+                gt_path = _safe_relative_path(row["gt_path"], "anno_txt")
+                if gt_path.parts[1] != row["clip_id"] or gt_path.name != f"{row['frame_id']}.lines.txt":
+                    raise ValueError(f"inconsistent gt_path at line {line_number}")
+            elif row["gt_path"] is not None:
+                # Leaking GT into a prediction-only split would silently turn a
+                # submission rehearsal into a self-scoring run.
+                raise ValueError(f"unlabeled split {expected_split!r} carries gt_path at line {line_number}")
             seen.add(expected_id)
             rows.append(row)
     if not rows:
@@ -191,9 +211,12 @@ class HardLaneDataset(BaseDataset):
 
     def __init__(self, data_root, manifest_path, split, cut_height, processes=None, cfg=None):
         _require_unlanedet()
-        if split not in {"train", "val"}:
-            raise ValueError(f"HardLaneDataset only supports train/val, got {split!r}")
+        if split not in SUPPORTED_SPLITS:
+            raise ValueError(
+                f"HardLaneDataset supports {sorted(SUPPORTED_SPLITS)}, got {split!r}"
+            )
         self.split = split
+        self.labeled = is_labeled_split(split)
         super().__init__(data_root, split, cut_height, processes=processes, cfg=cfg)
         self.manifest_path = str(manifest_path)
         self.load_annotations()
@@ -204,40 +227,69 @@ class HardLaneDataset(BaseDataset):
         data_root = Path(self.data_root)
         for row in rows:
             image_rel = PurePosixPath(row["image_path"])
-            gt_rel = PurePosixPath(row["gt_path"])
-            mask_rel = PurePosixPath("Annotations", row["clip_id"], f"{row['frame_id']}.png")
             image_path = data_root.joinpath(*image_rel.parts)
-            gt_path = data_root.joinpath(*gt_rel.parts)
-            mask_path = data_root.joinpath(*mask_rel.parts)
-            for kind, file_path in (
-                ("image", image_path), ("GT", gt_path), ("mask", mask_path)
-            ):
-                if not file_path.is_file():
-                    raise FileNotFoundError(f"manifest {kind} missing: {file_path}")
-            lanes = read_lines_lanes(gt_path)
-            if self.cfg is not None and len(lanes) > int(self.cfg.max_lanes):
-                raise ValueError(
-                    f"{row['image_id']} has {len(lanes)} lanes, exceeds target capacity "
-                    f"{self.cfg.max_lanes}"
+            if not image_path.is_file():
+                raise FileNotFoundError(f"manifest image missing: {image_path}")
+            info = {
+                "image_id": row["image_id"],
+                "img_name": image_rel.as_posix(),
+                "img_path": str(image_path),
+                "manifest_order": row["order"],
+                "labeled": self.labeled,
+            }
+            if self.labeled:
+                gt_rel = PurePosixPath(row["gt_path"])
+                mask_rel = PurePosixPath("Annotations", row["clip_id"], f"{row['frame_id']}.png")
+                gt_path = data_root.joinpath(*gt_rel.parts)
+                mask_path = data_root.joinpath(*mask_rel.parts)
+                for kind, file_path in (("GT", gt_path), ("mask", mask_path)):
+                    if not file_path.is_file():
+                        raise FileNotFoundError(f"manifest {kind} missing: {file_path}")
+                lanes = read_lines_lanes(gt_path)
+                if self.cfg is not None and len(lanes) > int(self.cfg.max_lanes):
+                    raise ValueError(
+                        f"{row['image_id']} has {len(lanes)} lanes, exceeds target capacity "
+                        f"{self.cfg.max_lanes}"
+                    )
+                info.update(
+                    {
+                        "anno_path": str(gt_path),
+                        "mask_path": str(mask_path),
+                        "lanes": lanes,
+                        "is_empty": not lanes,
+                    }
                 )
-            self.data_infos.append(
-                {
-                    "image_id": row["image_id"],
-                    "img_name": image_rel.as_posix(),
-                    "img_path": str(image_path),
-                    "anno_path": str(gt_path),
-                    "mask_path": str(mask_path),
-                    "lanes": lanes,
-                    "is_empty": not lanes,
-                    "manifest_order": row["order"],
-                }
+            else:
+                # Prediction-only split: keep the key set identical so consumers
+                # never hit a KeyError. lanes must be [] rather than None --
+                # GenerateLaneLine.__call__ iterates sample["lanes"] even with
+                # training=False (cut_height offset loop + lane_to_linestrings),
+                # so None would raise TypeError. [] is the same state the 35
+                # empty-GT val images already exercise. "labeled" is the
+                # discriminator; is_empty=True only reflects the empty list and
+                # must not be read as "this clip has no lanes".
+                info.update(
+                    {
+                        "anno_path": None,
+                        "mask_path": None,
+                        "lanes": [],
+                        "is_empty": True,
+                    }
+                )
+            self.data_infos.append(info)
+        if self.labeled:
+            LOGGER.info(
+                "Loaded HardLane %s manifest: %d images, %d empty",
+                self.split,
+                len(self.data_infos),
+                sum(info["is_empty"] for info in self.data_infos),
             )
-        LOGGER.info(
-            "Loaded HardLane %s manifest: %d images, %d empty",
-            self.split,
-            len(self.data_infos),
-            sum(info["is_empty"] for info in self.data_infos),
-        )
+        else:
+            LOGGER.info(
+                "Loaded HardLane %s manifest: %d images (unlabeled, predictions only)",
+                self.split,
+                len(self.data_infos),
+            )
 
     def _build_raw_sample(self, data_info: dict, image, mask):
         """Pristine pre-transforms sample; processes() mutates its input in
@@ -341,9 +393,53 @@ class HardLaneEvaluator(DatasetEvaluator):
                 result.append(points)
         return result
 
+    @staticmethod
+    def _write_prediction(path: Path, points: Sequence[np.ndarray]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            " ".join(f"{value:.5f}" for value in lane.reshape(-1)) for lane in points
+        ]
+        path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
     def evaluate(self, predictions):
         if len(predictions) != len(self.data_infos):
             raise ValueError(f"prediction count {len(predictions)} != manifest count {len(self.data_infos)}")
+        # "labeled" (not lane emptiness) is the discriminator: unlabeled rows
+        # legitimately carry lanes == [] to keep the transform chain working.
+        labeled_flags = {bool(info["labeled"]) for info in self.data_infos}
+        if len(labeled_flags) > 1:
+            raise ValueError("mixed labeled/unlabeled rows in one evaluator")
+        labeled = labeled_flags.pop() if labeled_flags else False
+
+        prediction_root = Path(self.output_basedir) / "predictions"
+        prediction_by_image = {}
+        for info, prediction in zip(self.data_infos, predictions):
+            points = self._prediction_points(prediction)
+            prediction_by_image[info["image_id"]] = points
+            self._write_prediction(prediction_root / f"{info['image_id']}.lines.txt", points)
+
+        output_root = Path(self.output_basedir)
+        output_root.mkdir(parents=True, exist_ok=True)
+
+        if not labeled:
+            # testA/testB: no GT exists, so any F1 here would be fabricated.
+            # Export the predictions and leave scoring to the frozen Oracle or
+            # the competition server.
+            summary = {
+                "status": "predictions_only",
+                "images": len(prediction_by_image),
+                "prediction_root": str(prediction_root),
+            }
+            (output_root / "unlabeled_summary.json").write_text(
+                json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            LOGGER.info(
+                "Exported %d unlabeled predictions to %s (no diagnostic F1)",
+                len(prediction_by_image),
+                prediction_root,
+            )
+            return {}
+
         # The evaluator runs inside train_net's process whose CWD (and thus
         # sys.path seed) is the UnLanedet repo root, so neither the project
         # root ("src" package) nor src/ itself ("common" package) is importable
@@ -357,25 +453,11 @@ class HardLaneEvaluator(DatasetEvaluator):
                 sys.path.insert(0, path)
         from src.eval.matching import compute_f1
 
-        prediction_by_image = {}
-        gt_by_image = {}
-        prediction_root = Path(self.output_basedir) / "predictions"
-        for info, prediction in zip(self.data_infos, predictions):
-            points = self._prediction_points(prediction)
-            prediction_by_image[info["image_id"]] = points
-            gt_by_image[info["image_id"]] = [
-                np.asarray(lane, dtype=np.float64) for lane in info["lanes"]
-            ]
-            output_path = prediction_root / f"{info['image_id']}.lines.txt"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            lines = [
-                " ".join(f"{value:.5f}" for value in lane.reshape(-1)) for lane in points
-            ]
-            output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-
+        gt_by_image = {
+            info["image_id"]: [np.asarray(lane, dtype=np.float64) for lane in info["lanes"]]
+            for info in self.data_infos
+        }
         result = compute_f1(prediction_by_image, gt_by_image)
-        output_root = Path(self.output_basedir)
-        output_root.mkdir(parents=True, exist_ok=True)
         (output_root / "diagnostic_metric.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )

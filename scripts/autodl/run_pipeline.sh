@@ -3,8 +3,8 @@ set -Eeuo pipefail
 
 through="${1:-gate}"
 case "$through" in
-  gate|screen|baseline) ;;
-  *) echo "usage: $0 {gate|screen|baseline}" >&2; exit 2 ;;
+  gate|screen|baseline|testA) ;;
+  *) echo "usage: $0 {gate|screen|baseline|testA}" >&2; exit 2 ;;
 esac
 
 for name in HARDLANE_PROJECT_ROOT HARDLANE_DATA_ROOT UNLANEDET_ROOT \
@@ -109,3 +109,21 @@ fi
   --through baseline --archive "$output/handoff_baseline.tar.gz" --force
 
 echo "AutoDL baseline pipeline complete: $output/runs/baseline_${winner}_36ep"
+
+if [[ "$through" == "baseline" ]]; then
+  exit 0
+fi
+
+# testA: export predictions for the unlabeled competition split. No F1 is
+# computed here -- the split ships no ground truth, so scoring only happens
+# later through the frozen Oracle (local rehearsal) or the competition server
+# (real submission). Predictions are archived separately from the 271MB model
+# handoff because only the .lines.txt files are needed to package a submission.
+infer_dir="$output/runs/baseline_${winner}_36ep/testA_infer"
+"$python_bin" "$project/scripts/autodl/infer_testA.py" \
+  --run-dir "$output/runs/baseline_${winner}_36ep" --split testA --skip-if-complete
+tar -czf "$output/handoff_testA_preds.tar.gz" \
+  -C "$infer_dir" testA/predictions infer_evidence.json
+
+echo "AutoDL testA inference complete: $infer_dir"
+echo "predictions archive: $output/handoff_testA_preds.tar.gz"
