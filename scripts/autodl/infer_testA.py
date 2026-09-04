@@ -69,6 +69,13 @@ def main() -> None:
     )
     parser.add_argument("--manifest", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument(
+        "--conf-threshold",
+        type=float,
+        default=None,
+        help="Override model.head.cfg.test_parameters.conf_threshold "
+        "(single-variable experiment hook; omit to keep the config value).",
+    )
     parser.add_argument("--skip-if-complete", action="store_true")
     args = parser.parse_args()
 
@@ -159,6 +166,13 @@ def main() -> None:
         "train.seed=42",
         "train.cudnn_benchmark=False",
     ]
+    if args.conf_threshold is not None:
+        # Single-variable experiment hook: the head reads the decode-time
+        # confidence gate from model.head.cfg (the shared param_config), so the
+        # override path is model.head.cfg.test_parameters.conf_threshold.
+        command.append(
+            override("model.head.cfg.test_parameters.conf_threshold", args.conf_threshold)
+        )
     (output_dir / "infer_command.json").write_text(
         json.dumps(command, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
@@ -172,6 +186,7 @@ def main() -> None:
                 "training_git_head": training_head,
                 "selected_checkpoint_sha256": checkpoint_sha,
                 "manifest_sha256": manifest_sha,
+                "conf_threshold": args.conf_threshold,
             },
             ensure_ascii=False,
             indent=2,
