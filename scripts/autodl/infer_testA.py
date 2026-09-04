@@ -98,8 +98,16 @@ def main() -> None:
     model = run_evidence.get("model")
     if model not in CONFIGS:
         raise SystemExit(f"unknown model in run evidence: {model!r}")
-    if run_evidence.get("project_git_head") != project_head:
-        raise SystemExit("run evidence was produced by a different project commit")
+    # Deliberately NOT requiring run_evidence["project_git_head"] == current head.
+    # evaluate_selected.py needs that equality because it must reproduce the
+    # training-time F1, which any code change can legitimately alter. Here there
+    # is no score to reproduce: the artifact identity is the checkpoint SHA
+    # (verified below), and inference should run under the CURRENT code --
+    # otherwise no new code could ever export predictions from an existing
+    # checkpoint. Provenance is preserved by recording both commits.
+    training_head = run_evidence.get("project_git_head")
+    if not isinstance(training_head, str) or len(training_head) != 40:
+        raise SystemExit(f"run evidence has no usable project_git_head: {run_evidence_path}")
     selected = run_evidence["selected_best_checkpoint"]
     checkpoint = Path(selected["path"]).resolve()
     if checkpoint.parent != run_dir:
@@ -159,6 +167,8 @@ def main() -> None:
                 "status": "running",
                 "model": model,
                 "split": args.split,
+                "project_git_head": project_head,
+                "training_git_head": training_head,
                 "selected_checkpoint_sha256": checkpoint_sha,
                 "manifest_sha256": manifest_sha,
             },
@@ -206,6 +216,7 @@ def main() -> None:
         "split": args.split,
         "run_evidence": str(run_evidence_path),
         "project_git_head": project_head,
+        "training_git_head": training_head,
         "selected_checkpoint": str(checkpoint),
         "selected_checkpoint_sha256": checkpoint_sha,
         "manifest": str(manifest),

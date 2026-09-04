@@ -280,6 +280,12 @@ def test_infer_testA_script_matches_unlabeled_split_contract():
     # ...and must refuse to believe a score computed without ground truth.
     assert "diagnostic_metric.json" in source
     assert "predictions_only" in source
+    # Inference runs under the current code, so it records the training commit
+    # instead of demanding equality (unlike evaluate_selected.py's F1 replay).
+    # The real artifact identity is then the checkpoint SHA, not the commit.
+    assert "training_git_head" in source
+    assert "selected_checkpoint_sha256" in source
+    assert "SHA changed" in source
 
 
 def test_autodl_configs_and_scripts_encode_execution_contract():
