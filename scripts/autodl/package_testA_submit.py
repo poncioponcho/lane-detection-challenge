@@ -21,6 +21,8 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
+
 from run_training import required_absolute_env
 from validate_run import manifest_prediction_paths
 
@@ -31,6 +33,53 @@ def _bootstrap_src_imports(project_root: Path) -> None:
     for path in (str(project_root), str(src_root)):
         if path not in sys.path:
             sys.path.insert(0, path)
+
+
+def recontract_predictions(prediction_root: Path, expected: set[str],
+                           staged_root: Path) -> dict:
+    """Rewrite predictions into the submission contract format (1 decimal).
+
+    The diagnostic evaluator exports 5-decimal coordinates for the F1 replay;
+    the official submission contract is strictly 1-decimal
+    (verify_submit._ONE_DECIMAL). Rounding happens HERE, in the packaging layer,
+    so the replay path and its byte-level F1 guard stay untouched — the boxed
+    caveat being that the server scores the rounded geometry, so the 5-decimal
+    diagnostic F1 is an upper-bound-style estimate, not the submission score.
+
+    Each lane goes through export_lines.lane_to_line: 1-decimal tokens, bounds
+    + non-normalized assertions, and consecutive-duplicate removal AFTER
+    formatting. Lanes that collapse below 2 points post-rounding are dropped
+    (a lane the official parser would reject anyway) and counted.
+    """
+    from submit.export_lines import lane_to_line
+
+    staged_root.mkdir(parents=True, exist_ok=True)
+    stats = {"files": 0, "lanes": 0, "dropped_lanes": 0, "empty_files": 0}
+    for rel in sorted(expected):
+        source = prediction_root / rel
+        target = staged_root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        lines: list[str] = []
+        if source.is_file():
+            for line in source.read_text(encoding="utf-8").splitlines():
+                tokens = line.split()
+                if not tokens:
+                    continue
+                if len(tokens) % 2 or len(tokens) < 4:
+                    raise ValueError(f"{rel}: malformed lane ({len(tokens)} tokens)")
+                points = np.asarray(tokens, dtype=np.float64).reshape(-1, 2)
+                try:
+                    lines.append(lane_to_line(points))
+                    stats["lanes"] += 1
+                except ValueError:
+                    stats["dropped_lanes"] += 1
+        target.write_text(
+            "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8"
+        )
+        stats["files"] += 1
+        if not lines:
+            stats["empty_files"] += 1
+    return stats
 
 
 def main() -> None:
@@ -83,7 +132,10 @@ def main() -> None:
     from submit.pack_submit import pack_submit
     from submit.verify_submit import verify_submit
 
-    pack_submit(prediction_root, expected, output_zip)
+    staged_root = output_zip.parent / f"{args.split}_submit_fmt"
+    fmt_stats = recontract_predictions(prediction_root, expected, staged_root)
+
+    pack_submit(staged_root, expected, output_zip)
     ok, report = verify_submit(
         output_zip, expected, report_path=output_zip.with_suffix(".verify.md")
     )
@@ -96,12 +148,7 @@ def main() -> None:
         "bytes": output_zip.stat().st_size,
         "sha256": digest,
         "expected_count": len(expected),
-        "empty_files": sum(
-            1
-            for rel in expected
-            if not (prediction_root / rel).is_file()
-            or (prediction_root / rel).stat().st_size == 0
-        ),
+        "recontract": fmt_stats,
         "missing_on_disk": missing_on_disk,
         "extra_on_disk": extra_on_disk,
         "verify_report": report.strip().splitlines()[-1] if report else "",
