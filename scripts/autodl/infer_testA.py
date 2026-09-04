@@ -28,7 +28,7 @@ from run_training import (
     required_absolute_env,
     stream_command,
 )
-from validate_run import expected_prediction_paths, sha256_file
+from validate_run import manifest_prediction_paths, sha256_file
 
 # Must stay in sync with src/integrations/unlanedet_hardlane.py::UNLABELED_SPLITS;
 # tests/test_unlanedet_hardlane.py guards the pairing.
@@ -122,7 +122,8 @@ def main() -> None:
     if not manifest.is_file():
         raise SystemExit(f"manifest missing: {manifest}")
     manifest_sha = sha256_file(manifest)
-    expected_paths = expected_prediction_paths(manifest)
+    # testA declares 900 paths; only the val split is pinned to 800.
+    expected_paths = manifest_prediction_paths(manifest, expected_count=None)
 
     output_dir = (args.output_dir or (run_dir / f"{args.split.lower()}_infer")).resolve()
     evidence_path = output_dir / "infer_evidence.json"

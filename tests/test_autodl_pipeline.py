@@ -323,3 +323,20 @@ def test_run_training_dry_run_is_non_mutating_and_pins_seed(tmp_path):
     assert "train.cudnn_benchmark=False" in launch["command"]
     assert "train.checkpointer.max_to_keep=40" in launch["command"]
     assert not (output / "runs").exists()
+
+
+def test_manifest_prediction_paths_handles_any_split_size():
+    """Only the val split is pinned to 800; unlabeled splits declare their own."""
+    val = VALIDATE.expected_prediction_paths(
+        ROOT / "data/processed/manifest_val_v1_seed42.jsonl"
+    )
+    assert len(val) == 800
+    test_a = VALIDATE.manifest_prediction_paths(
+        ROOT / "data/processed/manifest_testA.jsonl", expected_count=None
+    )
+    assert len(test_a) == 900
+    assert not test_a & val  # disjoint clip sets
+    with pytest.raises(ValueError, match="900 paths != 800"):
+        VALIDATE.manifest_prediction_paths(
+            ROOT / "data/processed/manifest_testA.jsonl", expected_count=800
+        )

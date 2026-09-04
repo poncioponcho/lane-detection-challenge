@@ -108,7 +108,8 @@ def validate_diagnostic(value: dict) -> dict:
     return {"F1": f1, "TP": tp, "FP": fp, "FN": fn, "P": predicted, "G": gt}
 
 
-def expected_prediction_paths(manifest_path: Path) -> set[str]:
+def manifest_prediction_paths(manifest_path: Path, expected_count: int | None = None) -> set[str]:
+    """Prediction rel-paths declared by any manifest, count-checked if given."""
     expected = set()
     for line_number, raw in enumerate(
         manifest_path.read_text(encoding="utf-8").splitlines(), 1
@@ -122,11 +123,15 @@ def expected_prediction_paths(manifest_path: Path) -> set[str]:
         if rel in expected:
             raise ValueError(f"duplicate pred_rel_path in manifest: {rel}")
         expected.add(rel)
-    if len(expected) != EXPECTED_VAL_IMAGES:
+    if expected_count is not None and len(expected) != expected_count:
         raise ValueError(
-            f"validation manifest has {len(expected)} paths != {EXPECTED_VAL_IMAGES}"
+            f"manifest has {len(expected)} paths != {expected_count}"
         )
     return expected
+
+
+def expected_prediction_paths(manifest_path: Path) -> set[str]:
+    return manifest_prediction_paths(manifest_path, EXPECTED_VAL_IMAGES)
 
 
 def git_head(project_root: Path) -> str:
