@@ -237,6 +237,7 @@ def main() -> None:
         "selected_checkpoint_sha256": checkpoint_sha,
         "manifest": str(manifest),
         "manifest_sha256": manifest_sha,
+        "conf_threshold": args.conf_threshold,
         "prediction_count": len(actual_paths),
         "prediction_root": str(basedir / "predictions"),
         "selected_best_f1": run_evidence["f1_history"]["best"]["f1"],
