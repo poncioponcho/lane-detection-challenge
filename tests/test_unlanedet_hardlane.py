@@ -226,6 +226,18 @@ def test_evaluator_exports_predictions_without_f1_for_unlabeled(tmp_path):
     assert not (tmp_path / "out" / "diagnostic_metric.json").exists()
 
 
+def test_evaluator_exports_finite_line_confidence_sidecar(tmp_path):
+    evaluator = _make_evaluator(tmp_path, labeled=False)
+    lane = _FakeLane(0.5)
+    lane.metadata = {"conf": 0.73125}
+    evaluator.evaluate([[lane]])
+    payload = json.loads(
+        (tmp_path / "out" / "prediction_scores.json").read_text(encoding="utf-8")
+    )
+    assert payload["images"] == 1
+    assert payload["scores_by_image"]["clip/00003"] == [pytest.approx(0.73125)]
+
+
 def test_evaluator_still_scores_labeled_after_unlabeled_support(tmp_path):
     evaluator = _make_evaluator(tmp_path, labeled=True)
     result = evaluator.evaluate([[_FakeLane(0.5)]])

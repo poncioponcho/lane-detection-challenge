@@ -380,9 +380,16 @@ class HardLaneEvaluator(DatasetEvaluator):
         return None
 
     def _prediction_points(self, prediction: Iterable) -> list[np.ndarray]:
+        points, _ = self._prediction_points_and_scores(prediction)
+        return points
+
+    def _prediction_points_and_scores(
+        self, prediction: Iterable
+    ) -> tuple[list[np.ndarray], list[float | None]]:
         sample_ys = np.asarray(list(self.cfg.sample_y), dtype=np.float64)
         normalized_ys = sample_ys / float(self.cfg.ori_img_h)
         result: list[np.ndarray] = []
+        scores: list[float | None] = []
         for lane in prediction:
             xs = np.asarray(lane(normalized_ys), dtype=np.float64)
             valid = np.isfinite(xs) & (xs >= 0.0) & (xs < 1.0)
@@ -391,7 +398,10 @@ class HardLaneEvaluator(DatasetEvaluator):
             )
             if len(points) >= 2:
                 result.append(points)
-        return result
+                metadata = getattr(lane, "metadata", {}) or {}
+                confidence = metadata.get("conf")
+                scores.append(float(confidence) if confidence is not None else None)
+        return result, scores
 
     @staticmethod
     def _write_prediction(path: Path, points: Sequence[np.ndarray]) -> None:
@@ -413,13 +423,33 @@ class HardLaneEvaluator(DatasetEvaluator):
 
         prediction_root = Path(self.output_basedir) / "predictions"
         prediction_by_image = {}
+        score_by_image = {}
         for info, prediction in zip(self.data_infos, predictions):
-            points = self._prediction_points(prediction)
+            points, scores = self._prediction_points_and_scores(prediction)
             prediction_by_image[info["image_id"]] = points
+            score_by_image[info["image_id"]] = scores
             self._write_prediction(prediction_root / f"{info['image_id']}.lines.txt", points)
 
         output_root = Path(self.output_basedir)
         output_root.mkdir(parents=True, exist_ok=True)
+        score_path = output_root / "prediction_scores.json"
+        score_path.write_text(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "images": len(score_by_image),
+                    "scores_by_image": score_by_image,
+                    "note": (
+                        "scores correspond to exported lines after model NMS; "
+                        "export eval must use conf_threshold=0.0 for offline threshold scans"
+                    ),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
         if not labeled:
             # testA/testB: no GT exists, so any F1 here would be fabricated.
@@ -446,9 +476,10 @@ class HardLaneEvaluator(DatasetEvaluator):
         # by default (observed as ModuleNotFoundError: No module named
         # 'common' in the gate final eval). Mirror the probe/smoke pattern and
         # add both roots up front.
-        src_root = Path(__file__).resolve().parent
-        project_root = str(src_root.parent)
-        for path in (project_root, str(src_root)):
+        integration_root = Path(__file__).resolve().parent
+        src_root = integration_root.parent
+        project_root = src_root.parent
+        for path in (str(project_root), str(src_root)):
             if path not in sys.path:
                 sys.path.insert(0, path)
         from src.eval.matching import compute_f1
