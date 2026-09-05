@@ -22,7 +22,7 @@
 
 **全集汇总下的 F1 恒等式（脚本验证）**：`F1 = 2·TP/(P+G)`。调试只需盯 TP 和 P 两个数。
 
-**当前方向（2026-09-05）**：详见 `docs/DECISIONS.md` §26 与 `outputs/reports/lvo_scene_attribution_20260905.md`。原 §9 的条数敏感度是早期先验；真实 LVO 归因显示最大离群 video 是 FP 爆炸，且 testA 也出现同族过检，因此当前先压 FP，再决定是否投入新的训练型增强。
+**当前方向（2026-09-05）**：详见 `docs/DECISIONS.md` §26 与 `docs/governance_consistency_20260905.md`。D→C raw/conf 扫描显示 final conf=`0.30/0.35` 在 LVO 上显著优于 conf=`0.40`，但真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`；当前先做 testA eval-only/打包验证，不直接改生产默认值，也不启动新训练。
 
 **横向误差边界（T12 实测修正）**：cv2 `thickness=30` 有效线宽≈31px → IoU=0.5 真实边界 **≈10.3px**（非理想模型的 10px）。本地 metric 已自检全绿，详见 `docs/T11_T12_metric_done.md`。
 
@@ -102,7 +102,7 @@ L6 治理层   DECISIONS 仲裁 + 文档状态管理（2026-09-01 §14 立制）
 原最高风险项 **metric 精度改由双层结构兜底**：官方 score.py 已逐字节冻结为裁决 Oracle；本地已修复三处偏差，并通过 1034 个渲染用例与 576 图非 identity 跨环境差分（逐图 TP/FP/FN 零分歧）。训练期可用本地诊断层，最终裁决仍一律走 Oracle（DECISIONS §17.1/§19）。
 单人剩余最大风险：**人工带宽**（≈95–105h，任何关键路径环节延期 ≥2 天触发再裁剪）。
 
-**目标滚动重估**（DECISIONS §26，9/5 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；AutoDL baseline 已完成，交接证据见远端 `handoff_baseline.tar.gz`。几何预筛已完成且无可保留变体（去重 no-op、cap4/5 均无正收益）；当前等待独立 36ep LVO D 完成后执行一次 C raw/conf checkpoint 扫描。
+**目标滚动重估**（DECISIONS §26，9/5 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；AutoDL baseline 与独立 36ep LVO D→C 均已完成，C midpoint/final 各覆盖 7100/7100 图。几何预筛无可保留变体；LVO 支持 final conf=`0.30/0.35`，但 A 榜支持 conf=`0.50`，当前执行 testA eval-only 候选验证。
 
 ---
 

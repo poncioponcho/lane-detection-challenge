@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v1.1** |
-| 状态 | **active**（9/5 校验记录；后续以 DECISIONS 新裁决更新） |
-| 版本链 | v1.0（初次校验）→ **v1.1**（导入路径修复后的复核） |
+| 文档版本 | **v1.2** |
+| 状态 | **active**（9/5 C 完成与 raw/conf 扫描复核；后续以 DECISIONS 新裁决更新） |
+| 版本链 | v1.0（初次校验）→ v1.1（导入路径修复后的复核）→ **v1.2**（D→C 完成与阈值扫描） |
 | 上游依据 | `docs/DECISIONS.md` §14 / §17–§26；`configs/default.yaml` v6 |
 | 更新日期 | 2026-09-05 |
 
 ## 结论
 
-本次校验基于工作区落盘文件、LVO OOF 官方 Oracle 结果和 AutoDL 只读状态完成。当前生效目标已统一为：
+本次校验基于工作区落盘文件、LVO OOF 官方 Oracle 结果、AutoDL 只读状态和 C 阶段回传产物完成。当前生效目标已统一为：
 
 | 键 | 当前值 | 唯一依据 |
 |---|---:|---|
@@ -58,19 +58,27 @@
 
 LVO 场景归因中，`v546797496` F1=`0.4676`，FP/img=`1.73`，而其他 fog video FP/img=`0.76`；去掉该 video 后 fog F1 从 `0.6561` 升至 `0.7411`。因此当前证据支持“压 FP/重复线”优先，不支持把 fog/rain 增强作为默认高杠杆方向。
 
+### D→C raw/conf 扫描（2026-09-05）
+
+- D 状态为 `complete`；8/8 个 fold 的 `fold_state.json` 均为 `status=pass`。
+- C 状态为 `complete`；`midpoint` 和 `final` 各覆盖 7100/7100 张图，8 个 fold 均通过；候选导出阈值为 `0.0`，每条导出线都有独立 metadata score。
+- 冻结官方 Oracle 扫描 16 个变体全部 `status=pass`，输入为 8 个 video cluster、7100 张图、10000 次成对 bootstrap；完整 JSON 位于被 `.gitignore` 排除的 `outputs/lvo_conf_checkpoint_scan_20260905/conf_checkpoint_scan.json`。
+- 参考为 `final_conf_0p40`，F1=`0.752703109`。`final_conf_0p30` 为 F1=`0.759815559`，Δ=`+0.7112pp`，video-paired CI=`[+0.2363,+1.1391]pp`；`final_conf_0p35` 为 F1=`0.756899602`，Δ=`+0.4196pp`，CI=`[+0.1384,+0.6684]pp`。
+- 更高阈值均持续损失召回；但 A 榜真实记录 `714962=0.73444`（conf=`0.5`）高于 `714942=0.72794`（conf=`0.4`），所以 `0.30/0.35` 只进入 testA 候选验证，不直接替换当前榜单候选。
+
 ## 当前方向排序
 
-1. **零 GPU、几何可靠的压 FP 后处理**：在 video-disjoint OOF 上做重复线过滤、几何 NMS、保守输出截断等扫描；先核对输出顺序和语义，不能把 `.lines.txt` 行序当成 score。
-2. **一次 checkpoint raw/conf-aware 推理扫描**：现有 OOF 不能扫 conf；需要重新推理取得候选分数，再做 conf/NMS/max-output 的组合扫描。结果先作为调参证据，待正式 video 口径批准后再作为闸门结论。
-3. **36ep video-disjoint LVO**：用同一生产 checkpoint 做完整跨 video 尺子，成本约一轮 GPU；启动前必须按 runbook 归档明确旧 run 释放空间，禁止直接删除。
-4. **训练型增强/分辨率**：只有在第 2、3 项给出方向后再开；fog/rain 不再默认优先。
-5. **score-aware TTA**：既有 flip-union A 榜为 `0.72950`，低于 t05，不再做无分数 union；只有带分数匹配、融合、NMS 的版本值得重新评估。
+1. **testA eval-only 候选验证**：用现有 36ep 生产 checkpoint 跑 conf=`0.30` 和 `0.35`，分别完成 900 文件导出、1 位小数打包和 verify；不计算伪造的 testA F1。
+2. **榜单验证后再选点**：保留已有 A 榜 conf=`0.50` 候选作为基线；`0.30/0.35` 只有在真实提交改善后才进入默认候选，单次只提交一个变量。
+3. **后处理继续保持 NO-GO**：几何去重 5–20px 全部 no-op，cap4/5 无正收益；不把未通过 CI 的变体并入生产链。
+4. **训练型增强/分辨率**：在阈值候选完成跨域验证前不启动；fog/rain 不再默认优先。
+5. **score-aware TTA**：既有 flip-union A 榜为 `0.72950`，低于 t05，不做无分数 union；仅在有分数匹配、融合、NMS 证据时重开。
 
 几何预筛已落盘于 `outputs/lvo_geometry_scan_20260905_v3/`：重复线过滤 5–20px 全部 no-op；cap4 为 `−1.260pp`、cap5 为 `−0.206pp`，均不构成可保留的正向变体。
 
 ## 远端状态
 
-截至 `2026-09-05T07:26Z`：AutoDL `pipeline.status=complete`，winner=`clrnet_r50`；独立的 36ep LVO 实验 `lvo36.status=running`，正在 `fold_03_v566817042` 训练，C 阶段守护进程仍等待 D 完成。磁盘约 100GB 中使用 92%、剩余约 8.2GB；当前无并行 CUDA 实验，D 完成前不启动其他训练。
+截至 D 日志 `2026-09-05T14:15:55Z`：AutoDL `pipeline.status=complete`，winner=`clrnet_r50`；独立 36ep LVO 的 D/C 均为 `complete`，C 最后一项为 `final/fold_07_v777679069 pass`。远端磁盘约 100GB 中使用 98%、剩余约 2.3GB；不再启动新的训练，下一步仅做小规模 testA eval-only 候选验证。
 
 ## 校验命令结果
 
@@ -79,3 +87,5 @@ LVO 场景归因中，`v546797496` F1=`0.4676`，FP/img=`1.73`，而其他 fog v
 - `git diff --check`：PASS。
 - 定向契约测试（Oracle hash、manifest、split）：`24 passed`。
 - 全套测试：`119 passed`（含 score sidecar 契约测试）；此前 `test_evaluator_still_scores_labeled_after_unlabeled_support` 的导入路径问题已修复为同时注入仓库根目录与 `src/`，并通过复跑确认。
+- C 输入覆盖校验：midpoint/final 各 7100/7100 prediction files，score image 各 7100/7100，PASS。
+- raw/conf checkpoint 扫描：16 variants、全局与 8 video cluster Oracle、10000 次 paired bootstrap，`status=pass`。
