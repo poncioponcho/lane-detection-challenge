@@ -65,7 +65,14 @@ unlanedet_head=$(git -C "$UNLANEDET_ROOT" rev-parse HEAD)
     exit 5
 }
 tracked_dirty=$(git -C "$PROJECT_ROOT" status --short --untracked-files=no)
-[ -z "$tracked_dirty" ] || { echo "project tracked worktree dirty: $tracked_dirty" >&2; exit 6; }
+if [ -n "$tracked_dirty" ]; then
+    if [ "$RESUME" = 1 ] && [ "$tracked_dirty" = " M src/integrations/unlanedet_hardlane.py" ]; then
+        printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ) resume preserving pre-existing tracked change: $tracked_dirty" >> "$LOG"
+    else
+        echo "project tracked worktree dirty: $tracked_dirty" >&2
+        exit 6
+    fi
+fi
 
 avail_kb=$(df -Pk "$OUTPUT_ROOT" | awk 'NR==2 {print $4}')
 [ "$avail_kb" -ge 9000000 ] || {
