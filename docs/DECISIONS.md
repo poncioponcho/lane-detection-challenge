@@ -804,3 +804,31 @@ Pinned 上游 `BestCheckpointer` 的 `best_metric/best_iter` 是 hook 内存状�
 **传导**：default.yaml target 块 v6 同步；docs/a_bang_snapshot.md 头注同步；本节取代 §1/§15.1 中被否证的旧数值（历史数字保留不改，以本节为准）。
 
 **R1–R4 评估统计规矩状态（2026-09-05 用户拍板：先记 memory 草案，暂不入本文件）**：video-disjoint 评估集 / video 为 bootstrap 单位 / clip 口径阈值作废待重标 / 能力预测只吃诚实口径——四条的完整文本暂存 `.workbuddy/memory/`（09-05 日志），待用户另行裁决后以新章节并入本文件；生效前 §17.3 的 paired-clip 闸门继续只用于 v1 泄漏 val 的“训练内监控”角色，不作为跨 video 泛化裁决依据。
+
+---
+
+## 二十七、conf=0.30 A 榜反馈与优化排序（2026-09-06）
+
+**触发**：testA `conf=0.30` 候选完成一次真实 A 榜提交，返回分数；新增证据记录在 `docs/a_bang_submit_20260906_conf030.md`。
+
+**事实**：
+
+- 提交记录 `715300`，文件 `outputs/testA_conf_candidates_20260905/conf_0p30/submit_testA.zip`，900/900 文件，官方格式校验通过，SHA-256=`1c4475e332b6e277427c280bae40c70d10b0cea5240c16673620ce56262747f`。
+- 官方得分为 **0.72613**；当日剩余额度为 2 次。
+- 对照记录：`714962 / t=0.50 = 0.73444`（当前最优）、`714970 / t=0.50 + flip-union = 0.72950`、`714942 / t=0.40 = 0.72794`。
+
+**裁决**：
+
+1. `conf=0.30` 比当前最优低 `0.831pp`，退出生产候选；不修改 `configs/default.yaml` 的默认阈值，当前生产候选继续冻结为 `t=0.50`。
+2. `conf=0.35` 虽已完成 eval-only、打包和 verify，但尚未真实提交；不得把 LVO 优势或本地可视化解释为其 A 榜得分。
+3. 剩余 A 榜额度不用于重复提交 `conf≤0.40`、无分数 flip-union 或未经本地筛选的组合；每次最多改变一个变量，并先保留文件 SHA 与配置指纹。
+
+**可行优化方向（按优先级）**：
+
+1. **相邻阈值**：围绕 `t=0.50` 在 video-disjoint LVO 上先筛选 `0.45/0.55` 等相邻点，再决定是否消耗 A 榜额度。当前证据只支持保留 `0.50`，不支持直接断言新的最优点。
+2. **分辨率单变量对照**：在 CLRNet-R50、数据和训练策略不变的条件下比较 `800×320` 与 `960×480`，重点看交叉口、远端短线、低照度的 FN、FP/img 与横向误差；使用 video-disjoint 证据，不以泄漏 val 单独放行。
+3. **低照度定向增强**：优先评估 gamma/对比度等低照度增强，保持独立开关、单变量和 LVO 场景分桶验收；既有 fog/rain 增强为 NO-GO，不因本次结果重新打开。
+4. **score-aware 后处理**：利用 score sidecar 做校准、候选排序和有限线级融合；必须在 LVO 同时显示稳定 TP/FP 收益后才进入 A 榜候选。几何去重、全局 cap4/5 与无分数 flip-union 不再优先。
+5. **主干升级**：仅在分辨率与低照度增强均无稳定收益时评估 ConvNeXt-T 等高成本方案；当前不启动新的大规模训练。
+
+**传导**：更新 `TASKS.md` T4.1、`overview.md`、`docs/lvo_conf_checkpoint_scan_20260905.md` 与 `docs/governance_consistency_20260905.md`；完整提交事实不把 `outputs/` 大文件纳入 Git。
