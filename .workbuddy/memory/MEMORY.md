@@ -17,6 +17,8 @@
 - 本地 CPU 开发 venv：`/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane`（numpy 2.5.2 / opencv-python-headless 5.0.0 / scipy 1.18.1 / pytest 9.1.1，python 3.13.12）。沙箱内复核须显式 `--basetemp=/private/tmp/<dedicated>`；2026-09-02 §25 后现测 **106 passed**。GPU 权重/模型/推理/训练实验只在 AutoDL，绝不以本地静态检查冒充。独立 Oracle 临时环境 `/private/tmp/lane-oracle-py312`（Python 3.12.13 + 官方精确 pins）；最终裁决不得使用训练环境。
 - **`.gitignore` 目录模式陷阱**：无前导斜杠的 `data/` 会匹配**任意层级**同名目录（误伤 `src/data/` 源码）；忽略根目录必须写 `/data/`（锚定）。
 
+- **切分协议铁律（2026-09-04 诊断，最高优先级）**：`v1_seed42` 是 **clip-level** 切分，**val 100% video 级泄漏**——val 的 8 clip 来自 5 个 video，这 5 个 video 的其余 63 clip 全在 train 里（7100 图 = 8 video / 71 clip）。因此 v1 val 上出现天花板效应，paired bootstrap CI 半宽 ±1.9pp，**任何 <2pp 的消融在 v1 val 上都不可判定**（实测：像素量 ×1.8 仅 +0.188pp）。→ 新消融必须先问"评估集是否 video-disjoint"，否则等于烧 GPU 换噪声。修法：8-fold leave-one-video-out 拼 7100 张 OOF 全集。**已闭环（2026-09-05）**：CLRNet-R50 15ep LVO 全局 F1=0.777628、video-cluster 95% CI=[0.6886,0.8374]——bootstrap 独立单位=8 video（71 clip 口径会低估，CI 半宽 7.4pp 非泄漏诊断时预期的 0.7pp）；最弱域 v546797496(F1 0.468)。这是 val 0.808(泄漏) 高估 ≈3pp 的机制解释，产物 `outputs/lvo_clrnet_r50_15ep_20260904/`。诊断见 `outputs/reports/video_leakage_diagnosis_20260904.md`。
+
 ## 已闭环的技术事实（勿重新推导）
 
 - **metric 复刻已完成且自检全绿**（2026-09-01，`tests/test_metric_selfcheck.py` 8/8）：cv2 `thickness=30` 有效线宽≈31px → **IoU=0.5 真实边界 ≈10.3px**（非理想模型的 10px）；A 榜反演标定 Q-A3 已关闭。
