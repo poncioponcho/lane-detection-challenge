@@ -1,13 +1,13 @@
-# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.8（单人版）
+# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.9（单人版）
 
 | 项 | 内容 |
 |---|---|
 | 文档版本 | **v2.9（单人版 + §25 AutoDL 可恢复流水线）** |
 | 状态 | **active**（执行跟踪唯一入口；进度以本文勾选列为准） |
 | 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ **v2.9**（§25 全种子/历史最优回放/交接包） |
-| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§25｜ `docs/ARCHITECTURE.md` v2.1 §6.5（单人关键路径） |
+| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§26｜ `docs/ARCHITECTURE.md` v2.2 §6.5（单人关键路径） |
 | 常量取值 | 目标 **0.77（工作·保前十）/ 0.79（冲刺·冲前五）/ 预测 0.75**（DECISIONS §26 下修，2026-09-05）｜预算 200 元｜单人，一律以 `configs/default.yaml`（v6）为准，本文只引用 |
-| 更新日期 | 2026-09-02（周三）｜距 A 榜截止 12 天｜距 B 榜截止 15 天 |
+| 更新日期 | 2026-09-05（周六）｜距 A 榜截止 9 天｜距 B 榜截止 12 天 |
 
 **勾选标记**：✅ 完成 ｜ 🔵 进行中 ｜ ⬜ 未开始 ｜ ❌ 已砍（单人裁剪，理由见 DECISIONS §13）｜ ⚠️ 降级（时间允许才做，不进关键路径）
 
@@ -37,7 +37,7 @@
 4. **B 样条 k≤3 稠密化** → 输出折线密集采样（≥10–20 点，弯道更密），纵向跨度覆盖可见范围。
 5. **按视频段切分验证集**，禁止按图随机切（同段连续帧相似 → F1 虚高 3–8pp）。
 6. **A 榜是探针不是考试**：只做本地 metric 校准与链路验证，不做调参依据。
-7. **（单人新增）检对比抑 FP 值钱 2.40×**（DECISIONS §9 J3）→ 主战场是召回侧（退化增强 + 分辨率），后处理只是收尾。
+7. **当前方向（§26 + LVO 归因）**：`v546797496` 的主要损失是 FP 爆炸，testA 也见宽路/交叉口过检；先做可靠的压 FP 后处理与 raw/conf-aware 扫描，再决定是否开训练型增强。旧 J3 条数敏感度保留为历史先验，不单独决定跨域方向。
 8. **（§17.1 新增）评测双层制**：一切最终裁决（A/B 闸门、冻结定稿、台账结论数）以冻结官方 `score.py`（Oracle）读数为准；本地 metric 仅诊断/扫描，须过差分测试套件方可参与过程判断。
 9. **（§17.6/§18.3）manifest 有序清单制**：`image_id = <clip>/<frame>`；从官方清单逐行构造 + 无重复断言；存在性按 split 区分（labeled 强制图像+GT，testA/testB 只断言图像、gt_path=None）；每段 100 帧仅对已核实 train/testA 强制；缺预测按空预测计 FN；一切聚合与分桶从同一 manifest 派生。
 
@@ -50,8 +50,8 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T0.1 | 完成赛事报名 | 报名状态已参赛（账号 daniel1547） | P0 | 9/1 ✅ |
-| 🔵 | T0.2 | **下载数据**：训练集 71 段/7100 张 + 三类标签、testA 9 段/900 张、`db_info.yaml`、`testA.txt`；落盘后上传 AutoDL 数据盘（DECISIONS §15.5/§23） | ✅ 落盘 + 全量核实完成（9/1 晚：71×100 / 9×100 / 三格式齐全 / anno_txt↔Json 条数互证 24435=24435 / 官方脚本到手，§17.9）；**AutoDL 云端上传待确认** | P0 | 9/1 晚–9/2 |
-| 🔵 | T0.3 | 仓库骨架（`src/ configs/ outputs/ scripts/ docs/ tests/`）+ AutoDL GPU 环境 | 本地骨架已建 ✅；**git 本地 + GitHub 私有远程已推 ✅（`poncioponcho/lane-detection-challenge`，DECISIONS §15.6）**；AutoDL GPU 实例待取得 | P0 | 9/1–9/2 |
+| ✅ | T0.2 | **下载数据**：训练集 71 段/7100 张 + 三类标签、testA 9 段/900 张、`db_info.yaml`、`testA.txt`；落盘后上传 AutoDL 数据盘（DECISIONS §15.5/§23） | 落盘 + 全量核实完成（71×100 / 9×100 / 三格式齐全 / anno_txt↔Json 条数互证 24435=24435 / 官方脚本到手）；AutoDL baseline 已基于该数据完成，交接包证据可复核 | P0 | ✅ 9/1–9/3 |
+| ✅ | T0.3 | 仓库骨架（`src/ configs/ outputs/ scripts/ docs/ tests/`）+ AutoDL GPU 环境 | 本地骨架、私有远程与 AutoDL pipeline 均已完成；baseline 交接证据含远端 project HEAD 与逐文件 SHA | P0 | ✅ 9/1–9/3 |
 | ✅ | T0.4 | 数据 EDA：场景/条数/点数/空标注/几何健康/切分偏移 | `src/data/eda.py` + `docs/eda.md` + 8 类固定 overlay；全量 7100 图/24435 线，空 GT 3.69%，越界/非有限/塌缩线均 0；发现旧 val 空 GT=0 后以车道条数直方图作 scene 同分 tie-break，新 val 空 GT=35/800，scene 主目标不变（DECISIONS §22） | P0 | ✅ 9/2 |
 
 ### W1 · 评测与提交管线（9/2 – 9/5）— 已部分提前完成
@@ -59,10 +59,10 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T1.1 | **metric 对齐官方实现（DECISIONS §17.1）**：本地诊断层已逐字义对齐——匈牙利 `cost=1−iou`、参数均匀稠密化 `(N−1)*5+1` + 逐段 `cv2.line`、float64 输入、异常即抛（禁线性回退）；官方 score.py 冻结为 Oracle（`src/eval/official_oracle/`，SHA-256 `b2f4c9b2…2de0d2`） | T1.2 差分套件全绿；本地 metric 仅作诊断/扫描，最终裁决仍一律走 Oracle | P0 | ✅ 9/2 |
-| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **106 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
+| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **119 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
 | ✅ | T1.3 | 预测交付唯一入口 `prepare_submit.py`：任意精度 raw → 一位小数 canonical → pack → verify → labeled 时可选 Oracle；精确文件集/安全路径/资源上限/严格边界/序列化后去重/全链几何 smoke | 5 位预测确实被重写为 1 位；舍入塌缩、缺失、多余、canonical 陈旧文件、traversal 均拒绝；非 identity 全链 Oracle=`TP/FP/FN=1/1/1,F1=0.5`；真实 train/testA 旧 smoke 保持 PASS（DECISIONS §24） | P0 | ✅ 9/2 |
 | ✅ | T1.4 | 按视频段 hold-out 切分本地验证集（8 段）：scene 二元特征为主目标、逐图车道条数直方图为同分 tie-break；seed=42 下 100,000 候选 + 单交换；`weather:mixed` 强制留 train | `src/data/split_by_clip.py` + 10 项测试；`configs/splits/v1_seed42.yaml` 固化 63/8 段、6300/800 图、段 ID 零交集；scene 最大偏差仍 0.06338，val 空 GT 35 张（4.375%），标签/manifest/条数直方图 SHA-256 入配置 | P0 | ✅ 9/2 |
-| ⬜ | T1.5 | A 榜首提（只烧 1 次额度验链路） | 平台返回有效分数，与本地 val 差值入台账 | P1 | 9/5 |
+| ✅ | T1.5 | A 榜首提与单变量阈值验证 | `714942=0.72794`、`714962=0.73444`（conf 0.5）及 flip-union `0.72950` 均留存；t05 相对基线 +0.65pp | P1 | ✅ 9/4 |
 | ✅ | T1.6 | （新增）A 榜每日快照提醒（每日 20:00，9/14 前） | 自动提醒已建；榜单 JS 渲染需人工记录前 5 名 | P1 | ✅ 9/1 |
 | ✅ | T1.7 | **oracle_runner 适配层（§18.2）**：冻结文件运行前 SHA-256 校验；强制 Python 3.12 + 官方精确 pins；只以子进程调用 score.py；全局全量单独调用 + 逐 clip 子集分别调用；结构化输出 TP/FP/FN/P/R/F1/n_images | `src/eval/{oracle_integrity,oracle_runner}.py` + 4 项 runner 测试；真实 train identity：全局 7100 图 TP=24435/FP=0/FN=0/F1=1.0，71 个 per_clip 均独立调用；样例 `outputs/reports/oracle_identity_train.json` | P0 | ✅ 9/2 |
 
@@ -71,9 +71,9 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T2.0 | 三格式解析 + 一致性校验（ARCHITECTURE T20/T21）：支持真实 `annotations.lane[]`、跨目录布局、palette instance PNG、多方向点序；lossless text↔JSON 精确比对 + PNG 10px union IoU 门 | 7100/7100 text↔JSON 点数组全等（24435 线）；262 空 GT 三格式同空；PNG union IoU min/P1/median=0.7282/0.8860/0.9117；badlist 1/7100=0.0141% <0.1%，极短二点线保留不删；`tests/test_parse_labels.py` 8 项，审计 `docs/label_consistency_audit_20260902.md` | P0 | ✅ 9/2 |
-| 🔵 | T2.1 | **AutoDL 专用** UnLanedet 落地 + 三 checkpoint shape/load 探针：固定 commit `0392184…4c`，同时核验 CLRNet 两个疑似错位文件与 ADNet-R34；本地禁下载/加载大权重 | 本地已备 setup/probe/config 执行面；待 AutoDL 输出两主干 compatible/missing/unexpected/shape-mismatch、实际 R50 文件名、adapted checkpoint SHA 与 demo 可视化后完成 | P0 | 9/3 |
-| 🔵 | T2.2 | manifest 驱动 `HardLaneDataset` + 双套 config（1366×720；palette 原始索引；保留空图和 2/3 点线；稳定连续去重）；T40 已收口为 pinned `tools/train_net.py` + 原生 AMP/checkpointer/`--resume`，权重只经 `train.init_checkpoint` 注入；CLRNet decode `top_k` 解耦为 `test_parameters.nms_topk` | 本地 106 tests 已完成 CPU 契约/配置/编排验证；`run_pipeline.sh gate` 待 **AutoDL** 跑通双模型空/非空 loss+backward、demo、1ep+val、525→526 resume 和历史最优回放。全局 seed=42，周期 checkpoint 保留 40 个，禁止跨 commit 续跑。字段映射：CLRNet target=8/classes=9/priors=192/candidate=12；ADNet target=8/anchors=300/candidate=12 | P0 | 9/3 白天 |
-| ⬜ | T2.3 | baseline：**双路 15ep 廉价筛选（CLRNet-R50 vs ADNet-R34，CULane 权重 fine-tune）→ 赢家 36ep**（DECISIONS §15.2；筛选兼任管线 shakedown；AutoDL 4090 各 ≈6h + 36ep ≈13h；判定：\|ΔF1\|<1.5pp 取 CLRNet-R50） | **9/5 出分（M2）**：val F1@0.5 首个数据点（入门线 0.75）+ 主干裁决入台账 → **立即触发 §15.1 重估**；⚠️ fine-tune 预案（DECISIONS §16.3）：若出现过拟合形态（train 降 / val 降），第一调节项 = LR 降档（1/5–1/10）+ 缩短 schedule，排除后再查 bug；**随机性控制（§18.7）：双路筛选固定相同 seed/初始化（paired bootstrap 只覆盖样本不确定性，不覆盖训练随机性），进入最终定稿的改动再按 {101,202,303} 多 seed 复核** | P0 | 9/3 晚–9/5 |
+| ✅ | T2.1 | **AutoDL 专用** UnLanedet 落地 + 三 checkpoint shape/load 探针 | gate/screen/baseline 产物已落盘；winner=`clrnet_r50`，selected checkpoint 与回放证据齐全 | P0 | ✅ 9/3 |
+| ✅ | T2.2 | manifest 驱动 `HardLaneDataset` + 双套 config；pinned `tools/train_net.py` + 原生 AMP/checkpointer/`--resume`；CLRNet decode `top_k` 解耦 | 本地 119 tests；远端 gate/screen/baseline 均完成，空/非空样本、历史最优回放与 handoff evidence 齐全；运行证据绑定远端 project HEAD `06f1da85…` | P0 | ✅ 9/3 |
+| ✅ | T2.3 | baseline：**双路 15ep 廉价筛选 → CLRNet-R50 赢家 36ep**（DECISIONS §15.2） | 36ep selected best 官方/诊断 F1=`0.808901`（泄漏 val，仅训练内监控）；AutoDL pipeline `complete`，winner=`clrnet_r50`；9/5 §26 重估已完成 | P0 | ✅ 9/3–9/5 |
 | ❌ | T2.4 | ~~多主干横向对比（ADNet/CondLaneNet/UFLD/RESA）~~ | **已砍**（DECISIONS §13：20h 人工超单人容量；α-SimADNet/RVLD 原版接入分支已于 9/1 晚关闭——UnLanedet 未收录两者；主干由 T2.3 双路筛选定，见 DECISIONS §15.2） | ~~P1~~ | — |
 | ✅ | T2.5 | **多维场景标签人工标注（§17.2/§18.4）**：71 段 × weather / illumination / artifact / geometry + confidence + 真实抽查帧号；每段 5 帧接触表，low-confidence 与稀有特征（持有段≤5）全部二审 | `data/processed/scene_labels.json`（已从 `/data/` 忽略规则中单独放行）；6 个稀有持有段完成密集二审；分布 clear/fog/mixed/rain=31/18/1/21，low-light/normal=31/40；唯一 mixed 段确认雾+积雪并留 train；审计见 `docs/scene_split_audit_20260902.md` | P0 | ✅ 9/2 |
 | ✅ | T2.6 | **manifest 构建器（§17.6/§18.3）**：官方清单逐行保序构造；无重复/路径安全/存在性/split GT 语义/order/已核实 split 每段 100 帧全断言；`image_id=clip/frame` | `src/data/manifest.py` + 8 项契约测试；真实产物 `manifest_train.jsonl`=7100 条/71 段、`manifest_testA.jsonl`=900 条/9 段，testA `gt_path=null`，全部存在性校验通过 | P0 | ✅ 9/2 |
@@ -82,17 +82,17 @@
 
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
-| ⬜ | T3.1 | 退化增强 **1 组高期望算子（雾 + 雨）**（ARCHITECTURE T53；84.0 的主来源） | **§17.3 双门槛**：点估计 ΔF1 ≥ **+1.0pp** 且 paired CI 下界 > 0，附 LOCO 敏感性；不过闸则回退 | P0 | 9/6–9/9 |
+| ✅ | T3.1 | 退化增强候选组（雾 + 雨，已复盘） | 官方 Oracle Δ=`−0.0205pp`，paired clip CI=`[−2.406, +2.131]pp`，NO-GO；LVO 归因进一步显示 fog 普遍并不弱，暂不再开该方向 | P0 | ✅ 9/4 |
 | ⚠️ | T3.2 | 图像复原前置（CLAHE/Zero-DCE/去雾）A/B | **降级**：不在单人关键路径；若做需评估 B 榜 41h 窗口吞吐 | ~~P1~~ | 时间允许 |
 | ⬜ | T3.3 | 后处理链（ARCHITECTURE T50）：等距重采样、端点外推、断裂补全、曲率平滑，各自独立开关 | 单开关 A/B；**§17.3 双门槛**：点估计 ΔF1 ≥ **+0.5pp** 且 paired CI 下界 > 0 才保留 | P1 | 9/7–9/10 |
-| ⬜ | T3.4 | 分桶诊断：低照度/雨雾/逆光/反光/阴影/弯道/路口 分桶 F1，Top-3 短板 | `docs/bucket_analysis.md` + ≥20 张失败案例 | P0 | 9/8–9/10 |
+| ✅ | T3.4 | 分桶诊断：weather / illumination / artifact / geometry + video F1/FP/FN | `outputs/reports/lvo_scene_attribution_20260905.md`；`v546797496` FP/img=1.73 为主要离群，illumination 与 weather 共线 | P0 | ✅ 9/5 |
 | ❌ | T3.5 | ~~短板桶过采样定向补强~~ | **已砍**（DECISIONS §13 = ARCHITECTURE T56：人工高、边际低；定向增强部分已并入 T3.1） | ~~P1~~ | — |
 
 ### W4 · 调参与定稿（9/8 – 9/14）
 
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
-| ⬜ | T4.1 | 阈值扫描（ARCHITECTURE T51）：置信度/NMS/max_output_lanes/点数/外推长度，以 F1 为目标；**J2 停止条件：新增线匹配率 ≤ F1/2≈41.6% 即停**；max_output_lanes 网格 {7,8,10,12}（§17.4/§18.5） | **J4 三件套（DECISIONS §9/§15.3/§17.3）**：平台区取点（非单点峰值）+ 扫描全表入台账（含负结果）+ 双门槛（点估计 ≥+0.5pp 且 paired CI 下界 > 0，附 LOCO 敏感性）；**选择偏差纪律（§18.7）**：同一 val 选优再算 CI 存在选择偏差——网格扫描定位为调参证据、取平台区稳健点，选中后的普通 CI 不得描述为无偏确认 | P0 | 9/8–9/11 |
+| 🔵 | T4.1 | 阈值/后处理扫描（优先压 FP） | 几何预筛已完成：去重 5–20px 全部 no-op；cap4 `−1.260pp`、cap5 `−0.206pp`（video-paired CI 均未形成正收益），不保留几何变体。C 阶段 raw/conf checkpoint 扫描仍待 D 完成；结果先标为调参证据并保留 paired-by-video 统计 | P0 | 9/5–9/10 |
 | ❌ | T4.2 | ~~按段 K=3 折交叉验证~~ | **已砍**（DECISIONS §13：单折 + 段级 bootstrap CI 替代，第二折记为风险写入台账） | ~~P1~~ | — |
 | ⬜ | T4.3 | 本地 val ↔ A 榜相关性台账（每次提交：本地 F1 / 配置 hash / A 榜 F1） | ≥4 组有效样本，能判定系统偏差 | P0 | 9/8–9/14 |
 | ⚠️ | T4.4 | TTA 探索（水平翻转对不对称车道可能有害） | **降级**（DECISIONS §13：1 GPU·h 但需人工接，不进关键路径） | ~~P2~~ | 时间允许 |
@@ -129,11 +129,11 @@
 → ✅ T2.5/T24 多维场景标签人工标注 → ✅ T1.4/T23 按段切分（9/2）
 
 【主路径】
-✅ 数据落盘+核实（9/1 晚，§17.9）→ ✅ T2.0 解析+一致性 badlist（9/2，1/7100）→ ✅ T0.4 EDA+hold-out 二次固化（9/2）
-→ T2.2 dataloader+双套 config（9/3 白天）
-→ T2.3 双路 15ep 筛选（9/3 晚–9/4 晨，兼任 shakedown）→ 赢家 36ep（9/4）→ 9/5 出分 M2（触发 §15.1 重估）
-→ T3.3 后处理 + T4.1 阈值扫描（0 GPU，CPU 并行）
-→ T55 分辨率方案组合（§17.5）→ T3.1 退化增强（雾+雨 1 组）
+✅ 数据落盘+核实（9/1–9/3，§17.9）→ ✅ T2.0 解析+一致性 badlist（9/2，1/7100）→ ✅ T0.4 EDA+hold-out 二次固化（9/2）
+→ ✅ T2.2 dataloader+双套 config / AutoDL 动态门 → ✅ T2.3 双路 15ep 筛选 + CLRNet-R50 赢家 36ep（9/3–9/5）
+→ ✅ T1.5 A 榜阈值验证 + ✅ T3.1 雾雨 NO-GO + ✅ T3.4 LVO 弱域归因（9/4–9/5）
+→ T4.1 后处理/raw-conf 扫描（先做可从几何可靠派生的压 FP项）
+→ T55 分辨率方案组合（需重新按 video-disjoint 证据执行）→ T53 仅在新证据支持时开训练型增强
 → T60 定模型（9/10，A 榜分布重估门槛）→ T61 重训 → T62 复现
 → T5.2 沙盘演练 → T5.1 冻结（9/14）→ T5.3 B 榜首提（9/16）→ T5.5 终提（9/17 15:00）
 ```
@@ -141,12 +141,12 @@
 | 日期 | 里程碑 | 判据 |
 |---|---|---|
 | 9/1 ✅ | 报名完成；骨架+venv+metric 自检全绿；git 本地+远程备份；**数据落盘 + 全量核实（§17.9）；官方 Oracle 冻结（§17.1）** | T0.1 / T0.3 / Oracle ✅ |
-| 9/1 晚 | ✅ 数据下载完成并核实（71×100 / 9×100 / 三格式齐全）；云端上传挂夜传待确认 | T0.2 |
+| 9/1 晚–9/3 | ✅ 数据下载、全量核实并用于 AutoDL pipeline；远端数据与 handoff evidence 可复核 | T0.2 / T2.1 / T2.2 |
 | 9/2–9/3 | **M1（减载版 + §17/§18 开工前置）**：metric 对齐 + 差分套件 → manifest → oracle_runner → 场景标注 + 切分；解析 badlist / EDA 成文 / dataloader + 双套 config + 双权重核验；submit 打包器解耦至 9/4–9/5 | T1.1 / T1.2 / T1.7 / T2.6 / T2.5 / T1.4 / T2.0 / T0.4 / T2.1 / T2.2 |
-| 9/3 晚–9/4 晨 | **双路 15ep 筛选**（CLRNet-R50 vs ADNet-R34，AutoDL 顺序 ≈12h，兼任 shakedown） | T2.3 |
-| 9/4–9/5 | **赢家 36ep → M2 出分 → 立即触发 §15.1 重估** | T2.3 |
-| 9/8 | 后处理 + 阈值扫描定稿（CPU 侧） | T3.3 / T4.1 |
-| 9/10 | 分辨率 2 档结论 + 增强组结论 + **A 榜重估门槛** | T55 / T3.1 / T60 |
+| 9/3 晚–9/5 | ✅ **双路 15ep 筛选 + CLRNet-R50 36ep**；selected best 泄漏 val F1=`0.808901`，仅作训练内监控 | T2.3 |
+| 9/4–9/5 | ✅ **A 榜阈值验证、雾雨 NO-GO、LVO video-disjoint 归因、§26 目标重估** | T1.5 / T3.1 / T3.4 / §26 |
+| 9/5–9/9 | 🔵 **几何预筛已完成且无 GO 变体**；D 36ep LVO 完成后只做一次 C raw/conf checkpoint 推理，不开新训练 | T4.1 |
+| 9/10 | **A 榜重估门槛** + 定模型；分辨率方案只有在 video-disjoint 证据可得时进入候选 | T55 / T60 |
 | **9/14** | **A 榜截止 + solution.zip 冻结 + 演练完成** | T5.1 / T5.2 |
 | **9/16–9/17** | **B 榜窗口（41h）** | T5.3 – T5.5 |
 | 10/24 | 决赛答辩（若前三） | T6.1 / T6.2 |
@@ -168,8 +168,8 @@
 
 | # | 风险 | 状态 | 缓解 |
 |---|---|---|---|
-| R1 | 本地 metric 与官方不一致 | **已缓解**——当前 94 项测试；7100 图 identity + 1034 渲染用例 + 576 图非 identity 跨环境差分全绿 | Oracle 双层结构；最终裁决仍只走 Oracle；T1.5 首提作平台链路锚点 |
-| R2 | 验证集按图随机切 → 虚高 3–8pp | **已缓解**——63/8 段显式固化，6300/800 图，段 ID 零交集 | `split_by_clip.py` + `v1_seed42.yaml` + 契约测试；后续实验只复用该 split |
+| R1 | 本地 metric 与官方不一致 | **已缓解**——当前 119 项测试；7100 图 identity + 1034 渲染用例 + 576 图非 identity 跨环境差分全绿 | Oracle 双层结构；最终裁决仍只走 Oracle；T1.5 首提作平台链路锚点 |
+| R2 | clip-level val 的 video 泄漏 → 泛化结论虚高 | **已确认并降级**——`v1_seed42` 的 5 个 val video 其余 clip 同在 train；LVO OOF 作为新增诚实尺，R1–R4 暂为 memory 草案 | v1 val 只作训练内监控；跨 video 结论看 LVO/A 榜；不得把旧 paired-clip CI 当泛化闸门 |
 | R3 | A 榜单点调参过拟合 | 开放 | 阈值只在本地 val 定 |
 | R4 | B 榜 41h 窗口故障无余量 | 开放 | T5.2 演练计时 + 提前 2h |
 | R9 | AutoDL GPU 暂不可得或租期中断 | 开放 | CPU 交付链先收口；到卡后先跑探针/动态门，输出落持久目录 |
@@ -190,7 +190,7 @@
 | Q3 | 框架 | ✅ **UnLanedet**（已生效）；主干 = **双路 15ep 筛选赢家**（CLRNet-R50 vs ADNet-R34，DECISIONS §15.2；ConvNeXt-T 为 9/10 升级备选） |
 | Q4 | 其他 GPU | 未提及视为无（如变化请显式声明） |
 
-**A 榜门槛状态**：9/1 首份快照已取得（前三 0.79076 / 0.78566 / 0.78422，见 `docs/a_bang_snapshot.md`）；仍需每日跟踪，9/10 用届时最新分布重估门槛，不把首日快照当最终竞争水位。
+**A 榜门槛状态**：截至 9/4 快照，榜首/前三/前五/前十线为 `0.80826 / 0.78693 / 0.77199 / 0.75377`（见 `docs/a_bang_snapshot.md`）；仍需每日跟踪，9/10 用届时最新分布重估门槛。
 
 ---
 

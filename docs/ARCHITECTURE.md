@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.1** |
+| 文档版本 | **v2.2** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v2.0（§24 预测提交链）→ **v2.1**（§25 AutoDL 全种子 + 历史最优回放 + 交接包） |
+| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ **v2.2**（§26 LVO/A 榜重估与压 FP 路线） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -24,9 +24,11 @@
 > **v1.9 变更记录**（2026-09-02，DECISIONS §23）：① GPU 模型验收环境明确为 AutoDL，本地仅做 CPU 契约/静态验证；② manifest-backed `HardLaneDataset` 保留空图、2/3 点线与 palette 索引；③ 两套 LazyConfig 与 pinned UnLanedet patch 落地，CLRNet GT 容量和候选 top-k 解耦；④ 权重入口修正为 `train.init_checkpoint`；⑤ 三权重 shape/load、双模型空/非空 loss+backward、demo 与 1 epoch 均以 AutoDL 证据为完成门。
 > **v2.0 变更记录**（2026-09-02，DECISIONS §24）：① 增加 `prepare_submit.py`，将 evaluator 的任意精度原始预测统一经一位小数导出器重写后才允许打包；② 以非 identity 合成预测贯通 canonicalize→pack→verify→Oracle；③ T40 从未实现的自研 trainer/checkpoint 方案收口为 pinned UnLanedet `tools/train_net.py` + LazyConfig + 原生 AMP/PeriodicCheckpointer/BestCheckpointer，训练与续跑动态验收只在 AutoDL。
 > **v2.1 变更记录**（2026-09-02，DECISIONS §25）：① 两套 config 显式锁定全局 seed=42/cudnn benchmark off；② 不再盲信 resume 后的 `model_best.pth`，保留 40 个周期权重并以 metrics 历史 best iteration + checkpoint 内部 iteration + eval-only 回放三重裁决；③ `run_pipeline.sh` 编排 gate/screen/baseline 可恢复执行，并生成带 SHA 的关机交接包。
+> **v2.2 变更记录**（2026-09-05，DECISIONS §26）：① 目标与路线同步为稳前十/冲前五；② v1 clip-level val 降级为训练内监控，LVO/A 榜作为当前跨域证据；③ 结合弱域归因将压 FP 的几何与 raw/conf-aware 扫描置于训练型增强之前。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
-> **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1 双轨滚动机制；当前工作目标 82.0、冲刺线 84.0，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
+> **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1/§26 双轨滚动机制；当前工作目标 **0.77（稳前十）**、冲刺线 **0.79（冲前五）**、能力预测 **0.75**，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
+> **口径提醒（2026-09-05）**：`v1_seed42` 是 clip-level hold-out，但 8 个 val clip 分属 5 个 video，且这 5 个 video 的其他 clip 同时出现在 train；它只能作训练内监控。跨 video 泛化结论以 LVO/A 榜证据为准。R1–R4 的 video bootstrap 规则仍是 memory 草案，未改写 §17.3 的生效文本。
 > **让两版 PRD 中的每一条【推测】都变成一个可被一次实验证伪或证实、且互不干扰的配置开关。**
 > 因此本文档中「可配置 / 可开关 / 可单变量 A/B / 可回退」是最高设计约束，优先级高于任何单点性能。
 
@@ -67,7 +69,7 @@
 | 验证集规模 | 固定 8 段 | 8–10 段 | 默认 8 段，可改；按 DECISIONS §15.4 断言区间 [6, 10] |
 | 冻结截止 | 9/14 前 | 9/15 24:00 前 | **取严者：9/14 24:00 完成冻结**，9/15 全天做复现演练 |
 | B 榜流程耗时 | ≤ 90 分钟 | ≤ 6 小时 | 内部验收 90 分钟，对外承诺 6 小时 |
-| 目标分 | 84.0（工作性目标） | 83.0 | 双轨：目标 0.84（DECISIONS.md §1），能力预测 0.822，缺口 1.8pp；常量取 0.84 不下调 |
+| 目标分 | 84.0（历史工作性目标） | 83.0（历史 PRD 目标） | **历史设计口径，已由 DECISIONS §26 supersede**；当前常量为 0.77 / 0.79 / 0.75 / 4.0pp |
 
 ---
 
@@ -75,7 +77,7 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座（Runner / Dataset / 后处理 / 评测复用）；主干不由预判选定，由双路 15ep 廉价筛选实测定（CLRNet-R50 vs ADNet-R34，均 CULane 预训练 fine-tune，DECISIONS §15.2）——9/3 晚–9/4 晨 AutoDL 顺序跑（兼任管线 shakedown），9/4 晨裁决，赢家 36ep 9/4 开跑，9/5 基线出分（M2）不变；CLRNet-ConvNeXt-T（CULane 80.21）留作 9/10（T60）升级备选。**
+> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** CLRNet-ConvNeXt-T 仍只是 9/10（T60）升级备选；在此之前先完成 video-disjoint 口径下的压 FP 后处理与 raw/conf-aware 推理扫描。
 
 即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
@@ -103,7 +105,7 @@
 | `clrnet_convnext_t` | UnLanedet 内置 + CULane 权重 | 9/10（T60）升级备选（训练更慢，不进筛选） | CULane 复现 80.21 | T60 后 |
 | ~~`clrnet_dla34` / `rvld` / `alpha_simadnet`~~ | — | **已除名（v1.2）**：DLA-34 无权重无 config；RVLD/α-SimADNet 未被 UnLanedet 收录（DECISIONS §15.2，`docs/weight_scout_report.md`） | — | — |
 
-> **门禁状态（v2.0 更新）**：本地已构建两套 1366×720 config、manifest dataset、pinned patch 和可复现脚本；模型门仍未关闭。必须在 AutoDL 用 `probe_weights.py` 裁决 CLRNet 两文件的真实 R34/R50 映射，再完成双模型空/非空 loss+backward、demo、1 epoch train+val 与 `last_checkpoint` 续跑。训练权重唯一入口为 `train.init_checkpoint`。筛选判定保持不变：|ΔF1| < 1.5pp → 取 CLRNet-R50。
+> **门禁状态（2026-09-05 更新）**：gate/screen/baseline 已在 AutoDL 完成；winner=`clrnet_r50`，selected checkpoint 的独立回放与 handoff evidence 齐全。后续新训练仍须绑定新 run 目录、空间治理和当前实验协议，不能覆盖既有完成产物。
 
 ### 1.4 技术栈与版本锁定策略
 
@@ -934,7 +936,7 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
 >
-> **战略权重（来自 DECISIONS.md §9 脚本实测）**：`多检对 1 条线 = +0.0254pp`，`少画 1 条废线 = +0.0106pp`，**检对的边际价值是抑制 FP 的 2.40 倍**；从 83.2 冲 84.0 的实测路径中，仅靠「少画废线」只能到 0.8365（不达标），必须靠**提升召回**（退化增强 S1、分辨率 S7）。故 **S1（退化增强）与 S7（分辨率）是主战场，S3（后处理阈值）只是收尾**——资源冲突时优先前者（见 §6.1 并行策略）。
+> **方向更新（2026-09-05）**：原条数敏感度保留为历史先验，但不能覆盖跨域归因。LVO 中 `v546797496` 的主要损失来自 FP/img=1.73，testA 可视化也显示宽路/交叉口重复过检；因此当前顺序是**先做可从几何可靠派生的压 FP 后处理，再做 raw/conf-aware 推理扫描，最后才开 36ep LVO 或训练型增强**。fog/rain 不再是默认高优先级。
 
 ---
 
@@ -1229,7 +1231,7 @@ T00 → T01 → T30 ────────────────────
 
 **单人版关键路径（保留项，按时间序）**
 
-> ✅ **数据/评测/提交开工前置已闭环（DECISIONS §17–§25）**：T17 Oracle 冻结 + 哈希守护 → T11/T12 metric 对齐 + 差分（当前 106 tests；1034 渲染/576 图非 identity）→ T19 manifest → T18 oracle_runner → T20/T21 真实三格式全量（1/7100 badlist）→ T22 EDA → T24 71 段多维标签 → T23 63/8 按段切分 → raw 预测一位小数 canonical 提交链。T31/T40 本地实现门解除，历史最优回放与交接门已固化，AutoDL CUDA 动态验收门仍开（§23–§25）。
+> ✅ **数据/评测/提交开工前置已闭环（DECISIONS §17–§26）**：T17 Oracle 冻结 + 哈希守护 → T11/T12 metric 对齐 + 差分（当前 119 tests；1034 渲染/576 图非 identity）→ T19 manifest → T18 oracle_runner → T20/T21 真实三格式全量（1/7100 badlist）→ T22 EDA → T24 71 段多维标签 → T23 63/8 按段切分 → raw 预测一位小数 canonical 提交链。T31/T40 本地实现门解除，历史最优回放、交接门与 AutoDL CUDA 动态验收门均已闭环（§23–§26）。
 
 ```
 T00 骨架(9/1) → T10 基础设施 → T17 Oracle冻结+哈希守护(✅) → T11 metric对齐(✅ 9/2) → T12 差分套件(✅ 9/2)
