@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.5** |
+| 文档版本 | **v2.6** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ **v2.5**（§31 模块化消融收口） |
+| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ v2.5（§31 模块化消融收口）→ **v2.6**（§32 ConvNeXt screen NO-GO） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31；v2.6 传导 §32） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -28,6 +28,7 @@
 > **v2.3 变更记录**（2026-09-06，DECISIONS §27–§28）：① 记录 conf=0.30 A 榜反馈并继续冻结生产 `t=0.50`；② 修正 CLRNet sidecar 由 raw positive logit 到 positive-class softmax probability 的量纲错误，加入 schema/range/post-NMS 契约与 legacy 拒绝；③ 增加直接解码↔离线过滤等价性检查；④ score-aware 压 FP 前置，分辨率/低照度与 ConvNeXt-T 后移。
 > **v2.4 变更记录**（2026-09-06，DECISIONS §29–§30）：① NMS 小扫、`960×480 + cut=0` 分辨率组合和条件化低照度 gamma 均完成 video-disjoint eval-only 筛选且 NO-GO；② 生产预处理继续为 `800×320 + cut=180`，生产阈值继续为 `t=0.50`；③ ConvNeXt-T 仅保留为资源、磁盘和时间门通过时的 15ep screen，不直接启动完整训练。
 > **v2.5 变更记录**（2026-09-06，DECISIONS §31）：① 在修正的 positive-class softmax probability sidecar 上完成 16 个 36ep LVO 模块化变体；② 官方 Oracle + video paired bootstrap + LOCO 未发现稳定收益，亮度规则最高仅 +0.110pp；③ 生产继续为 `800×320 + cut=180`、`t=0.50`，不生成新的 A 榜候选。
+> **v2.6 变更记录**（2026-09-06，DECISIONS §32）：① AutoDL 完成 CLRNet-ConvNeXt-Tiny 15ep screen 与 `model_best.pth` 独立回放；② 官方 Oracle 标准 val F1=`0.783872`，相对 CLRNet-R50 15ep 的 `0.783958` 为 `−0.0086pp`，8-cluster paired bootstrap 95% CI=`[−1.6122,+1.3594]pp`；③ screen 标记 NO-GO，不启动 ConvNeXt 36ep，不切换生产主干，生产继续为 CLRNet-R50 36ep、`t=0.50`。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1/§26 双轨滚动机制；当前工作目标 **0.77（稳前十）**、冲刺线 **0.79（冲前五）**、能力预测 **0.75**，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
@@ -80,7 +81,7 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 仅保留为 9/10（T60）资源门控下的最后 15ep screen。
+> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；最后的 CLRNet-ConvNeXt-T 15ep screen 已完成但 NO-GO，不启动其完整训练。
 
 即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
@@ -939,7 +940,7 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
 >
-> **方向更新（2026-09-06）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma 和模块化置信度/亮度/几何消融均未形成稳定收益，亮度规则最高仅 +0.110pp，生产保持 `800×320 + cut=180`。ConvNeXt-T 仅在资源门通过时最后评估，fog/rain 继续 NO-GO。
+> **方向更新（2026-09-06）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma 和模块化置信度/亮度/几何消融均未形成稳定收益，亮度规则最高仅 +0.110pp，生产保持 `800×320 + cut=180`。ConvNeXt-Tiny 15ep screen 也已完成，官方 Oracle 相对 R50 15ep 为 `−0.0086pp`，标记 NO-GO；fog/rain 继续 NO-GO。
 
 ---
 
@@ -1166,7 +1167,7 @@ gantt
 | **T43** | 基线首评：全量 `EvalBundle` + 横向误差分布报告 | 4 | T42, T14 | | ★ | M2 出分 | **9/5** |
 | **T50** | 后处理套件（resample / extrapolate / filter / nms，各独立开关） | 14 | T43 | ✔ | | 后处理可 A/B | 9/5–9/7 |
 | **T51** | 阈值 / `max_output_lanes` / NMS 网格扫描；取平台区稳健点，全表入台账；同一 val 选优后的普通 CI 仅为调参证据，不得称为无偏确认 | 6 | T50, T14 | ✔ | | 阈值扫描曲线 + 选择偏差注记 | 9/6–9/7 |
-| **T52** | ~~主力候选接入：RVLD + α-SimADNet~~ **已关闭（v1.2）**：UnLanedet 未收录两者（DECISIONS §15.2）；主干由 T42 双路筛选定，ConvNeXt-T 留 T60 备选 | — | — | — | | — | — |
+| **T52** | ~~主力候选接入：RVLD + α-SimADNet~~ **已关闭（v1.2）**：UnLanedet 未收录两者（DECISIONS §15.2）；主干由 T42 双路筛选定，ConvNeXt-T 15ep screen 已完成并按 DECISIONS §32 关闭（NO-GO） | — | — | — | | — | — |
 | **T53** | 退化增强各算子（gamma/雾/雨/反光/阴影/模糊/噪声） | 12 | T31 | ✔ | | `degrade.py` | 9/5–9/7 |
 | **T54** | 复原前置 CLAHE / 自适应 gamma / 暗通道去雾 | 5 | T31 | ✔ | | `restore.py` | 9/6 |
 | **T55** | 预处理方案组合 A/B：`cut=180 + 800×320` vs `cut=0 + 960×480 letterbox`；先完成 eval-only screen，候选在 `0.40–0.60` 全部退化，NO-GO；结论只归因整套管线，单因素归因需追加匹配分辨率控制组 | eval-only 已完成 | T42 | | | `docs/lvo_resolution_scan_20260906.md` | 9/6 |

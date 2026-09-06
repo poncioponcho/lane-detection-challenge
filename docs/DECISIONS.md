@@ -978,3 +978,41 @@ UnLanedet 项目及其未提交的概率修正工作树改动均保留。
 
 本节生效后，后续只有在新的 video-disjoint 证据满足同一放行门槛时，才允许生成新的 testA
 候选包；不重复提交 submit_testA_t05.zip，也不把任何点估计正收益直接解释为榜单提升。
+
+## 三十二、ConvNeXt-Tiny 15ep screen 完成与 NO-GO（2026-09-06）
+
+**触发**：§31 已关闭模块化轻量方向后，资源、磁盘和时间门通过，按既定顺序执行最后的
+ConvNeXt-Tiny 15ep screen；实验仍不消耗 A 榜额度。
+
+### 32.1 事实
+
+- AutoDL 远端项目 HEAD 为 `84d7db7df50f6e2ba966b5b1daf6239aac63ebd7`，训练目录
+  `/hy-tmp/lane-outputs/runs/convnext_tiny_15ep`，状态为 `complete`。
+- 配置为 `800×320 + cut_height=180`、batch `12`、seed `42`、最大迭代 `7875`；
+  训练、15 次周期评估和 final eval 均完成，loss 全程 finite。
+- 使用修正后的 post-NMS sidecar：schema `1`、语义
+  `positive_class_softmax_probability`、`post_nms=true`、导出阈值 `0.40`。
+- ConvNeXt-Tiny `model_best.pth`（最佳点 iter `5249`）独立回放覆盖验证集 `800/800`
+  张图，冻结官方 Oracle 结果为 `TP/FP/FN=2051/527/604`、F1=`0.7838715842`；
+  `model_final.pth` 结果为 F1=`0.7794654874`。
+- 同一验证集、同一 conf 和同一 Oracle 下，CLRNet-R50 15ep 对照最佳点为
+  `TP/FP/FN=2072/559/583`、F1=`0.7839576239`。ConvNeXt-Tiny 相对差异为
+  `−0.0086pp`，paired bootstrap（8 个验证 clip、10,000 次、seed=42）区间为
+  `[−1.6122,+1.3594]pp`。
+
+### 32.2 裁决
+
+1. ConvNeXt-Tiny 15ep screen 标记为完成，但 **NO-GO**：标准验证集上与 R50 15ep
+   持平范围内，没有足够的稳定收益覆盖额外训练成本和跨视频泛化风险。
+2. 该验证集与训练存在同视频重叠，以上比较只作训练内诊断，不能冒充 video-disjoint
+   LVO 证据；不启动 ConvNeXt-Tiny 36ep 完整训练，不切换生产主干。
+3. 生产继续冻结为 CLRNet-R50 36ep、`800×320 + cut_height=180`、显式
+   `model.head.cfg.test_parameters.conf_threshold=0.50`；A 榜 incumbent 仍为
+   `714962 / 0.73444`。不生成新 testA 包，不重复提交 `submit_testA_t05.zip`。
+
+### 32.3 证据
+
+完整实验报告为 `docs/convnext_screen_20260906.md`；本地回传包、800 张最佳预测、
+sidecar 和 Oracle JSON 均在 `outputs/convnext_screen_20260906_evidence/`（outputs
+按仓库规则不入 Git），压缩包 SHA-256 为
+`edebc9851848faea1ac74cb5b624d96015ff8bb10dbe93c10ea416a9b9fc17f7`。
