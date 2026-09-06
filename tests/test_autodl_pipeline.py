@@ -26,6 +26,7 @@ VALIDATE = _load("validate_autodl_run", "scripts/autodl/validate_run.py")
 SELECT = _load("select_screen_winner", "scripts/autodl/select_screen_winner.py")
 RUN = _load("run_autodl_training", "scripts/autodl/run_training.py")
 COLLECT = _load("collect_autodl_results", "scripts/autodl/collect_results.py")
+LVO = _load("lvo_autodl_runner", "scripts/autodl/lvo_video_runner.py")
 
 
 def test_metric_evidence_helpers_reject_inconsistent_counts():
@@ -380,6 +381,28 @@ def test_run_training_accepts_only_declared_single_variable_overrides(tmp_path):
         "model.head.cfg.cls_loss_weight=4.0"
     ]
     assert "model.head.cfg.cls_loss_weight=4.0" in launch["command"]
+
+
+def test_lvo_runner_propagates_experiment_override_to_train_and_eval_commands():
+    mods = LVO.import_project_modules(ROOT)
+    runner = object.__new__(LVO.LVORunner)
+    runner.python_bin = "/opt/python/bin/python"
+    runner.train_net = Path("/opt/UnLanedet/tools/train_net.py")
+    runner.base_config = Path("/opt/project/configs/unlanedet/clrnet_r50_hardlane.py")
+    runner.override = mods["override"]
+    runner.experiment_overrides = mods["parse_experiment_overrides"](
+        ["model.head.cfg.cls_loss_weight=3.0"]
+    )
+    fold = {
+        "train_manifest": Path("/opt/manifests/manifest_train.jsonl"),
+        "holdout_manifest": Path("/opt/manifests/manifest_holdout.jsonl"),
+    }
+    train = runner.train_command(Path("/opt/run"), fold, 7875, 525, False)
+    evaluate = runner.eval_command(
+        Path("/opt/eval"), fold, Path("/opt/run/model_final.pth")
+    )
+    assert "model.head.cfg.cls_loss_weight=3.0" in train
+    assert "model.head.cfg.cls_loss_weight=3.0" in evaluate
 
 
 def test_manifest_prediction_paths_handles_any_split_size():

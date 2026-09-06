@@ -1040,7 +1040,8 @@ sidecar 和 Oracle JSON 均在 `outputs/convnext_screen_20260906_evidence/`（ou
    运行 `3.0` 与 `4.0` 两组 screen。基线 `2.0` 已有 `screen_clrnet_r50_15ep` 证据。
 2. 新增的 `scripts/autodl/run_r50_loss_weight_screen.sh` 使用统一训练启动器；每个
    run 的 override 写入 `launches.jsonl`，防止“改了变量但证据不记账”。这是一项分类
-   目标权重 screen，不冒充已经实现的 OHEM。
+   目标权重 screen，不冒充已经实现的 OHEM。`lvo_video_runner.py` 同样接受白名单
+   `--override`，把同一变量传入每折训练/回放，并拒绝用不同 override 恢复既有 fold。
 3. 只选一组最有希望的变体进入 8-video video-disjoint LVO 15ep；采用既有放行门：
    ΔF1 至少 `+0.50pp`、paired CI 下界严格大于 0、8 个 LOCO 差异全部为正。screen
    只作廉价筛选，不能单独产生 A 榜候选。

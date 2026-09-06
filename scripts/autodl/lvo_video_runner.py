@@ -86,6 +86,7 @@ def import_project_modules(project_root: Path):
         git_head,
         inspect_cuda_python,
         override,
+        parse_experiment_overrides,
         required_absolute_env,
         stream_command,
     )
@@ -97,6 +98,7 @@ def import_project_modules(project_root: Path):
         "git_head": git_head,
         "inspect_cuda_python": inspect_cuda_python,
         "override": override,
+        "parse_experiment_overrides": parse_experiment_overrides,
         "required_absolute_env": required_absolute_env,
         "stream_command": stream_command,
         "checkpoint_payload": checkpoint_payload,
@@ -119,6 +121,9 @@ class LVORunner:
         self.mods = import_project_modules(self.project_root)
         self.read_manifest = self.mods["read_manifest"]
         self.override = self.mods["override"]
+        self.experiment_overrides = self.mods["parse_experiment_overrides"](
+            args.overrides
+        )
         self.stream_command = self.mods["stream_command"]
         self.checkpoint_payload = self.mods["checkpoint_payload"]
         self.manifest_prediction_paths = self.mods["manifest_prediction_paths"]
@@ -211,6 +216,7 @@ class LVORunner:
             "status": "pass",
             "protocol": "leave-one-video-out",
             "model": "clrnet_r50",
+            "experiment_overrides": self.experiment_overrides,
             "epochs": 15,
             "batch_size": 12,
             "input": "800x320",
@@ -340,6 +346,7 @@ class LVORunner:
         if resume:
             command.append("--resume")
         command.extend([
+            *self.experiment_overrides,
             self.override("train.max_iter", target_iter),
             self.override("train.eval_period", 0),
             self.override("train.checkpointer.period", iter_per_epoch),
@@ -360,6 +367,7 @@ class LVORunner:
         return [
             self.python_bin, str(self.train_net), "--eval-only",
             "--config-file", str(self.base_config), "--num-gpus", "1",
+            *self.experiment_overrides,
             self.override("train.init_checkpoint", checkpoint),
             self.override("train.output_dir", eval_dir),
             self.override("dataloader.evaluator.output_basedir", eval_dir / "val"),
@@ -379,6 +387,14 @@ class LVORunner:
         run_dir = self.fold_run_dir(fold, smoke)
         state_path = run_dir / "fold_state.json"
         run_dir.mkdir(parents=True, exist_ok=True)
+        if state_path.is_file():
+            existing = json.loads(state_path.read_text(encoding="utf-8"))
+            if existing.get("experiment_overrides", []) != self.experiment_overrides:
+                raise SystemExit(
+                    f"{fold['name']}: existing fold uses different experiment overrides: "
+                    f"expected {self.experiment_overrides}, "
+                    f"found {existing.get('experiment_overrides', [])}"
+                )
         if self.skip_complete and state_path.is_file():
             existing = json.loads(state_path.read_text(encoding="utf-8"))
             if existing.get("status") == "pass":
@@ -405,6 +421,7 @@ class LVORunner:
             "heldout_video": fold["video"],
             "smoke": smoke,
             "model": "clrnet_r50",
+            "experiment_overrides": self.experiment_overrides,
             "epochs": 15,
             "effective_epochs": "smoke-2-iterations" if smoke else 15,
             "batch_size": batch_size,
@@ -586,6 +603,14 @@ def main() -> None:
     parser.add_argument("--experiment-root", type=Path, required=True)
     parser.add_argument("--manifests-root", type=Path, required=True)
     parser.add_argument("--python-bin", required=True)
+    parser.add_argument(
+        "--override",
+        dest="overrides",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="single-variable training override; may be repeated",
+    )
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-complete", action="store_true")
     args = parser.parse_args()
