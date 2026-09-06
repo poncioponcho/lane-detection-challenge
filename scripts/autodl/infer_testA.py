@@ -192,6 +192,11 @@ def main() -> None:
     command.append(
         override("model.head.cfg.test_parameters.conf_threshold", args.conf_threshold)
     )
+    # The evaluator owns a separate LazyConfig copy of param_config. Keep its
+    # sidecar provenance in the same units/value as the model decode gate.
+    command.append(
+        override("dataloader.evaluator.cfg.test_parameters.conf_threshold", args.conf_threshold)
+    )
     (output_dir / "infer_command.json").write_text(
         json.dumps(command, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

@@ -94,6 +94,7 @@ for label in midpoint final; do
             "dataloader.test.dataset.manifest_path='$holdout_manifest'" \
             "dataloader.test.dataset.split='val'" \
             "model.head.cfg.test_parameters.conf_threshold=0.0" \
+            "dataloader.evaluator.cfg.test_parameters.conf_threshold=0.0" \
             train.seed=42 train.cudnn_benchmark=False \
             > "$eval_dir/eval.log" 2>&1
         pred_root="$eval_dir/val/predictions"
@@ -144,6 +145,11 @@ for path in sorted((root / label).glob("fold_*/val/prediction_scores.json")):
         raise SystemExit(f"score range mismatch: {path}")
     if payload.get("post_nms") is not True:
         raise SystemExit(f"score sidecar is not post-NMS: {path}")
+    if payload.get("candidate_export_conf_threshold") != 0.0:
+        raise SystemExit(
+            f"candidate export threshold is not 0.0: {path}: "
+            f"{payload.get('candidate_export_conf_threshold')!r}"
+        )
     fold_scores = payload.get("scores_by_image", {})
     if not isinstance(fold_scores, dict):
         raise SystemExit(f"score sidecar is not an object: {path}")

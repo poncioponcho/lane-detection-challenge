@@ -189,6 +189,7 @@ for fold_dir in $(find "$MANIFESTS" -mindepth 1 -maxdepth 1 -type d -name 'fold_
             "dataloader.test.dataset.manifest_path='$holdout_manifest'" \
             "dataloader.test.dataset.split='val'" \
             "model.head.cfg.test_parameters.conf_threshold=0.0" \
+            "dataloader.evaluator.cfg.test_parameters.conf_threshold=0.0" \
             train.seed=42 train.cudnn_benchmark=False \
             > "$eval_dir/eval.log" 2>&1
         pred_root="$eval_dir/val/predictions"

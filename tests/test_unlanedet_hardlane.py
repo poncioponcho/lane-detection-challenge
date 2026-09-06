@@ -312,8 +312,14 @@ def test_infer_testA_script_matches_unlabeled_split_contract():
     assert "selected_checkpoint_sha256" in source
     assert "SHA changed" in source
     assert "model.head.cfg.test_parameters.conf_threshold" in source
+    assert "dataloader.evaluator.cfg.test_parameters.conf_threshold" in source
     pipeline = (root / "scripts/autodl/run_pipeline.sh").read_text(encoding="utf-8")
     assert "--conf-threshold 0.50" in pipeline
+
+    c_export = (root / "scripts/autodl/run_lvo36_c_export.sh").read_text(encoding="utf-8")
+    assert '"model.head.cfg.test_parameters.conf_threshold=0.0"' in c_export
+    assert '"dataloader.evaluator.cfg.test_parameters.conf_threshold=0.0"' in c_export
+    assert 'candidate export threshold is not 0.0' in c_export
 
 
 def test_autodl_configs_and_scripts_encode_execution_contract():
