@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.3** |
+| 文档版本 | **v2.4** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ **v2.3**（§27–§28 sidecar 修正与 score-aware 路线） |
+| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ **v2.4**（§29–§30 NMS/分辨率/低照度筛选收口） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -26,6 +26,7 @@
 > **v2.1 变更记录**（2026-09-02，DECISIONS §25）：① 两套 config 显式锁定全局 seed=42/cudnn benchmark off；② 不再盲信 resume 后的 `model_best.pth`，保留 40 个周期权重并以 metrics 历史 best iteration + checkpoint 内部 iteration + eval-only 回放三重裁决；③ `run_pipeline.sh` 编排 gate/screen/baseline 可恢复执行，并生成带 SHA 的关机交接包。
 > **v2.2 变更记录**（2026-09-05，DECISIONS §26）：① 目标与路线同步为稳前十/冲前五；② v1 clip-level val 降级为训练内监控，LVO/A 榜作为当前跨域证据；③ 结合弱域归因将压 FP 的几何与 raw/conf-aware 扫描置于训练型增强之前。
 > **v2.3 变更记录**（2026-09-06，DECISIONS §27–§28）：① 记录 conf=0.30 A 榜反馈并继续冻结生产 `t=0.50`；② 修正 CLRNet sidecar 由 raw positive logit 到 positive-class softmax probability 的量纲错误，加入 schema/range/post-NMS 契约与 legacy 拒绝；③ 增加直接解码↔离线过滤等价性检查；④ score-aware 压 FP 前置，分辨率/低照度与 ConvNeXt-T 后移。
+> **v2.4 变更记录**（2026-09-06，DECISIONS §29–§30）：① NMS 小扫、`960×480 + cut=0` 分辨率组合和条件化低照度 gamma 均完成 video-disjoint eval-only 筛选且 NO-GO；② 生产预处理继续为 `800×320 + cut=180`，生产阈值继续为 `t=0.50`；③ ConvNeXt-T 仅保留为资源、磁盘和时间门通过时的 15ep screen，不直接启动完整训练。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1/§26 双轨滚动机制；当前工作目标 **0.77（稳前十）**、冲刺线 **0.79（冲前五）**、能力预测 **0.75**，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
@@ -78,7 +79,7 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** CLRNet-ConvNeXt-T 仍只是 9/10（T60）升级备选；在此之前先完成概率 sidecar 修正、直接解码/离线过滤等价性检查与 video-disjoint 口径下的 score-aware 压 FP。
+> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 仅保留为 9/10（T60）资源门控下的最后 15ep screen。
 
 即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
@@ -937,7 +938,7 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
 >
-> **方向更新（2026-09-06）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；旧 sidecar 的 `metadata["conf"]` 是 raw positive logit，不是概率，必须先重导出 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；随后优先做 score-aware 压 FP 和 `nms_thres/nms_topk` 小扫，再做分辨率/低照度实验，ConvNeXt-T 最后评估。fog/rain 不再是默认高优先级。
+> **方向更新（2026-09-06）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0` 和条件化低照度 gamma 均未形成稳定收益，生产保持 `800×320 + cut=180`。ConvNeXt-T 仅在资源门通过时最后评估，fog/rain 继续 NO-GO。
 
 ---
 
@@ -1167,7 +1168,7 @@ gantt
 | **T52** | ~~主力候选接入：RVLD + α-SimADNet~~ **已关闭（v1.2）**：UnLanedet 未收录两者（DECISIONS §15.2）；主干由 T42 双路筛选定，ConvNeXt-T 留 T60 备选 | — | — | — | | — | — |
 | **T53** | 退化增强各算子（gamma/雾/雨/反光/阴影/模糊/噪声） | 12 | T31 | ✔ | | `degrade.py` | 9/5–9/7 |
 | **T54** | 复原前置 CLAHE / 自适应 gamma / 暗通道去雾 | 5 | T31 | ✔ | | `restore.py` | 9/6 |
-| **T55** | 预处理方案组合 A/B：`cut=180 + 800×320` vs `cut=0 + 960×480 letterbox`，各 15 epoch；带坐标 round-trip + overlay；结论只归因整套管线，单因素归因需追加匹配分辨率控制组 | 4（GPU 30h） | T42 | | | 方案组合裁决 | 9/6–9/9 |
+| **T55** | 预处理方案组合 A/B：`cut=180 + 800×320` vs `cut=0 + 960×480 letterbox`；先完成 eval-only screen，候选在 `0.40–0.60` 全部退化，NO-GO；结论只归因整套管线，单因素归因需追加匹配分辨率控制组 | eval-only 已完成 | T42 | | | `docs/lvo_resolution_scan_20260906.md` | 9/6 |
 | **T56** | 短板桶定向过采样 `sampler.py` | 5 | T24, T14 | ✔ | | 长尾改善 | 9/8–9/9 |
 | **T57** | TTA（水平翻转 + 多尺度结果级融合） | 6 | T50 | ✔ | | TTA 开关 | 9/8 |
 | **T58** | 台账自动化（ledger / ablation 单变量断言 / compute_ledger） | 8 | T43 | ✔ | | `docs/experiments.csv` | 9/5–9/6 |

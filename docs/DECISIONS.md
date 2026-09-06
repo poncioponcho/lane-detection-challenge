@@ -897,6 +897,50 @@ NMS 变体均 **NO-GO**：最大点估计只有约 `+0.027pp`，CI 下界没有�
 `docs/lvo_nms_scan_20260906.md` 和被 `.gitignore` 排除的
 `outputs/lvo_nms_conf_scan_20260906/conf_checkpoint_scan.json`。
 
-NMS 方向关闭后，关键路径转入分辨率的廉价 video-disjoint 筛选；若无稳定
-收益，再做只针对暗图、按下半幅 road ROI 条件启用的温和 gamma/对比度小试。
-ConvNeXt-T 仍排在最后，生产候选继续为 `t=0.50`。
+NMS 方向关闭后，关键路径依次完成了分辨率与定向低照度的廉价
+video-disjoint eval-only 筛选；两项结果均在 §30 记录为 NO-GO。ConvNeXt-T
+仍排在最后，生产候选继续为 `t=0.50`。
+
+## 三十、分辨率与定向低照度筛选 NO-GO（2026-09-06）
+
+### 30.1 分辨率方案
+
+同一份 CLRNet-R50 36ep 权重上完成 8-fold leave-one-video-out eval-only
+筛选。候选 `960×480 + cut=0` 与生产 `800×320 + cut=180` 同时改变了
+分辨率、视野和纵横比，因此只把结论归因于这套预处理组合，不宣称纯分辨率
+因果效应。冻结官方 Oracle、修正后的正类 softmax probability sidecar 和
+video-level paired bootstrap（10,000 次，seed=42）均通过。
+
+在阈值 `0.40/0.45/0.50/0.55/0.60` 下，候选相对基线的 ΔF1 分别为
+`−50.938/−52.257/−53.622/−55.040/−56.460pp`，对应 paired CI
+下界全部小于 0。该方案 **NO-GO**，不进入训练型分辨率候选或 A 榜提交。
+若未来重新打开分辨率方向，必须先增加匹配 crop/FOV 控制组，再做
+video-disjoint 筛选。完整证据见 `docs/lvo_resolution_scan_20260906.md`。
+
+### 30.2 条件化低照度 gamma
+
+同一份 CLRNet-R50 36ep 权重上完成 eval-only 条件化预处理筛选：仅当原始
+BGR 图像下半幅 road ROI 平均亮度 `≤42` 时启用 `gamma=0.85`，否则保持
+基线图像；输入为 `800×320`、`cut_height=180`。场景标签仅用于训练集诊断
+分桶，不能作为 testA/testB 的运行时路由。
+
+全局 7100 图、8 个 video 的 F1 从 `0.778516` 变为 `0.778316`，Δ=`−0.020pp`，
+paired CI=`[−0.077,+0.021]pp`；`low_light` 桶 3100 图/3 个 video 的
+Δ=`−0.033pp`，CI=`[−0.175,+0.051]pp`；`normal` 桶 4000 图/5 个 video
+的 Δ=`−0.015pp`，CI=`[−0.046,0.000]pp`。方案 **NO-GO**，不进入生产，
+不做 gamma 训练型增强。低照度桶只有 3 个 video，且 weather 与
+illumination 在训练集共线，不作独立因果结论。完整证据见
+`docs/lvo_lowlight_scan_20260906.md`。
+
+### 30.3 当前执行裁决
+
+1. 生产候选继续冻结为 CLRNet-R50 36ep、`800×320 + cut=180`、显式
+   `model.head.cfg.test_parameters.conf_threshold=0.50`；静态配置的
+   `conf_threshold=0.4` 仍只作为训练/LVO 基准，不得覆盖生产 CLI override。
+2. 分辨率组合和条件化低照度 gamma 均关闭，不消耗剩余 A 榜额度；`conf=0.30`
+   的官方记录 `715300 / 0.72613` 仍低于 incumbent `714962 / 0.73444`。
+3. 轻量方向全部收口后，ConvNeXt-T 仅保留为 9/10 资源、磁盘和时间门通过时
+   的 15ep screen；不直接启动完整主干训练。9/6 只读门禁发现仓库未落地
+   ConvNeXt 权重，AutoDL 约仅剩 1.9GB，当前门禁不通过，因此该 screen **延期**，
+   不对 ConvNeXt 的效果作结论；若资源门仍不通过，直接进入定模型、最终重训、
+   复现和冻结流程。

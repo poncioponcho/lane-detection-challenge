@@ -1,11 +1,11 @@
-# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.11（单人版）
+# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.13（单人版）
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.12（单人版 + §25 AutoDL 可恢复流水线 + §27 A 榜反馈 + §28 sidecar 修正 + §29 NMS NO-GO）** |
+| 文档版本 | **v2.13（单人版 + §25 AutoDL 可恢复流水线 + §27 A 榜反馈 + §28 sidecar 修正 + §29 NMS NO-GO + §30 分辨率/低照度 NO-GO）** |
 | 状态 | **active**（执行跟踪唯一入口；进度以本文勾选列为准） |
-| 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ v2.9（§25 全种子/历史最优回放/交接包）→ v2.10（§27 A 榜反馈）→ v2.11（§28 sidecar 修正）→ **v2.12**（§29 NMS NO-GO） |
-| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§28｜ `docs/ARCHITECTURE.md` v2.3 §6.5（单人关键路径） |
+| 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ v2.9（§25 全种子/历史最优回放/交接包）→ v2.10（§27 A 榜反馈）→ v2.11（§28 sidecar 修正）→ v2.12（§29 NMS NO-GO）→ **v2.13**（§30 分辨率/低照度 NO-GO） |
+| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§30｜ `docs/ARCHITECTURE.md` v2.4 §6.5（单人关键路径） |
 | 常量取值 | 目标 **0.77（工作·保前十）/ 0.79（冲刺·冲前五）/ 预测 0.75**（DECISIONS §26 下修，2026-09-05）｜预算 200 元｜单人，一律以 `configs/default.yaml`（v6）为准，本文只引用 |
 | 更新日期 | 2026-09-06（周日）｜距 A 榜截止 8 天｜距 B 榜截止 11 天 |
 
@@ -37,7 +37,7 @@
 4. **B 样条 k≤3 稠密化** → 输出折线密集采样（≥10–20 点，弯道更密），纵向跨度覆盖可见范围。
 5. **按视频段切分验证集**，禁止按图随机切（同段连续帧相似 → F1 虚高 3–8pp）。
 6. **A 榜是探针不是考试**：只做本地 metric 校准与链路验证，不做调参依据。
-7. **当前方向（§26–§28 + LVO 归因）**：`v546797496` 的主要损失是 FP 爆炸，testA 也见宽路/交叉口过检；先修正 sidecar 量纲并完成直接解码↔离线过滤等价性检查，再做 score-aware 压 FP 与相邻阈值扫描，最后才决定分辨率/定向低照度增强。旧 raw-logit 曲线、J3 条数敏感度均只保留为历史先验，不单独决定跨域方向。
+7. **当前方向（§26–§30 + LVO 归因）**：`v546797496` 的主要损失是 FP 爆炸，testA 也见宽路/交叉口过检；sidecar 量纲、直接解码等价性、score-aware、相邻阈值、NMS、分辨率和定向低照度筛选均已完成。所有轻量变体均未达到放行条件，生产继续冻结 `t=0.50`；ConvNeXt-T 只在资源安全时做最后的 15ep screen。旧 raw-logit 曲线、J3 条数敏感度均只保留为历史先验，不单独决定跨域方向。
 8. **（§17.1 新增）评测双层制**：一切最终裁决（A/B 闸门、冻结定稿、台账结论数）以冻结官方 `score.py`（Oracle）读数为准；本地 metric 仅诊断/扫描，须过差分测试套件方可参与过程判断。
 9. **（§17.6/§18.3）manifest 有序清单制**：`image_id = <clip>/<frame>`；从官方清单逐行构造 + 无重复断言；存在性按 split 区分（labeled 强制图像+GT，testA/testB 只断言图像、gt_path=None）；每段 100 帧仅对已核实 train/testA 强制；缺预测按空预测计 FN；一切聚合与分桶从同一 manifest 派生。
 
@@ -59,7 +59,7 @@
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
 | ✅ | T1.1 | **metric 对齐官方实现（DECISIONS §17.1）**：本地诊断层已逐字义对齐——匈牙利 `cost=1−iou`、参数均匀稠密化 `(N−1)*5+1` + 逐段 `cv2.line`、float64 输入、异常即抛（禁线性回退）；官方 score.py 冻结为 Oracle（`src/eval/official_oracle/`，SHA-256 `b2f4c9b2…2de0d2`） | T1.2 差分套件全绿；本地 metric 仅作诊断/扫描，最终裁决仍一律走 Oracle | P0 | ✅ 9/2 |
-| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **128 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
+| ✅ | T1.2 | **metric 差分测试套件（§17.1）**：边界/线数/空缺文件/重复点/折返/越界/匈牙利/异常传播/哈希；真实 identity 全集；非 identity 跨环境整图差分 | 当前 `tests/` **141 passed**；identity 7100 图/24435 线 TP=24435/F1=1；跨 cv2 5.0↔4.12 非平凡渲染 1034 用例逐比特一致，整图 576 图/2009 线逐图 TP/FP/FN 零分歧（总计 1488/812/521，F1=0.690647） | P0 | ✅ 9/2 |
 | ✅ | T1.3 | 预测交付唯一入口 `prepare_submit.py`：任意精度 raw → 一位小数 canonical → pack → verify → labeled 时可选 Oracle；精确文件集/安全路径/资源上限/严格边界/序列化后去重/全链几何 smoke | 5 位预测确实被重写为 1 位；舍入塌缩、缺失、多余、canonical 陈旧文件、traversal 均拒绝；非 identity 全链 Oracle=`TP/FP/FN=1/1/1,F1=0.5`；真实 train/testA 旧 smoke 保持 PASS（DECISIONS §24） | P0 | ✅ 9/2 |
 | ✅ | T1.4 | 按视频段 hold-out 切分本地验证集（8 段）：scene 二元特征为主目标、逐图车道条数直方图为同分 tie-break；seed=42 下 100,000 候选 + 单交换；`weather:mixed` 强制留 train | `src/data/split_by_clip.py` + 10 项测试；`configs/splits/v1_seed42.yaml` 固化 63/8 段、6300/800 图、段 ID 零交集；scene 最大偏差仍 0.06338，val 空 GT 35 张（4.375%），标签/manifest/条数直方图 SHA-256 入配置 | P0 | ✅ 9/2 |
 | ✅ | T1.5 | A 榜首提与单变量阈值验证 | `714942=0.72794`、`714962=0.73444`（conf 0.5）及 flip-union `0.72950` 均留存；t05 相对基线 +0.65pp | P1 | ✅ 9/4 |
@@ -87,12 +87,13 @@
 | ⬜ | T3.3 | 后处理链（ARCHITECTURE T50）：等距重采样、端点外推、断裂补全、曲率平滑，各自独立开关 | 单开关 A/B；**§17.3 双门槛**：点估计 ΔF1 ≥ **+0.5pp** 且 paired CI 下界 > 0 才保留 | P1 | 9/7–9/10 |
 | ✅ | T3.4 | 分桶诊断：weather / illumination / artifact / geometry + video F1/FP/FN | `outputs/reports/lvo_scene_attribution_20260905.md`；`v546797496` FP/img=1.73 为主要离群，illumination 与 weather 共线 | P0 | ✅ 9/5 |
 | ❌ | T3.5 | ~~短板桶过采样定向补强~~ | **已砍**（DECISIONS §13 = ARCHITECTURE T56：人工高、边际低；定向增强部分已并入 T3.1） | ~~P1~~ | — |
+| ✅ | T3.6 | 分辨率与条件化低照度 eval-only 筛选 | `960×480 + cut=0` 在 `0.40–0.60` 全部退化；下半幅亮度 `≤42`、`gamma=0.85` 全局 Δ=`−0.020pp`，分桶同样无稳定正收益；两项均 NO-GO，生产仍为 `800×320 + cut=180`、`t=0.50`。证据：`docs/lvo_resolution_scan_20260906.md`、`docs/lvo_lowlight_scan_20260906.md` | P0 | ✅ 9/6 |
 
 ### W4 · 调参与定稿（9/8 – 9/14）
 
 | 状态 | ID | 任务内容 | 验收标准 | 优先级 | 起止 |
 |---|---|---|---|---|---|
-| ✅ | T4.1 | 阈值/后处理扫描（优先压 FP） | P0 sidecar 量纲已修正并通过 schema/`post_nms` 校验；直接解码↔离线过滤等价性检查 PASS；概率阈值、cross-fit score-aware ranker 与 `nms_thres/nms_topk` 均完成冻结 Oracle 筛选。score-aware ranker、几何预筛、cap4/5、无分数 flip-union 与 NMS 变体均 NO-GO；生产候选仍为 `t=0.50`。证据：`docs/lvo_nms_scan_20260906.md` | P0 | ✅ 9/5–9/6 |
+| ✅ | T4.1 | 阈值/后处理扫描（优先压 FP） | P0 sidecar 量纲已修正并通过 schema/`post_nms` 校验；直接解码↔离线过滤等价性检查 PASS；概率阈值、cross-fit score-aware ranker 与 `nms_thres/nms_topk` 均完成冻结 Oracle 筛选。score-aware ranker、几何预筛、cap4/5、无分数 flip-union 与 NMS 变体均 NO-GO；生产候选仍为 `t=0.50`。证据：`docs/lvo_nms_scan_20260906.md`、`docs/lvo_resolution_scan_20260906.md`、`docs/lvo_lowlight_scan_20260906.md` | P0 | ✅ 9/5–9/6 |
 | ❌ | T4.2 | ~~按段 K=3 折交叉验证~~ | **已砍**（DECISIONS §13：单折 + 段级 bootstrap CI 替代，第二折记为风险写入台账） | ~~P1~~ | — |
 | ⬜ | T4.3 | 本地 val ↔ A 榜相关性台账（每次提交：本地 F1 / 配置 hash / A 榜 F1） | ≥4 组有效样本，能判定系统偏差 | P0 | 9/8–9/14 |
 | ⚠️ | T4.4 | TTA 探索（水平翻转对不对称车道可能有害） | **降级**（DECISIONS §13：1 GPU·h 但需人工接，不进关键路径） | ~~P2~~ | 时间允许 |
@@ -133,8 +134,8 @@
 → ✅ T2.2 dataloader+双套 config / AutoDL 动态门 → ✅ T2.3 双路 15ep 筛选 + CLRNet-R50 赢家 36ep（9/3–9/5）
 → ✅ T1.5 A 榜阈值验证 + ✅ T3.1 雾雨 NO-GO + ✅ T3.4 LVO 弱域归因（9/4–9/5）
 → ✅ T4.1 sidecar 量纲修正 + eval-only C + 直接解码/离线过滤等价性检查 → score-aware 压 FP → 相邻阈值/NMS 筛选（均未放行）
-→ T55 分辨率方案组合（需重新按 video-disjoint 证据执行）→ T53 仅在新证据支持时开训练型增强
-→ T60 定模型（9/10，A 榜分布重估门槛）→ T61 重训 → T62 复现
+→ ✅ T55 分辨率方案与 T53 定向低照度 eval-only 筛选（均 NO-GO）
+→ T60 定模型（9/10，A 榜分布重估门槛；仅资源安全时做 ConvNeXt-T 15ep screen）→ T61 重训 → T62 复现
 → T5.2 沙盘演练 → T5.1 冻结（9/14）→ T5.3 B 榜首提（9/16）→ T5.5 终提（9/17 15:00）
 ```
 
@@ -145,8 +146,8 @@
 | 9/2–9/3 | **M1（减载版 + §17/§18 开工前置）**：metric 对齐 + 差分套件 → manifest → oracle_runner → 场景标注 + 切分；解析 badlist / EDA 成文 / dataloader + 双套 config + 双权重核验；submit 打包器解耦至 9/4–9/5 | T1.1 / T1.2 / T1.7 / T2.6 / T2.5 / T1.4 / T2.0 / T0.4 / T2.1 / T2.2 |
 | 9/3 晚–9/5 | ✅ **双路 15ep 筛选 + CLRNet-R50 36ep**；selected best 泄漏 val F1=`0.808901`，仅作训练内监控 | T2.3 |
 | 9/4–9/5 | ✅ **A 榜阈值验证、雾雨 NO-GO、LVO video-disjoint 归因、§26 目标重估** | T1.5 / T3.1 / T3.4 / §26 |
-| 9/5–9/9 | ✅ **D→C、概率 sidecar 修正、等价性、score-aware 与 NMS 筛选已完成**；`conf=0.30` 记录 `715300` 得 `0.72613`，保留 `t=0.50` 记录 `714962` 的 `0.73444` 为当前最优；NMS 最大点增益约 `+0.027pp` 且 CI 下界为 0，未放行，继续不盲目消耗剩余额度 | T4.1 |
-| 9/10 | **A 榜重估门槛** + 定模型；分辨率方案只有在 video-disjoint 证据可得时进入候选 | T55 / T60 |
+| 9/5–9/6 | ✅ **D→C、概率 sidecar 修正、等价性、score-aware、NMS、分辨率与低照度筛选已完成**；`conf=0.30` 记录 `715300` 得 `0.72613`，保留 `t=0.50` 记录 `714962` 的 `0.73444` 为当前最优；NMS、分辨率、低照度均未放行，继续不盲目消耗剩余额度 | T4.1 / T3.6 |
+| 9/10 | **A 榜重估门槛** + 定模型；轻量方向均已关闭，仅在资源和时间安全时做 ConvNeXt-T 15ep screen | T60 |
 | **9/14** | **A 榜截止 + solution.zip 冻结 + 演练完成** | T5.1 / T5.2 |
 | **9/16–9/17** | **B 榜窗口（41h）** | T5.3 – T5.5 |
 | 10/24 | 决赛答辩（若前三） | T6.1 / T6.2 |
@@ -168,7 +169,7 @@
 
 | # | 风险 | 状态 | 缓解 |
 |---|---|---|---|
-| R1 | 本地 metric 与官方不一致 | **已缓解**——当前 119 项测试；7100 图 identity + 1034 渲染用例 + 576 图非 identity 跨环境差分全绿 | Oracle 双层结构；最终裁决仍只走 Oracle；T1.5 首提作平台链路锚点 |
+| R1 | 本地 metric 与官方不一致 | **已缓解**——当前 141 项测试；7100 图 identity + 1034 渲染用例 + 576 图非 identity 跨环境差分全绿 | Oracle 双层结构；最终裁决仍只走 Oracle；T1.5 首提作平台链路锚点 |
 | R2 | clip-level val 的 video 泄漏 → 泛化结论虚高 | **已确认并降级**——`v1_seed42` 的 5 个 val video 其余 clip 同在 train；LVO OOF 作为新增诚实尺，R1–R4 暂为 memory 草案 | v1 val 只作训练内监控；跨 video 结论看 LVO/A 榜；不得把旧 paired-clip CI 当泛化闸门 |
 | R3 | A 榜单点调参过拟合 | 开放 | 阈值只在本地 val 定 |
 | R4 | B 榜 41h 窗口故障无余量 | 开放 | T5.2 演练计时 + 提前 2h |
