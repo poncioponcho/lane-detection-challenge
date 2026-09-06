@@ -66,6 +66,78 @@ UNLABELED_SPLITS = {"testA", "testB"}
 SUPPORTED_SPLITS = LABELED_SPLITS | UNLABELED_SPLITS
 
 
+def lower_half_luma(image: np.ndarray, cut_height: int = 0) -> float:
+    """Return mean BT.601 luma in the visible lower-half road region.
+
+    The input is the raw OpenCV BGR image before the dataset crop.  Using the
+    lower half avoids letting sky/ceiling pixels decide whether a road image
+    needs the optional low-light correction.  ``cut_height`` is also honored
+    so the region never includes pixels removed by the model crop.
+    """
+    array = np.asarray(image)
+    if array.ndim == 2:
+        gray = array.astype(np.float32, copy=False)
+    elif array.ndim == 3 and array.shape[2] >= 3:
+        blue, green, red = (array[..., index].astype(np.float32, copy=False)
+                            for index in range(3))
+        gray = 0.114 * blue + 0.587 * green + 0.299 * red
+    else:
+        raise ValueError(f"expected grayscale or BGR image, got shape={array.shape}")
+    start = max(gray.shape[0] // 2, int(cut_height))
+    region = gray[start:]
+    if region.size == 0:
+        raise ValueError(f"image has no lower-half ROI: shape={array.shape}")
+    return float(region.mean())
+
+
+def apply_conditional_gamma(
+    image: np.ndarray,
+    *,
+    enabled: bool,
+    luma_threshold: float,
+    gamma: float,
+    cut_height: int = 0,
+) -> np.ndarray:
+    """Brighten only dark images with a gentle, deterministic gamma curve.
+
+    This function is deliberately independent of imgaug and works for both
+    train and eval/test paths.  A gamma below one brightens shadows.  The
+    decision is made from the pristine image before random training
+    augmentations, so inference uses the same trigger and curve.
+    """
+    array = np.asarray(image)
+    if not enabled:
+        return array
+    if not np.isfinite(luma_threshold) or not 0.0 <= luma_threshold <= 255.0:
+        raise ValueError(f"luma_threshold must be in [0, 255], got {luma_threshold!r}")
+    if not np.isfinite(gamma) or gamma <= 0.0:
+        raise ValueError(f"gamma must be positive and finite, got {gamma!r}")
+    if lower_half_luma(array, cut_height=cut_height) > luma_threshold:
+        return array
+    normalized = array.astype(np.float32) / 255.0
+    corrected = np.power(np.clip(normalized, 0.0, 1.0), gamma) * 255.0
+    return np.clip(corrected, 0.0, 255.0).astype(array.dtype, copy=False)
+
+
+def conditional_gamma_settings(cfg) -> tuple[bool, float, float]:
+    """Read and validate the optional preprocessing contract from ``cfg``."""
+    raw = cfg.get("conditional_gamma", {}) if cfg is not None else {}
+    if raw is None:
+        raw = {}
+    enabled = bool(raw.get("enabled", False))
+    luma_threshold = float(raw.get("luma_threshold", 42.0))
+    gamma = float(raw.get("gamma", 0.85))
+    if not np.isfinite(luma_threshold) or not 0.0 <= luma_threshold <= 255.0:
+        raise ValueError(
+            f"conditional_gamma.luma_threshold must be in [0, 255], got {luma_threshold!r}"
+        )
+    if not np.isfinite(gamma) or gamma <= 0.0:
+        raise ValueError(
+            f"conditional_gamma.gamma must be positive and finite, got {gamma!r}"
+        )
+    return enabled, luma_threshold, gamma
+
+
 def is_labeled_split(split: str) -> bool:
     """Whether a split name carries lane-line ground truth."""
     return split in LABELED_SPLITS
@@ -225,6 +297,17 @@ class HardLaneDataset(BaseDataset):
         self.split = split
         self.labeled = is_labeled_split(split)
         super().__init__(data_root, split, cut_height, processes=processes, cfg=cfg)
+        (
+            self.conditional_gamma_enabled,
+            self.conditional_gamma_luma_threshold,
+            self.conditional_gamma_value,
+        ) = conditional_gamma_settings(cfg)
+        LOGGER.info(
+            "Conditional gamma: enabled=%s threshold=%.3f gamma=%.3f",
+            self.conditional_gamma_enabled,
+            self.conditional_gamma_luma_threshold,
+            self.conditional_gamma_value,
+        )
         self.manifest_path = str(manifest_path)
         self.load_annotations()
 
@@ -315,6 +398,13 @@ class HardLaneDataset(BaseDataset):
             raise FileNotFoundError(f"cannot decode image: {data_info['img_path']}")
         if tuple(image.shape[:2]) != (CANVAS_H, CANVAS_W):
             raise ValueError(f"unexpected image shape {image.shape}: {data_info['img_path']}")
+        image = apply_conditional_gamma(
+            image,
+            enabled=self.conditional_gamma_enabled,
+            luma_threshold=self.conditional_gamma_luma_threshold,
+            gamma=self.conditional_gamma_value,
+            cut_height=self.cut_height,
+        )
 
         mask = None
         if self.training:

@@ -69,6 +69,11 @@ param_config = OmegaConf.create(
         "img_w": img_w,
         "img_h": img_h,
         "cut_height": cut_height,
+        "conditional_gamma": {
+            "enabled": False,
+            "luma_threshold": 42.0,
+            "gamma": 0.85,
+        },
         "ignore_label": 255,
         "bg_weight": 0.4,
         "featuremap_out_channel": 192,

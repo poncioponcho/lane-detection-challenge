@@ -47,6 +47,36 @@ def test_canonicalize_lane_rejects_collapsed_or_nonfinite():
         MODULE.canonicalize_lane([(1, 2), (np.nan, 3)])
 
 
+def test_conditional_gamma_brightens_only_dark_lower_half():
+    dark = np.full((8, 6, 3), 16, dtype=np.uint8)
+    bright = np.full((8, 6, 3), 100, dtype=np.uint8)
+    corrected = MODULE.apply_conditional_gamma(
+        dark, enabled=True, luma_threshold=42.0, gamma=0.85
+    )
+    untouched = MODULE.apply_conditional_gamma(
+        bright, enabled=True, luma_threshold=42.0, gamma=0.85
+    )
+    assert corrected.dtype == np.uint8
+    assert corrected.mean() > dark.mean()
+    assert np.array_equal(untouched, bright)
+    assert MODULE.lower_half_luma(dark) == pytest.approx(16.0)
+
+
+def test_conditional_gamma_disabled_is_identity():
+    image = np.arange(24, dtype=np.uint8).reshape(4, 2, 3)
+    result = MODULE.apply_conditional_gamma(
+        image, enabled=False, luma_threshold=42.0, gamma=0.85
+    )
+    assert result is image
+
+
+def test_conditional_gamma_settings_use_safe_defaults():
+    assert MODULE.conditional_gamma_settings(None) == (False, 42.0, 0.85)
+    assert MODULE.conditional_gamma_settings(
+        {"conditional_gamma": {"enabled": True, "luma_threshold": 50, "gamma": 0.9}}
+    ) == (True, 50.0, 0.9)
+
+
 def test_read_lines_lanes_keeps_short_lines(tmp_path):
     label = tmp_path / "sample.lines.txt"
     label.write_text("1 2 3 4\n9 8 9 8 7 6\n", encoding="utf-8")
