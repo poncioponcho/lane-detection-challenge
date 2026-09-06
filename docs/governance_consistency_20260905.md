@@ -2,9 +2,9 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v1.5** |
+| 文档版本 | **v1.6** |
 | 状态 | **active**（9/6 A 榜反馈与 sidecar 量纲 P0 修正已纳入；后续以 DECISIONS 新裁决更新） |
-| 版本链 | v1.0（初次校验）→ v1.1（导入路径修复后的复核）→ v1.2（D→C 完成与阈值扫描）→ v1.3（testA 候选执行）→ v1.4（A 榜反馈）→ **v1.5**（sidecar 语义修正） |
+| 版本链 | v1.0（初次校验）→ v1.1（导入路径修复后的复核）→ v1.2（D→C 完成与阈值扫描）→ v1.3（testA 候选执行）→ v1.4（A 榜反馈）→ v1.5（sidecar 语义修正）→ **v1.6**（NMS 小扫 NO-GO） |
 | 上游依据 | `docs/DECISIONS.md` §14 / §17–§28；`configs/default.yaml` v6 |
 | 更新日期 | 2026-09-06 |
 
@@ -23,7 +23,7 @@
 | `team.size` | `1` | 同上 |
 | `target.recheck_dates` | `2026-09-10` | 同上 |
 
-`overview.md`、`docs/ARCHITECTURE.md`、`TASKS.md` 和 `docs/a_bang_snapshot.md` 的主动导语已同步到上述口径。DECISIONS 的早期 84.0/82.0/80.3 等数字和 A 榜历史快照正文保留为历史证据，并明确不再作为当前常量。
+`overview.md`、`docs/ARCHITECTURE.md`、`TASKS.md` 和 `docs/a_bang_snapshot.md` 的主动导语已同步到上述口径。DECISIONS 的早期 84.0/82.0/80.3 等数字和 A 榜历史快照正文保留为历史证据，并明确不再作为当前常量。NMS 小扫已完成并关闭，不改变生产候选。
 
 ## 统计规矩的生效层级
 
@@ -116,3 +116,14 @@ LVO 场景归因中，`v546797496` F1=`0.4676`，FP/img=`1.73`，而其他 fog v
 - C 输入覆盖校验：midpoint/final 各 7100/7100 prediction files，score image 各 7100/7100，PASS。
 - raw/conf checkpoint 扫描：16 variants、全局与 8 video cluster Oracle、10000 次 paired bootstrap，`status=pass`。
 - testA 候选校验：conf=`0.30/0.35` 各 900/900 文件，zip 清单精确匹配 manifest，官方 verify PASS。
+
+## NMS 小扫补充（2026-09-06）
+
+- `nms_topk=8,nms_thres=50` 与原始 `nms_topk=12,nms_thres=50` 在 0.40–0.60
+  概率阈值下输出和 F1 完全一致。
+- `nms_thres=30` 的同阈值最大点增益为 `+0.027pp`；8-video paired CI
+  下界为 0，未达到“严格大于 0”的确认条件。生产 NMS 和 `t=0.50` 均不变。
+- 结果由冻结官方 Oracle 生成，完整证据为
+  `docs/lvo_nms_scan_20260906.md` 与
+  `outputs/lvo_nms_conf_scan_20260906/conf_checkpoint_scan.json`（outputs
+  不入 Git）。关键路径已转入 video-disjoint 分辨率筛选。

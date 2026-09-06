@@ -1,6 +1,6 @@
 # 恶劣场景下的车道线检测挑战赛 · 方案与架构总览
 
-> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + §27 A 榜验证 + §28 sidecar 语义修正）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
+> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + §27 A 榜验证 + §28 sidecar 语义修正 + §29 NMS NO-GO）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
 > 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§28）与 `configs/default.yaml` 为准）
 > 文档族：`TASKS.md`（v2.11 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.3 active）
 
@@ -22,7 +22,7 @@
 
 **全集汇总下的 F1 恒等式（脚本验证）**：`F1 = 2·TP/(P+G)`。调试只需盯 TP 和 P 两个数。
 
-**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§28 与 `docs/a_bang_submit_20260906_conf030.md`。旧 D→C raw/conf 扫描的 sidecar 量纲错误，不能当作真实概率曲线；生产默认仍冻结为 `t=0.50`，先重跑正类 softmax sidecar、做直接解码↔离线过滤等价性检查，再做 score-aware 压 FP 与相邻阈值筛选，之后才进入 video-disjoint 分辨率/定向低照度实验。
+**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§29 与 `docs/a_bang_submit_20260906_conf030.md`。旧 D→C raw/conf 扫描的 sidecar 量纲错误，不能当作真实概率曲线；生产默认仍冻结为 `t=0.50`。概率 sidecar、等价性、score-aware 和 NMS 小扫已完成，均未形成可放行收益；下一步进入 video-disjoint 分辨率/定向低照度实验。
 
 **横向误差边界（T12 实测修正）**：cv2 `thickness=30` 有效线宽≈31px → IoU=0.5 真实边界 **≈10.3px**（非理想模型的 10px）。本地 metric 已自检全绿，详见 `docs/T11_T12_metric_done.md`。
 
@@ -95,7 +95,7 @@ L6 治理层   DECISIONS 仲裁 + 文档状态管理（2026-09-01 §14 立制）
 → ✅ 开工前置已闭环：metric 对齐+差分套件 → manifest 有序清单 → oracle_runner（全局 7100 图 + 71 clip）→ 71 段场景标注 → 63/8 按段切分（9/2）
 → ✅ dataloader + 双套 config / AutoDL 动态门 → ✅ 双路 15ep 筛选 + CLRNet-R50 赢家 36ep（9/3–9/5）
 → ✅ A 榜阈值验证 + 雾雨 NO-GO + LVO 弱域归因
-→ 🔵 sidecar 量纲修正 + 直接解码/离线过滤等价性检查 → score-aware 压 FP → 相邻阈值
+→ ✅ sidecar 量纲修正 + 直接解码/离线过滤等价性检查 → score-aware 压 FP → 相邻阈值/NMS（均未放行）
 → 分辨率方案组合（需按 video-disjoint 证据重跑）→ 定向低照度增强（仅有新证据才开）→ 定模型（9/10，A 榜重估门槛）
 → 重训+复现 → 沙盘演练 → 冻结（9/14）→ B 榜首提（9/16）→ 终提（9/17 15:00）
 ```

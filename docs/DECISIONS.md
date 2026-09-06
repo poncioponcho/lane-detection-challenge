@@ -875,3 +875,28 @@ sidecar 离线过滤及其对 LVO/A 榜冲突的解释。
 生产推理必须显式传入 `model.head.cfg.test_parameters.conf_threshold=0.50`。
 `infer_testA.py` 的默认值和 `run_pipeline.sh` 均固化该 override，并写入
 `infer_command.json` 与 `infer_evidence.json`，避免演练时意外回到 `0.4`。
+
+## 二十九、NMS 小扫 NO-GO 与分辨率筛选转序（2026-09-06）
+
+### 29.1 结果
+
+在同一批 CLRNet-R50 36ep checkpoint 上完成 8-fold LVO eval-only NMS 小扫：
+
+- `nms_topk=8,nms_thres=50` 在概率阈值 `0.40/0.45/0.50/0.55/0.60` 下与
+  原始 `nms_topk=12,nms_thres=50` 的输出和 F1 完全一致；
+- `nms_topk=12,nms_thres=30` 相对原始 NMS 的同阈值点差为
+  `+0.027/+0.021/+0.023/+0.017/+0.012pp`；8-video paired bootstrap
+  95% CI 下界依次为 `0.000/0.000/0.000/0.000/-0.005pp`；
+- 全部候选使用修正后的正类 softmax sidecar，7100/7100 图覆盖，冻结官方
+  Oracle 评估通过。
+
+### 29.2 裁决
+
+NMS 变体均 **NO-GO**：最大点估计只有约 `+0.027pp`，CI 下界没有严格大于
+0，不能证明稳定收益；不改变生产 NMS，不消耗 A 榜额度。完整证据见
+`docs/lvo_nms_scan_20260906.md` 和被 `.gitignore` 排除的
+`outputs/lvo_nms_conf_scan_20260906/conf_checkpoint_scan.json`。
+
+NMS 方向关闭后，关键路径转入分辨率的廉价 video-disjoint 筛选；若无稳定
+收益，再做只针对暗图、按下半幅 road ROI 条件启用的温和 gamma/对比度小试。
+ConvNeXt-T 仍排在最后，生产候选继续为 `t=0.50`。
