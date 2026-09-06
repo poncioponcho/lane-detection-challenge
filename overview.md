@@ -1,6 +1,6 @@
 # 恶劣场景下的车道线检测挑战赛 · 方案与架构总览
 
-> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + conf=0.30 A 榜验证）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
+> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + §27 A 榜验证 + §28 sidecar 语义修正）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
 > 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§28）与 `configs/default.yaml` 为准）
 > 文档族：`TASKS.md`（v2.11 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.3 active）
 
