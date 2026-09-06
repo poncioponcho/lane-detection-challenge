@@ -19,6 +19,9 @@
 # v6 变更（2026-09-05，DECISIONS §26 传导）：
 #   - target 全块按 LVO/A 榜诚实口径下修：定位 稳前10冲前5；
 #   - 评估统计口径 R1–R4 仍为 memory 草案，validation 块暂不改动。
+# v7 变更（2026-09-06，DECISIONS §33 传导）：
+#   - ConvNeXt-Tiny 15ep screen 已完成但 NO-GO；不再作为升级备选；
+#   - 生产预处理冻结为 cut_height=180；GPU 租期改用 R50 FP 定向训练筛选。
 # =====================================================================
 
 # ---- 目标（DECISIONS §1 裁决机制 + §15.1 滚动重估；§26 于 2026-09-05 按 LVO/A 榜口径下修） ----
@@ -54,16 +57,16 @@ eval:
 
 # ---- 模型与主干（DECISIONS.md §15.2 收口，§16.4 归位；权重事实源 docs/weight_scout_report.md） ----
 model:
-  name: clrnet_r50             # 默认主干（筛选先验）；T2.3 双路筛选实证后改记赢家（DECISIONS §15.2）
-  fallback_chain: [clrnet_r50, adnet_r34, clrnet_convnext_t]  # 与 ARCHITECTURE §4.5 ModelConfig 同源
+  name: clrnet_r50             # 生产主干（T2.3 双路筛选赢家；DECISIONS §15.2/§32）
+  fallback_chain: [clrnet_r50, adnet_r34]  # ConvNeXt-Tiny screen 已按 §32 关闭
   pretrained: required         # baseline 一律从公开预训练权重（CULane）fine-tune，禁 from-scratch（DECISIONS §15.2）
   backbone_screen: [clrnet_r50, adnet_r34]  # 双路 15ep 筛选（§15.2，9/3 晚–9/4 晨 AutoDL）；判定：|ΔF1|<1.5pp 取 clrnet_r50
-  backbone_upgrade: clrnet_convnext_t       # 9/10（T60 定模型）升级备选（UnLanedet CULane 80.21）；DLA-34 无权重勿配置
+  backbone_upgrade: null       # ConvNeXt-Tiny 15ep screen NO-GO（DECISIONS §32）；不得误触发完整训练
 
 # ---- 数据与输入（DECISIONS.md §15.4 收口；§17.4/§17.5 修订） ----
 data:
   input_size: [800, 320]       # 网络输入 (W,H)，与 ARCHITECTURE §4.5 DataConfig 同源；T55 另有 preset 对比
-  cut_height: null             # 【待 §17.5 方案组合 A/B 裁决】旧先验 330 已作废（实测截断 ≥5% GT 线）；候选：180（+800×320 直缩）/ 0（+960×480 letterbox）
+  cut_height: 180              # 生产冻结值（800×320 + cut=180；960×480 + cut=0 方案按 §30 关闭）
   max_gt_lanes: 8              # 训练侧 GT 容量上限（loss assignment / target padding）；GT 实测 max=7 + 余量（§17.4/§18.5）
   candidate_topk: 12           # 推理候选保留量（> 输出上限，避免过早截断）
   max_output_sweep: [7, 8, 10, 12]  # 后处理最终输出截断扫描网格（val 上定，不与训练容量绑死）

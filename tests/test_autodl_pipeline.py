@@ -325,6 +325,63 @@ def test_run_training_dry_run_is_non_mutating_and_pins_seed(tmp_path):
     assert not (output / "runs").exists()
 
 
+def test_run_training_accepts_only_declared_single_variable_overrides(tmp_path):
+    project = tmp_path / "project"
+    unlanedet = tmp_path / "UnLanedet"
+    data = tmp_path / "data"
+    weights = tmp_path / "weights"
+    output = tmp_path / "output"
+    config = project / "configs/unlanedet/clrnet_r50_hardlane.py"
+    train_net = unlanedet / "tools/train_net.py"
+    config.parent.mkdir(parents=True)
+    train_net.parent.mkdir(parents=True)
+    config.write_text("# fake\n", encoding="utf-8")
+    train_net.write_text("# fake\n", encoding="utf-8")
+    for directory in (data, weights, output):
+        directory.mkdir()
+
+    assert RUN.parse_experiment_overrides(
+        ["model.head.cfg.cls_loss_weight=4.0"]
+    ) == ["model.head.cfg.cls_loss_weight=4.0"]
+    with pytest.raises(SystemExit, match="launcher controls"):
+        RUN.parse_experiment_overrides(["train.seed=101"])
+    with pytest.raises(SystemExit, match="duplicate"):
+        RUN.parse_experiment_overrides([
+            "model.head.cfg.cls_loss_weight=3.0",
+            "model.head.cfg.cls_loss_weight=4.0",
+        ])
+
+    env = {
+        **os.environ,
+        "HARDLANE_PROJECT_ROOT": str(project),
+        "HARDLANE_DATA_ROOT": str(data),
+        "UNLANEDET_ROOT": str(unlanedet),
+        "HARDLANE_WEIGHTS_ROOT": str(weights),
+        "HARDLANE_OUTPUT_ROOT": str(output),
+        "HARDLANE_PYTHON": sys.executable,
+    }
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/autodl/run_training.py"),
+            "--model", "clrnet_r50",
+            "--epochs", "15",
+            "--run-name", "screen_r50_clsweight4_15ep",
+            "--override", "model.head.cfg.cls_loss_weight=4.0",
+            "--dry-run",
+        ],
+        env=env,
+        text=True,
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    launch = json.loads(proc.stdout)
+    assert launch["experiment_overrides"] == [
+        "model.head.cfg.cls_loss_weight=4.0"
+    ]
+    assert "model.head.cfg.cls_loss_weight=4.0" in launch["command"]
+
+
 def test_manifest_prediction_paths_handles_any_split_size():
     """Only the val split is pinned to 800; unlabeled splits declare their own."""
     val = VALIDATE.expected_prediction_paths(

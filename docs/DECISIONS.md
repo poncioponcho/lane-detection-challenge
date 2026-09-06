@@ -1016,3 +1016,51 @@ ConvNeXt-Tiny 15ep screen；实验仍不消耗 A 榜额度。
 sidecar 和 Oracle JSON 均在 `outputs/convnext_screen_20260906_evidence/`（outputs
 按仓库规则不入 Git），压缩包 SHA-256 为
 `edebc9851848faea1ac74cb5b624d96015ff8bb10dbe93c10ea416a9b9fc17f7`。
+
+## 三十三、GPU 租期压缩执行计划（2026-09-06）
+
+**触发**：ConvNeXt-Tiny 15ep screen 已完成且 NO-GO，但 AutoDL 3090 租期仍有约
+6 天；9/10 才开始使用 GPU 会造成无效空档，也会把任何新候选压缩到提交前最后几天。
+
+### 33.1 当前资源事实
+
+- 2026-09-06 21:30（北京时间）只读检查：AutoDL GPU 为 RTX 3090，利用率 `0%`、显存
+  使用 `2 MiB / 24576 MiB`；`pipeline.status=complete`，没有进行中的训练进程。
+- `/hy-tmp` 总容量 100GB，已用约 88GB、剩余约 13GB；新实验必须使用独立 run 目录，
+  只归档可恢复的过期失败目录，不覆盖基线、C、LVO 和 ConvNeXt 证据。
+- 远端 HardLane 项目工作树干净，UnLanedet 仍固定在
+  `03921844220adb2e65c840de2d9759478d5c3d4c`，训练前继续执行现有 clean/patch/环境门。
+
+### 33.2 立即执行的实验
+
+当前主线从“等待 9/10”改为“先消化 FP 爆炸假设”:
+
+1. 固定生产数据、`800×320 + cut_height=180`、CULane adapted CLRNet-R50 权重、
+   `seed=42`、15ep、同一验证与 Oracle；只改变 `model.head.cfg.cls_loss_weight`，
+   运行 `3.0` 与 `4.0` 两组 screen。基线 `2.0` 已有 `screen_clrnet_r50_15ep` 证据。
+2. 新增的 `scripts/autodl/run_r50_loss_weight_screen.sh` 使用统一训练启动器；每个
+   run 的 override 写入 `launches.jsonl`，防止“改了变量但证据不记账”。这是一项分类
+   目标权重 screen，不冒充已经实现的 OHEM。
+3. 只选一组最有希望的变体进入 8-video video-disjoint LVO 15ep；采用既有放行门：
+   ΔF1 至少 `+0.50pp`、paired CI 下界严格大于 0、8 个 LOCO 差异全部为正。screen
+   只作廉价筛选，不能单独产生 A 榜候选。
+4. LVO 通过后才启动该变体的 36ep；LVO 不通过则不扩展、不打包、不提交，立即转入
+   R50 多种子复现或最终交付演练。生产 incumbent `714962 / 0.73444` 始终保留。
+
+### 33.3 六天排程
+
+| 日期 | GPU 主任务 | CPU/交付任务 | 退出条件 |
+|---|---|---|---|
+| 9/6–9/7 | 两组 R50 15ep loss-weight screen | 回放、Oracle 证据、清理过期可恢复目录 | 两组均退化则关闭该方向 |
+| 9/7–9/8 | 仅最佳组做 8-fold LVO 15ep | paired bootstrap + LOCO | 未过门则不做 36ep |
+| 9/8–9/9 | 通过者做 36ep；否则 R50 seed 复现 | 独立 eval、候选台账 | 不允许因时间压力放宽门槛 |
+| 9/9–9/10 | 通过者必要时做 36ep LVO/最终导出 | testA 只生成候选，不自动提交 | 没有 LVO 稳定收益就不消耗 A 榜 |
+| 9/10 | 只做 T60/A 榜分布重估与定模型 | 更新快照、冻结选择 | incumbent 默认优先 |
+| 9/11–9/12 | GPU 仅用于最终复现/导出，不再探索 | SHA、干净环境复现、B 榜沙盘 | 9/12 前交接/停机 |
+
+**A 榜纪律**：不重复提交 `submit_testA_t05.zip`；新包必须先经过 LVO 放行，最多
+只把一个新变体作为探针，保留 incumbent 和剩余额度，不把标准 val 点估计当作榜单收益。
+
+**撤销条件**：任何候选出现 loss 非 finite、checkpoint/sidecar 覆盖不全、项目 HEAD
+或 UnLanedet patch 不一致、磁盘剩余低于 9GB，立即停止该候选并保留失败证据；不通过
+门槛不能靠重复启动同一 run“碰运气”。

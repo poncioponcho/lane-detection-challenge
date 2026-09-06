@@ -32,6 +32,29 @@ CONFIGS = {
 }
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
+EXPERIMENT_OVERRIDE_KEYS = frozenset(
+    {
+        "model.head.cfg.cls_loss_weight",
+        "model.head.cfg.xyt_loss_weight",
+        "model.head.cfg.iou_loss_weight",
+        "model.head.cfg.seg_loss_weight",
+        "optimizer.lr",
+        "optimizer.weight_decay",
+    }
+)
+CONTROLLED_OVERRIDE_KEYS = frozenset(
+    {
+        "train.max_iter",
+        "train.eval_period",
+        "train.checkpointer.period",
+        "train.checkpointer.max_to_keep",
+        "train.output_dir",
+        "dataloader.evaluator.output_basedir",
+        "train.seed",
+        "train.cudnn_benchmark",
+        "train.init_checkpoint",
+    }
+)
 
 
 def override(key: str, value) -> str:
@@ -49,6 +72,37 @@ def override(key: str, value) -> str:
     except (ValueError, SyntaxError):
         return f"{key}='{text}'"
     return f"{key}={text}"
+
+
+def parse_experiment_override(raw: str) -> str:
+    """Validate and normalize one single-variable experiment override."""
+    key, separator, value = raw.partition("=")
+    if not separator or not key or not value or key.strip() != key:
+        raise SystemExit(
+            f"invalid --override {raw!r}; expected KEY=VALUE with a non-empty value"
+        )
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]*", key):
+        raise SystemExit(f"invalid experiment override key: {key!r}")
+    if key in CONTROLLED_OVERRIDE_KEYS:
+        raise SystemExit(f"launcher controls override key: {key}")
+    if key not in EXPERIMENT_OVERRIDE_KEYS:
+        allowed = ", ".join(sorted(EXPERIMENT_OVERRIDE_KEYS))
+        raise SystemExit(f"unsupported experiment override {key!r}; allowed: {allowed}")
+    return override(key, value)
+
+
+def parse_experiment_overrides(raw_values: list[str]) -> list[str]:
+    """Normalize overrides and reject duplicate keys that hide a variable change."""
+    normalized = []
+    seen = set()
+    for raw in raw_values:
+        value = parse_experiment_override(raw)
+        key = value.split("=", 1)[0]
+        if key in seen:
+            raise SystemExit(f"duplicate experiment override key: {key}")
+        seen.add(key)
+        normalized.append(value)
+    return normalized
 
 
 def required_absolute_env(name: str) -> Path:
@@ -107,7 +161,12 @@ def assert_tracked_worktree_clean(path: Path) -> None:
         raise SystemExit(f"tracked project files are dirty; commit before AutoDL training:\n{status}")
 
 
-def validate_launch_history(path: Path, model: str, project_head: str) -> None:
+def validate_launch_history(
+    path: Path,
+    model: str,
+    project_head: str,
+    expected_overrides: list[str] | None = None,
+) -> None:
     if not path.is_file():
         return
     for line_number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -123,6 +182,12 @@ def validate_launch_history(path: Path, model: str, project_head: str) -> None:
             raise SystemExit(
                 f"refusing cross-commit resume: {path}:L{line_number} was launched at "
                 f"{launch.get('project_git_head')}, current HEAD is {project_head}"
+            )
+        if expected_overrides is not None and launch.get("experiment_overrides", []) != expected_overrides:
+            raise SystemExit(
+                f"refusing resume with different experiment overrides at "
+                f"{path}:L{line_number}: expected {expected_overrides}, "
+                f"found {launch.get('experiment_overrides', [])}"
             )
 
 
@@ -286,6 +351,13 @@ def main() -> None:
     parser.add_argument("--epochs", required=True, type=int)
     parser.add_argument("--run-name", required=True)
     parser.add_argument("--max-iter", type=int)
+    parser.add_argument(
+        "--override",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="single-variable training override; may be repeated",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--resume", action="store_true")
     mode.add_argument("--auto-resume", action="store_true")
@@ -300,6 +372,7 @@ def main() -> None:
     target_iter = args.max_iter or args.epochs * ITERATIONS_PER_EPOCH
     if target_iter <= 0:
         raise SystemExit("--max-iter must be positive")
+    experiment_overrides = parse_experiment_overrides(args.override)
 
     project_root = required_absolute_env("HARDLANE_PROJECT_ROOT")
     required_absolute_env("HARDLANE_DATA_ROOT")
@@ -350,6 +423,12 @@ def main() -> None:
     if not args.dry_run and args.skip_if_complete and evidence_is_complete(
         evidence_path, args.model, target_iter, project_head
     ):
+        validate_launch_history(
+            run_dir / "launches.jsonl",
+            args.model,
+            project_head,
+            experiment_overrides,
+        )
         validate_run(run_dir, args.model, target_iter, project_root)
         print(json.dumps({
             "status": "already_complete",
@@ -374,7 +453,12 @@ def main() -> None:
             "move it aside or use --resume/--auto-resume"
         )
     if resume and not args.dry_run:
-        validate_launch_history(run_dir / "launches.jsonl", args.model, project_head)
+        validate_launch_history(
+            run_dir / "launches.jsonl",
+            args.model,
+            project_head,
+            experiment_overrides,
+        )
         import torch
 
         last_checkpoint, last_payload = read_last_checkpoint(torch, run_dir)
@@ -429,6 +513,7 @@ def main() -> None:
         command.append("--resume")
     command.extend(
         [
+            *experiment_overrides,
             override("train.max_iter", target_iter),
             override(
                 "train.eval_period",
@@ -449,6 +534,7 @@ def main() -> None:
         "model": args.model,
         "epochs_label": args.epochs,
         "target_max_iter": target_iter,
+        "experiment_overrides": experiment_overrides,
         "resume": resume,
         "command": command,
         "python": sys.version,
