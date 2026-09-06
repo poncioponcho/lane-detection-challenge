@@ -34,6 +34,7 @@ export HARDLANE_PROJECT_ROOT="$PROJECT_ROOT"
 export HARDLANE_DATA_ROOT="$DATA_ROOT"
 export HARDLANE_WEIGHTS_ROOT="$WEIGHTS_ROOT"
 export HARDLANE_OUTPUT_ROOT="$OUTPUT_ROOT"
+export PYTHONPATH="$UNLANEDET_ROOT:$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 fail() {
     code=$?
@@ -42,6 +43,12 @@ fail() {
     exit "$code"
 }
 trap fail ERR
+
+loaded_unlanedet_root=$("$PYTHON_BIN" -c 'import pathlib, unlanedet; print(pathlib.Path(unlanedet.__file__).resolve().parent.parent)')
+[ "$loaded_unlanedet_root" = "$(cd "$UNLANEDET_ROOT" && pwd -P)" ] || {
+    echo "wrong UnLanedet import root: $loaded_unlanedet_root" >&2
+    exit 8
+}
 
 "$PYTHON_BIN" "$BUILDER" --base "$BASE_CONFIG" \
     --output "$OUTPUT_ROOT/clrnet_r50_hardlane_lowlight.py" \
