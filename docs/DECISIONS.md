@@ -944,3 +944,37 @@ illumination 在训练集共线，不作独立因果结论。完整证据见
    ConvNeXt 权重，AutoDL 约仅剩 1.9GB，当前门禁不通过，因此该 screen **延期**，
    不对 ConvNeXt 的效果作结论；若资源门仍不通过，直接进入定模型、最终重训、
    复现和冻结流程。
+
+## 三十一、修正概率 sidecar 模块化消融收口（2026-09-06）
+
+触发：SOL 要求在修正后的 eval-only C、等价性检查和真实概率曲线之后，优先用低成本模块化消融寻找稳定压 FP 收益；在此之前不消耗新的 A 榜额度。
+
+### 31.1 事实
+
+- 使用修正 C final 的 post-NMS 候选池，sidecar 语义为 positive-class softmax probability，
+  导出阈值为 0.0；固定 manifest 覆盖 7100 张图、8 个 video。
+- 通过冻结官方 Oracle 完成 16 个变体：概率阈值 5 个、下半幅亮度条件阈值 6 个、
+  y-span 几何过滤 3 个、线长过滤 2 个；每个变体都完成全局和逐 video TP/FP/FN。
+- 统计为 10,000 次、seed=42 的 video-level paired bootstrap，并附 8 个 LOCO 差异。
+
+### 31.2 结果与裁决
+
+- 参考为 final@0.40，F1=0.778516。
+- 最好点为 luma>110 时使用 conf=0.60、否则 conf=0.40：F1=0.779618，
+  Δ=+0.110pp，paired CI=[-0.018,+0.356]pp，LOCO 最小 Δ=-0.008pp；
+  未达到效应量 ≥+0.50pp、CI 下界>0、LOCO 全正的放行条件。
+- 亮度规则只记为弱正点，不训练、不写入生产配置、不生成 A 榜包；y-span 过滤基本不变或退化，
+  线长过滤为负，均关闭；提高统一概率阈值也退化。
+- 结合 §29–§30 及此前 score-aware/NMS/TTA 证据，本轮没有稳定可提交模块；
+  生产候选继续为 CLRNet-R50 36ep、800×320 + cut=180、显式 conf=0.50，
+  incumbent 仍为 A 榜记录 714962、0.73444。
+
+### 31.3 证据和资源卫生
+
+完整机器结果、16×7100 预测树和报告位于 outputs/modular_ablation_20260906_v3/；
+可复核脚本为 scripts/evaluate_modular_ablation.py。AutoDL 已删除已核实的失败中间目录、
+旧 raw-logit C 导出和 stale 环境目录，释放约 316MB；修正 C 目录、压缩备份、生产 checkpoint、
+UnLanedet 项目及其未提交的概率修正工作树改动均保留。
+
+本节生效后，后续只有在新的 video-disjoint 证据满足同一放行门槛时，才允许生成新的 testA
+候选包；不重复提交 submit_testA_t05.zip，也不把任何点估计正收益直接解释为榜单提升。

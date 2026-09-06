@@ -1,8 +1,8 @@
 # 恶劣场景下的车道线检测挑战赛 · 方案与架构总览
 
-> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + §27 A 榜验证 + §28 sidecar 语义修正 + §29 NMS NO-GO + §30 分辨率/低照度 NO-GO）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
-> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§30）与 `configs/default.yaml` 为准）
-> 文档族：`TASKS.md`（v2.13 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.4 active）
+> 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + §27 A 榜验证 + §28 sidecar 语义修正 + §29 NMS NO-GO + §30 分辨率/低照度 NO-GO + §31 模块化消融收口）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
+> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§31）与 `configs/default.yaml` 为准）
+> 文档族：`TASKS.md`（v2.14 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.5 active）
 
 ---
 
@@ -22,7 +22,7 @@
 
 **全集汇总下的 F1 恒等式（脚本验证）**：`F1 = 2·TP/(P+G)`。调试只需盯 TP 和 P 两个数。
 
-**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§30 与 `docs/a_bang_submit_20260906_conf030.md`。旧 D→C raw/conf 扫描的 sidecar 量纲错误，不能当作真实概率曲线；生产默认仍冻结为 `t=0.50`。概率 sidecar、等价性、score-aware、NMS、`960×480 + cut=0` 和条件化低照度 gamma 均已完成筛选，均未形成可放行收益；ConvNeXt-T 只保留为资源门控下的最后 15ep screen。
+**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§31 与 `docs/a_bang_submit_20260906_conf030.md`。旧 D→C raw/conf 扫描的 sidecar 量纲错误，不能当作真实概率曲线；生产默认仍冻结为 `t=0.50`。概率 sidecar、等价性、score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma 和模块化置信度/亮度/几何消融均已完成筛选，最高点仅 +0.110pp 且未过放行门；ConvNeXt-T 只保留为资源门控下的最后 15ep screen。
 
 **横向误差边界（T12 实测修正）**：cv2 `thickness=30` 有效线宽≈31px → IoU=0.5 真实边界 **≈10.3px**（非理想模型的 10px）。本地 metric 已自检全绿，详见 `docs/T11_T12_metric_done.md`。
 
@@ -61,7 +61,7 @@
 
 ---
 
-## 四、架构：6 层（ARCHITECTURE v2.4）
+## 四、架构：6 层（ARCHITECTURE v2.5）
 
 ```
 L1 数据层   manifest 有序清单 / 三格式标签解析 / 段索引 / 按段切分（多维场景标签分层）/ 退化增强 / 复原前置
@@ -103,7 +103,7 @@ L6 治理层   DECISIONS 仲裁 + 文档状态管理（2026-09-01 §14 立制）
 原最高风险项 **metric 精度改由双层结构兜底**：官方 score.py 已逐字节冻结为裁决 Oracle；本地已修复三处偏差，并通过 1034 个渲染用例与 576 图非 identity 跨环境差分（逐图 TP/FP/FN 零分歧）。训练期可用本地诊断层，最终裁决仍一律走 Oracle（DECISIONS §17.1/§19）。
 单人剩余最大风险：**人工带宽**（≈95–105h，任何关键路径环节延期 ≥2 天触发再裁剪）。
 
-**目标滚动重估**（DECISIONS §26–§30，9/5–9/6 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；sidecar 概率语义、直接解码等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已完成，但未形成可放行变体。`conf=0.30` 已真实 A 榜验证为 `0.72613`，低于 `t=0.50` 的 `0.73444`，默认阈值不变。后续只在资源和时间安全时做 ConvNeXt-T 15ep screen，然后进入定模型、重训、复现和冻结。
+**目标滚动重估**（DECISIONS §26–§31，9/5–9/6 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；sidecar 概率语义、直接解码等价性、score-aware、NMS、分辨率、低照度和模块化后处理 eval-only 筛选均已完成，但未形成可放行变体。`conf=0.30` 已真实 A 榜验证为 `0.72613`，低于 `t=0.50` 的 `0.73444`，默认阈值不变。后续只在资源和时间安全时做 ConvNeXt-T 15ep screen，然后进入定模型、重训、复现和冻结。
 
 ---
 
