@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -33,6 +34,10 @@ from validate_run import manifest_prediction_paths, sha256_file
 # Must stay in sync with src/integrations/unlanedet_hardlane.py::UNLABELED_SPLITS;
 # tests/test_unlanedet_hardlane.py guards the pairing.
 UNLABELED_SPLITS = {"testA", "testB"}
+# The checked-in CLRNet config remains at 0.4 for the training/LVO contract.
+# Production testA/testB inference must always record and pass this explicit
+# decode-time override so a rehearsal cannot silently fall back to 0.4.
+PRODUCTION_CONF_THRESHOLD = 0.50
 
 
 def manifest_for_split(project_root: Path, split: str) -> Path:
@@ -44,6 +49,7 @@ def existing_evidence_passes(
     checkpoint_sha: str,
     manifest_sha: str,
     split: str,
+    conf_threshold: float,
     expected_count: int,
 ) -> bool:
     try:
@@ -53,6 +59,9 @@ def existing_evidence_passes(
             and value.get("split") == split
             and value.get("selected_checkpoint_sha256") == checkpoint_sha
             and value.get("manifest_sha256") == manifest_sha
+            and math.isclose(
+                float(value.get("conf_threshold")), conf_threshold, abs_tol=1e-12
+            )
             and int(value.get("prediction_count", -1)) == expected_count
         )
     except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
@@ -72,12 +81,18 @@ def main() -> None:
     parser.add_argument(
         "--conf-threshold",
         type=float,
-        default=None,
+        default=PRODUCTION_CONF_THRESHOLD,
         help="Override model.head.cfg.test_parameters.conf_threshold "
-        "(single-variable experiment hook; omit to keep the config value).",
+        f"(defaults to frozen production override {PRODUCTION_CONF_THRESHOLD:.2f}; "
+        "pass another value only for a named threshold experiment).",
     )
     parser.add_argument("--skip-if-complete", action="store_true")
     args = parser.parse_args()
+
+    if not math.isfinite(args.conf_threshold) or not 0.0 <= args.conf_threshold <= 1.0:
+        raise SystemExit(
+            f"--conf-threshold must be a finite probability in [0, 1], got {args.conf_threshold!r}"
+        )
 
     if args.split not in UNLABELED_SPLITS:
         raise SystemExit(
@@ -135,7 +150,12 @@ def main() -> None:
     output_dir = (args.output_dir or (run_dir / f"{args.split.lower()}_infer")).resolve()
     evidence_path = output_dir / "infer_evidence.json"
     if args.skip_if_complete and existing_evidence_passes(
-        evidence_path, checkpoint_sha, manifest_sha, args.split, len(expected_paths)
+        evidence_path,
+        checkpoint_sha,
+        manifest_sha,
+        args.split,
+        args.conf_threshold,
+        len(expected_paths),
     ):
         if _prediction_set(output_dir, args.split) == expected_paths:
             print(json.dumps({"status": "already_complete", "evidence": str(evidence_path)}))
@@ -166,13 +186,12 @@ def main() -> None:
         "train.seed=42",
         "train.cudnn_benchmark=False",
     ]
-    if args.conf_threshold is not None:
-        # Single-variable experiment hook: the head reads the decode-time
-        # confidence gate from model.head.cfg (the shared param_config), so the
-        # override path is model.head.cfg.test_parameters.conf_threshold.
-        command.append(
-            override("model.head.cfg.test_parameters.conf_threshold", args.conf_threshold)
-        )
+    # The head reads the decode-time confidence gate from model.head.cfg (the
+    # shared param_config), so the production override path is explicit even
+    # when the caller omitted --conf-threshold.
+    command.append(
+        override("model.head.cfg.test_parameters.conf_threshold", args.conf_threshold)
+    )
     (output_dir / "infer_command.json").write_text(
         json.dumps(command, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )

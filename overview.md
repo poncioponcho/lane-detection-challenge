@@ -1,8 +1,8 @@
 # 恶劣场景下的车道线检测挑战赛 · 方案与架构总览
 
 > 生成：2026-09-01｜更新：2026-09-06（§26 LVO/A 榜重估 + conf=0.30 A 榜验证）｜ 当前目标：**稳前十，冲前五**（讯飞 AI 开发者大赛，中国矿业大学赛道）
-> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§27）与 `configs/default.yaml` 为准）
-> 文档族：`TASKS.md`（v2.10 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.2 active）
+> 状态：**active**（本文为摘要层，只引用不复制——判据/常量/任务详情一律以 `docs/DECISIONS.md`（§1/§9/§12–§15/§17–§28）与 `configs/default.yaml` 为准）
+> 文档族：`TASKS.md`（v2.11 单人执行跟踪）· `docs/PRD.md`（superseded 部分）· `docs/PRD_v1_目标84.md`（superseded）· `docs/DECISIONS.md`（active 仲裁）· `docs/ARCHITECTURE.md`（v2.3 active）
 
 ---
 
@@ -22,7 +22,7 @@
 
 **全集汇总下的 F1 恒等式（脚本验证）**：`F1 = 2·TP/(P+G)`。调试只需盯 TP 和 P 两个数。
 
-**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§27 与 `docs/a_bang_submit_20260906_conf030.md`。D→C raw/conf 扫描显示 final conf=`0.30/0.35` 在 LVO 上显著优于 conf=`0.40`，但真实 A 榜已验证 conf=`0.30` 得分 `0.72613`，低于 `t=0.50` 的 `0.73444`；生产默认仍冻结为 `t=0.50`，下一步优先做相邻阈值、本地 video-disjoint 分辨率对照和定向恶劣场景增强，不启动无证据的新训练。
+**当前方向（2026-09-06）**：详见 `docs/DECISIONS.md` §26–§28 与 `docs/a_bang_submit_20260906_conf030.md`。旧 D→C raw/conf 扫描的 sidecar 量纲错误，不能当作真实概率曲线；生产默认仍冻结为 `t=0.50`，先重跑正类 softmax sidecar、做直接解码↔离线过滤等价性检查，再做 score-aware 压 FP 与相邻阈值筛选，之后才进入 video-disjoint 分辨率/定向低照度实验。
 
 **横向误差边界（T12 实测修正）**：cv2 `thickness=30` 有效线宽≈31px → IoU=0.5 真实边界 **≈10.3px**（非理想模型的 10px）。本地 metric 已自检全绿，详见 `docs/T11_T12_metric_done.md`。
 
@@ -61,7 +61,7 @@
 
 ---
 
-## 四、架构：6 层（ARCHITECTURE v1.4）
+## 四、架构：6 层（ARCHITECTURE v2.3）
 
 ```
 L1 数据层   manifest 有序清单 / 三格式标签解析 / 段索引 / 按段切分（多维场景标签分层）/ 退化增强 / 复原前置
@@ -94,15 +94,16 @@ L6 治理层   DECISIONS 仲裁 + 文档状态管理（2026-09-01 §14 立制）
 ✅ 官方 Oracle 冻结 + 哈希守护 + 数据落盘核实（9/1–9/2，DECISIONS §17/§18）
 → ✅ 开工前置已闭环：metric 对齐+差分套件 → manifest 有序清单 → oracle_runner（全局 7100 图 + 71 clip）→ 71 段场景标注 → 63/8 按段切分（9/2）
 → ✅ dataloader + 双套 config / AutoDL 动态门 → ✅ 双路 15ep 筛选 + CLRNet-R50 赢家 36ep（9/3–9/5）
-→ ✅ A 榜阈值验证 + 雾雨 NO-GO + LVO 弱域归因 → 后处理/raw-conf 扫描（先压 FP）
-→ 分辨率方案组合（需按 video-disjoint 证据重跑）→ 训练型增强（仅有新证据才开）→ 定模型（9/10，A 榜重估门槛）
+→ ✅ A 榜阈值验证 + 雾雨 NO-GO + LVO 弱域归因
+→ 🔵 sidecar 量纲修正 + 直接解码/离线过滤等价性检查 → score-aware 压 FP → 相邻阈值
+→ 分辨率方案组合（需按 video-disjoint 证据重跑）→ 定向低照度增强（仅有新证据才开）→ 定模型（9/10，A 榜重估门槛）
 → 重训+复现 → 沙盘演练 → 冻结（9/14）→ B 榜首提（9/16）→ 终提（9/17 15:00）
 ```
 
 原最高风险项 **metric 精度改由双层结构兜底**：官方 score.py 已逐字节冻结为裁决 Oracle；本地已修复三处偏差，并通过 1034 个渲染用例与 576 图非 identity 跨环境差分（逐图 TP/FP/FN 零分歧）。训练期可用本地诊断层，最终裁决仍一律走 Oracle（DECISIONS §17.1/§19）。
 单人剩余最大风险：**人工带宽**（≈95–105h，任何关键路径环节延期 ≥2 天触发再裁剪）。
 
-**目标滚动重估**（DECISIONS §26–§27，9/5–9/6 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；AutoDL baseline 与独立 36ep LVO D→C 均已完成，C midpoint/final 各覆盖 7100/7100 图。几何预筛无可保留变体；conf=`0.30` 已真实 A 榜验证为 `0.72613`，低于 `t=0.50` 的 `0.73444`，默认阈值不变。下一步转向相邻阈值的本地筛选、分辨率对照和定向恶劣场景增强。
+**目标滚动重估**（DECISIONS §26–§28，9/5–9/6 已执行）：工作目标 **0.77（稳前十）**/ 冲刺 **0.79（冲前五）** / 预测 **0.75** / 缺口 **4.0pp**；剩余节点 9/10。主干为 **CLRNet-R50**（36ep 生产 run 已完成）。**数据已全量核实**（7100 图 / 24435 条线；text↔JSON 全等，PNG badlist 1/7100）；AutoDL baseline 与独立 36ep LVO D→C 均已完成，但旧 C sidecar 为 raw-logit 语义，必须 eval-only 重导出。几何预筛无可保留变体；conf=`0.30` 已真实 A 榜验证为 `0.72613`，低于 `t=0.50` 的 `0.73444`，默认阈值不变。下一步为概率 sidecar/等价性检查、score-aware 压 FP，再做相邻阈值、分辨率和定向低照度筛选。
 
 ---
 

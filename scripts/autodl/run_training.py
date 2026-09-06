@@ -335,6 +335,8 @@ def main() -> None:
             "top_k=self.cfg.test_parameters.nms_topk" not in patch_source
             or ".astype(bool)" not in patch_source
             or "predictions[..., 4].clamp(0.01, 0.99)" not in patch_source
+            or "torch.softmax(lane[:2], dim=0)[1]" not in patch_source
+            or "score_semantics" not in patch_source
             or "torch.autograd.set_detect_anomaly(False)" not in condlane_head_source
         ):
             raise SystemExit("required HardLane UnLanedet patch is not applied")

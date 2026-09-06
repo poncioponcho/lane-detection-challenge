@@ -14,6 +14,13 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
+from src.eval.score_sidecar import (
+    POSITIVE_CLASS_SOFTMAX_PROBABILITY,
+    UNKNOWN_SCORE_SEMANTICS,
+    make_score_sidecar_contract,
+    probability_score,
+)
+
 # imgaug==0.4.0 (pinned by UnLanedet's requirements) still references numpy
 # aliases that were removed in numpy>=1.24 (np.bool etc.) at call time -- e.g.
 # dtype=np.bool in augmenters/meta.py. The project pins numpy==1.26.4, so
@@ -380,16 +387,17 @@ class HardLaneEvaluator(DatasetEvaluator):
         return None
 
     def _prediction_points(self, prediction: Iterable) -> list[np.ndarray]:
-        points, _ = self._prediction_points_and_scores(prediction)
+        points, _, _ = self._prediction_points_and_scores(prediction)
         return points
 
     def _prediction_points_and_scores(
         self, prediction: Iterable
-    ) -> tuple[list[np.ndarray], list[float | None]]:
+    ) -> tuple[list[np.ndarray], list[float | None], list[str | None]]:
         sample_ys = np.asarray(list(self.cfg.sample_y), dtype=np.float64)
         normalized_ys = sample_ys / float(self.cfg.ori_img_h)
         result: list[np.ndarray] = []
         scores: list[float | None] = []
+        score_semantics: list[str | None] = []
         for lane in prediction:
             xs = np.asarray(lane(normalized_ys), dtype=np.float64)
             valid = np.isfinite(xs) & (xs >= 0.0) & (xs < 1.0)
@@ -400,8 +408,38 @@ class HardLaneEvaluator(DatasetEvaluator):
                 result.append(points)
                 metadata = getattr(lane, "metadata", {}) or {}
                 confidence = metadata.get("conf")
-                scores.append(float(confidence) if confidence is not None else None)
-        return result, scores
+                semantics = metadata.get("score_semantics")
+                if semantics is not None and not isinstance(semantics, str):
+                    raise ValueError(
+                        f"lane score_semantics must be a string, got {semantics!r}"
+                    )
+                if confidence is None:
+                    scores.append(None)
+                elif semantics == POSITIVE_CLASS_SOFTMAX_PROBABILITY:
+                    scores.append(
+                        probability_score(
+                            confidence,
+                            context="positive-class softmax confidence",
+                        )
+                    )
+                else:
+                    try:
+                        value = float(confidence)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            f"lane confidence is not numeric: {confidence!r}"
+                        ) from exc
+                    if not np.isfinite(value):
+                        raise ValueError(f"lane confidence is not finite: {value!r}")
+                    scores.append(value)
+                score_semantics.append(semantics)
+        return result, scores, score_semantics
+
+    @staticmethod
+    def _candidate_export_conf_threshold(cfg) -> float:
+        test_parameters = getattr(cfg, "test_parameters", None)
+        value = getattr(test_parameters, "conf_threshold", 0.0)
+        return 0.0 if value is None else float(value)
 
     @staticmethod
     def _write_prediction(path: Path, points: Sequence[np.ndarray]) -> None:
@@ -424,24 +462,43 @@ class HardLaneEvaluator(DatasetEvaluator):
         prediction_root = Path(self.output_basedir) / "predictions"
         prediction_by_image = {}
         score_by_image = {}
+        semantics_seen: set[str] = set()
         for info, prediction in zip(self.data_infos, predictions):
-            points, scores = self._prediction_points_and_scores(prediction)
+            points, scores, line_semantics = self._prediction_points_and_scores(
+                prediction
+            )
             prediction_by_image[info["image_id"]] = points
             score_by_image[info["image_id"]] = scores
+            semantics_seen.update(
+                semantics for semantics in line_semantics if semantics is not None
+            )
             self._write_prediction(prediction_root / f"{info['image_id']}.lines.txt", points)
+
+        if len(semantics_seen) > 1:
+            raise ValueError(
+                "mixed score semantics in one evaluator: "
+                f"{sorted(semantics_seen)}"
+            )
+        score_semantics = next(iter(semantics_seen), UNKNOWN_SCORE_SEMANTICS)
 
         output_root = Path(self.output_basedir)
         output_root.mkdir(parents=True, exist_ok=True)
         score_path = output_root / "prediction_scores.json"
+        score_contract = make_score_sidecar_contract(
+            score_semantics,
+            self._candidate_export_conf_threshold(self.cfg),
+        )
         score_path.write_text(
             json.dumps(
                 {
                     "status": "pass",
                     "images": len(score_by_image),
                     "scores_by_image": score_by_image,
+                    **score_contract,
                     "note": (
                         "scores correspond to exported lines after model NMS; "
-                        "export eval must use conf_threshold=0.0 for offline threshold scans"
+                        "export eval must use conf_threshold=0.0 for offline threshold scans; "
+                        "unknown semantics are intentionally rejected by scan tools"
                     ),
                 },
                 ensure_ascii=False,

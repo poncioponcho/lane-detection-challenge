@@ -121,7 +121,8 @@ fi
 # handoff because only the .lines.txt files are needed to package a submission.
 infer_dir="$output/runs/baseline_${winner}_36ep/testA_infer"
 "$python_bin" "$project/scripts/autodl/infer_testA.py" \
-  --run-dir "$output/runs/baseline_${winner}_36ep" --split testA --skip-if-complete
+  --run-dir "$output/runs/baseline_${winner}_36ep" --split testA \
+  --conf-threshold 0.50 --skip-if-complete
 tar -czf "$output/handoff_testA_preds.tar.gz" \
   -C "$infer_dir" testA/predictions infer_evidence.json
 

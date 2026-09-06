@@ -2,10 +2,10 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v1.4** |
-| 状态 | **active**（9/6 conf=0.30 A 榜反馈已纳入；后续以 DECISIONS 新裁决更新） |
-| 版本链 | v1.0（初次校验）→ v1.1（导入路径修复后的复核）→ v1.2（D→C 完成与阈值扫描）→ v1.3（testA 候选执行）→ **v1.4**（A 榜反馈） |
-| 上游依据 | `docs/DECISIONS.md` §14 / §17–§27；`configs/default.yaml` v6 |
+| 文档版本 | **v1.5** |
+| 状态 | **active**（9/6 A 榜反馈与 sidecar 量纲 P0 修正已纳入；后续以 DECISIONS 新裁决更新） |
+| 版本链 | v1.0（初次校验）→ v1.1（导入路径修复后的复核）→ v1.2（D→C 完成与阈值扫描）→ v1.3（testA 候选执行）→ v1.4（A 榜反馈）→ **v1.5**（sidecar 语义修正） |
+| 上游依据 | `docs/DECISIONS.md` §14 / §17–§28；`configs/default.yaml` v6 |
 | 更新日期 | 2026-09-06 |
 
 ## 结论
@@ -79,19 +79,32 @@ LVO 场景归因中，`v546797496` F1=`0.4676`，FP/img=`1.73`，而其他 fog v
 - 该分数低于 `714962 / t=0.50 / 0.73444` `0.831pp`，也低于 `714942 / t=0.40 / 0.72794`；`conf=0.30` 退出生产候选，默认阈值继续保持 `t=0.50`。
 - `conf=0.35` 尚未提交，不对其 A 榜效果作推断。详细提交账本见 `docs/a_bang_submit_20260906_conf030.md`。
 
+### sidecar 量纲 P0 修正（2026-09-06）
+
+- pinned CLRNet 的 decode gate 使用 `softmax(logits[:, :2])[:, 1]`，但旧
+  `predictions_to_pred()` 曾把原始正类 logit 写入 `metadata["conf"]`；旧 C
+  sidecar 范围约为 `[-3.05, 2.16]`，所以旧 LVO `conf` 扫描不是概率扫描。
+- 旧扫描与旧 C 产物保留为历史 raw-logit 实验，不能继续支撑阈值映射或“LVO/A
+  榜冲突完全来自域差异”的解释；A 榜直接解码记录本身不受此 sidecar 问题影响。
+- 当前代码已把 sidecar 分数改为正类 softmax 概率，加入 schema/version、范围、
+  `post_nms` 和语义校验；扫描器会拒绝 legacy/raw-logit sidecar。修正后的 C
+  使用新目录 `outputs/lvo_clrnet_r50_36ep_c_export_20260906/`，尚未执行远端重导出。
+- 直接解码与离线过滤的等价性检查入口为
+  `scripts/check_decode_equivalence.py`；通过前不把离线阈值曲线当作生产证据。
+
 ## 当前方向排序
 
-1. **保留 A 榜基线**：`t=0.50` / `714962` / `0.73444` 仍是当前最优；不把 conf=`0.30` 写入默认配置，conf=`0.35` 仅保留为未验证候选。
-2. **相邻阈值先本地筛选**：围绕 `t=0.50` 做 `0.45/0.55` 等单变量 video-disjoint 诊断，只有出现稳定证据才消耗剩余 A 榜额度。
-3. **后处理继续保持 NO-GO**：几何去重 5–20px 全部 no-op，cap4/5 无正收益；不把未通过 CI 的变体并入生产链。
-4. **分辨率与定向增强**：优先做 video-disjoint 的 `800×320` vs `960×480` 对照，以及低照度 gamma/对比度增强；fog/rain 维持 NO-GO，除非出现新的正向证据。
-5. **score-aware TTA**：既有 flip-union A 榜为 `0.72950`，低于 t05，不做无分数 union；仅在有分数匹配、融合、NMS 证据时重开。
+1. **先修正并重跑 sidecar**：同一批 checkpoint 做 eval-only C，扫描真正的正类 softmax 概率；旧 raw-logit 曲线降级为历史记录。
+2. **score-aware 压 FP 前置**：以候选级 TP/FP 为标签做 video-level cross-fit 校准，再加入 score、rank、纵向跨度、线长、候选数和下半幅亮度等轻量排序特征；同时小范围扫 `nms_thres/nms_topk`。无分数 union 不重开。
+3. **直接解码等价性检查与相邻阈值**：先验证离线过滤与直接解码一致，再看 `0.40–0.60`（必要时 `0.475/0.525`）；只有稳定本地收益才消耗 A 榜额度。生产基线仍为 `t=0.50`。
+4. **分辨率与定向低照度增强**：先做 video-disjoint 的 `800×320` vs `960×480`，增加匹配 crop/FOV 控制组；低照度仅按下半幅亮度条件启用温和 gamma/对比度，fog/rain 维持 NO-GO。
+5. **高成本主干升级**：上述方向无稳定收益后再做 ConvNeXt-T 15ep screen；不直接启动完整训练。
 
 几何预筛已落盘于 `outputs/lvo_geometry_scan_20260905_v3/`：重复线过滤 5–20px 全部 no-op；cap4 为 `−1.260pp`、cap5 为 `−0.206pp`，均不构成可保留的正向变体。
 
 ## 远端状态
 
-截至 D/C 日志 `2026-09-05T14:15:55Z`：AutoDL `pipeline.status=complete`，winner=`clrnet_r50`；独立 36ep LVO 的 D/C 均为 `complete`，C 最后一项为 `final/fold_07_v777679069 pass`。随后 testA conf=`0.30/0.35` 候选均已完成并回传，conf=`0.30` 已完成真实 A 榜验证；远端磁盘约 100GB 中使用 98%、剩余约 2.3GB；不启动新的大规模训练，先做本地 video-disjoint 筛选。
+截至 D/C 日志 `2026-09-05T14:15:55Z`：AutoDL `pipeline.status=complete`，winner=`clrnet_r50`；独立 36ep LVO 的 D/C 均为 `complete`，C 最后一项为 `final/fold_07_v777679069 pass`，但其旧 sidecar 量纲错误，不能用于真实概率阈值扫描。随后 testA conf=`0.30/0.35` 候选均已完成并回传，conf=`0.30` 已完成真实 A 榜验证；远端磁盘约 100GB 中使用 98%、剩余约 2.3GB；不启动新的大规模训练，先重跑 eval-only C 与本地契约检查。
 
 ## 校验命令结果
 
@@ -99,7 +112,7 @@ LVO 场景归因中，`v546797496` F1=`0.4676`，FP/img=`1.73`，而其他 fog v
 - split 泄漏计算：PASS；63 个 train clip / 8 个 val clip，5 个 val video 与 train video 集合相交。
 - `git diff --check`：PASS。
 - 定向契约测试（Oracle hash、manifest、split）：`24 passed`。
-- 全套测试：`119 passed`（含 score sidecar 契约测试）；此前 `test_evaluator_still_scores_labeled_after_unlabeled_support` 的导入路径问题已修复为同时注入仓库根目录与 `src/`，并通过复跑确认。
+- 全套测试：`128 passed`（含 score sidecar 与直接解码/离线过滤等价性契约测试）；此前 `test_evaluator_still_scores_labeled_after_unlabeled_support` 的导入路径问题已修复为同时注入仓库根目录与 `src/`，并通过复跑确认。
 - C 输入覆盖校验：midpoint/final 各 7100/7100 prediction files，score image 各 7100/7100，PASS。
 - raw/conf checkpoint 扫描：16 variants、全局与 8 video cluster Oracle、10000 次 paired bootstrap，`status=pass`。
 - testA 候选校验：conf=`0.30/0.35` 各 900/900 文件，zip 清单精确匹配 manifest，官方 verify PASS。

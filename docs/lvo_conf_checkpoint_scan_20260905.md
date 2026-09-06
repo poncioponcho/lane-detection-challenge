@@ -1,5 +1,10 @@
 # 2026-09-05 D→C LVO raw/conf 扫描记录
 
+> **历史记录 / 语义冻结**：本次扫描使用的旧 sidecar 把 CLRNet 原始正类
+> logit 写入 `metadata["conf"]`，因此文中的 `conf=0.30/0.35/...` 不是
+> 正类 softmax 概率阈值。结果仍作为 raw-logit 历史实验保留，但不得再被
+> 当作真实 `conf` 曲线或用于候选排序。
+
 ## 结论
 
 D→C 流程已完成。8 个 leave-one-video-out fold 均通过训练、holdout 导出和预测覆盖校验；`midpoint` 与 `final` 各覆盖 7100/7100 张图。随后使用冻结官方 Oracle 对两个 checkpoint、8 个置信度阈值做了 16 个变体扫描。
@@ -20,10 +25,26 @@ D→C 流程已完成。8 个 leave-one-video-out fold 均通过训练、holdout
 
 1. CI 的重采样单位是 8 个 video cluster，结果是调参证据，不追认尚未写入 DECISIONS 的新治理闸门。
 2. LVO 有 GT，testA 没有 GT；不能从 testA 文件或本地可视化伪造 F1。
-3. `.lines.txt` 行序没有被当作置信度；过滤只使用 evaluator 导出的 score sidecar。
+3. `.lines.txt` 行序没有被当作置信度；但本次旧 sidecar 的 score 量纲错误，
+   过滤实际使用的是 post-NMS 原始正类 logit，不能解释为概率阈值。
 4. LVO 与 A 榜方向存在冲突：A 榜 `714962=0.73444`（conf=`0.50`）高于 `714942=0.72794`（conf=`0.40`）。因此不直接改 `configs/default.yaml` 或生产默认阈值。
 
-## 下一步执行方案
+## P0 语义修正后的执行方案
+
+代码已加入 sidecar schema、概率范围与 `post_nms` 契约，并拒绝缺少语义的
+legacy/raw-logit sidecar；修正后的 C 必须使用新的输出目录
+`outputs/lvo_clrnet_r50_36ep_c_export_20260906/`，不能覆盖或混用本目录对应的旧产物。
+
+1. 使用同一批冻结 36ep checkpoint 做 eval-only C，导出真正的正类 softmax 概率，
+   不重新训练。
+2. 运行 `scripts/scan_lvo_conf_checkpoints.py`，优先扫描 `0.40–0.60`，必要时补
+   `0.475/0.525`；旧 raw-logit 曲线仅保留作历史对照。
+3. 对至少一个阈值运行 `scripts/check_decode_equivalence.py`，比较直接解码目录与
+   离线过滤目录的 `.lines.txt` 及分数数组；不通过则不采用离线筛选结论。
+4. 在阈值之后做 score-aware FP 控制：候选级 TP/FP、video-level cross-fit 校准、
+   rank/跨度/线长/候选数/下半幅亮度特征，以及小范围 `nms_thres/nms_topk` 扫描。
+
+## 历史 testA 候选执行方案
 
 1. 使用现有生产 checkpoint（不训练）生成 testA conf=`0.30`、`0.35` 两个 eval-only 目录。
 2. 对每个目录执行 900 文件覆盖检查、官方一位小数重契约、zip verify，并保留 checkpoint/config/manifest SHA。

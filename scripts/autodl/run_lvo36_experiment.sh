@@ -113,6 +113,9 @@ else
   "checkpoint_period_epochs": 18,
   "checkpoint_max_to_keep": 3,
   "confidence_export": true,
+  "score_schema_version": 1,
+  "score_semantics": "positive_class_softmax_probability",
+  "post_nms": true,
   "c_policy": "filter exported post-NMS candidates offline, then score with frozen Oracle",
   "project_git_head": "$project_head",
   "unlanedet_git_head": "$unlanedet_head",
@@ -166,7 +169,12 @@ for fold_dir in $(find "$MANIFESTS" -mindepth 1 -maxdepth 1 -type d -name 'fold_
     eval_ready=0
     if [ -d "$pred_root" ] && [ -f "$diagnostic" ] && [ -f "$score_json" ]; then
         prediction_count=$(find "$pred_root" -type f -name '*.lines.txt' | wc -l | tr -d ' ')
-        [ "$prediction_count" -eq "$holdout_rows" ] && eval_ready=1
+        if [ "$prediction_count" -eq "$holdout_rows" ] \
+            && grep -Fq '"score_schema_version": 1' "$score_json" \
+            && grep -Fq '"score_semantics": "positive_class_softmax_probability"' "$score_json" \
+            && grep -Fq '"post_nms": true' "$score_json"; then
+            eval_ready=1
+        fi
     fi
     if [ "$eval_ready" -ne 1 ]; then
         if [ "$RESUME" = 1 ] && [ -e "$eval_dir" ]; then
@@ -237,7 +245,7 @@ done
 SOURCE_MANIFEST="$EXP/manifests/source_manifest_train.jsonl" \
 OOF_ROOT="$EXP/oof/predictions" EXP_ROOT="$EXP" \
   "$PYTHON_BIN" - <<'PY'
-import hashlib, json, os
+import hashlib, json, math, os
 from pathlib import Path
 
 exp = Path(os.environ["EXP_ROOT"])
@@ -249,15 +257,35 @@ actual = {path.relative_to(pred_root).as_posix() for path in pred_root.rglob("*.
 if expected != actual or len(expected) != 7100:
     raise SystemExit(f"OOF mismatch expected={len(expected)} actual={len(actual)}")
 score_by_image = {}
+score_semantics = "positive_class_softmax_probability"
+score_schema_version = 1
 for score_path in sorted((exp / "runs").glob("fold_*/holdout_eval/val/prediction_scores.json")):
     payload = json.loads(score_path.read_text(encoding="utf-8"))
-    score_by_image.update(payload.get("scores_by_image", {}))
+    if payload.get("score_schema_version") != score_schema_version:
+        raise SystemExit(f"unsupported score schema: {score_path}")
+    if payload.get("score_semantics") != score_semantics:
+        raise SystemExit(f"score semantics mismatch: {score_path}")
+    if payload.get("score_range") != {"min": 0.0, "max": 1.0, "inclusive": True}:
+        raise SystemExit(f"score range mismatch: {score_path}")
+    if payload.get("post_nms") is not True:
+        raise SystemExit(f"score sidecar is not post-NMS: {score_path}")
+    fold_scores = payload.get("scores_by_image", {})
+    if not isinstance(fold_scores, dict):
+        raise SystemExit(f"score sidecar is not an object: {score_path}")
+    overlap = set(score_by_image).intersection(fold_scores)
+    if overlap:
+        raise SystemExit(f"duplicate OOF scores: {sorted(overlap)[:3]}")
+    score_by_image.update(fold_scores)
 if set(score_by_image) != {row["image_id"] for row in records}:
     raise SystemExit(
         f"score sidecar mismatch expected={len(records)} actual={len(score_by_image)}"
     )
 if any(not isinstance(scores, list) for scores in score_by_image.values()):
     raise SystemExit("score sidecar contains a non-list image entry")
+for image_id, scores in score_by_image.items():
+    for score in scores:
+        if score is None or not math.isfinite(float(score)) or not 0.0 <= float(score) <= 1.0:
+            raise SystemExit(f"non-probability score for {image_id}: {score!r}")
 digest = hashlib.sha256()
 for rel in sorted(actual):
     path = pred_root / rel
@@ -277,6 +305,10 @@ value = {
     "prediction_root": str(pred_root),
     "prediction_tree_sha256": digest.hexdigest(),
     "candidate_export_conf_threshold": 0.0,
+    "score_schema_version": score_schema_version,
+    "score_semantics": score_semantics,
+    "score_range": {"min": 0.0, "max": 1.0, "inclusive": True},
+    "post_nms": True,
     "prediction_score_count": len(score_by_image),
     "prediction_scores_path": str(exp / "oof" / "prediction_scores.json"),
     "created_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
@@ -290,6 +322,10 @@ value = {
             "status": "pass",
             "images": len(score_by_image),
             "candidate_export_conf_threshold": 0.0,
+            "score_schema_version": score_schema_version,
+            "score_semantics": score_semantics,
+            "score_range": {"min": 0.0, "max": 1.0, "inclusive": True},
+            "post_nms": True,
             "scores_by_image": score_by_image,
         },
         ensure_ascii=False,

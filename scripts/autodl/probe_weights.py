@@ -234,7 +234,12 @@ def main() -> None:
         raise SystemExit("UnLanedet HEAD does not match the pinned commit")
     clr_head = unlanedet_root / "unlanedet/model/CLRNet/clr_head.py"
     source = clr_head.read_text(encoding="utf-8")
-    if "top_k=self.cfg.test_parameters.nms_topk" not in source or ".astype(bool)" not in source:
+    if (
+        "top_k=self.cfg.test_parameters.nms_topk" not in source
+        or ".astype(bool)" not in source
+        or "torch.softmax(lane[:2], dim=0)[1]" not in source
+        or "score_semantics" not in source
+    ):
         raise SystemExit("required HardLane UnLanedet patch is not applied")
 
     sys.path.insert(0, str(project_root))

@@ -108,7 +108,7 @@ ssh -i ~/.ssh/lane_id -p 34529 -o BatchMode=yes -o ConnectTimeout=15 root@i-1.gp
 ### 7.2 需要动 UnLanedet 时
 
 - pinned HEAD 必须是 `0392184`；改动一律走 `patches/unlanedet_hardlane.patch`。
-- `scripts/autodl/run_training.py` 的校验器要求 4 个子串同时存在：`nms_topk`、`.astype(bool)`、`predictions[..., 4].clamp(0.01, 0.99)`、condlane head 的 `set_detect_anomaly(False)`；动 clr_head/CondlaneNet head 前先对照。
+- `scripts/autodl/run_training.py` 的校验器要求 6 个子串同时存在：`nms_topk`、`.astype(bool)`、`predictions[..., 4].clamp(0.01, 0.99)`、`torch.softmax(lane[:2], dim=0)[1]`、`score_semantics`、condlane head 的 `set_detect_anomaly(False)`；动 clr_head/CondlaneNet head 前先对照。
 - 补丁应用逻辑在 `setup_unlanedet.sh`（先于跳过守卫），工作区脏会导致 setup 报错——需要重打补丁时先 `git -C /hy-tmp/UnLanedet checkout -- .`。
 
 ### 7.3 疑似挂死

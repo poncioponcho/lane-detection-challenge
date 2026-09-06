@@ -832,3 +832,46 @@ Pinned 上游 `BestCheckpointer` 的 `best_metric/best_iter` 是 hook 内存状�
 5. **主干升级**：仅在分辨率与低照度增强均无稳定收益时评估 ConvNeXt-T 等高成本方案；当前不启动新的大规模训练。
 
 **传导**：更新 `TASKS.md` T4.1、`overview.md`、`docs/lvo_conf_checkpoint_scan_20260905.md` 与 `docs/governance_consistency_20260905.md`；完整提交事实不把 `outputs/` 大文件纳入 Git。
+
+## 二十八、sidecar 置信度量纲修正与后续执行顺序（2026-09-06）
+
+### 28.1 P0 事实核对
+
+复核 pinned UnLanedet CLRNet 后确认：`get_lanes()` 的置信度门使用
+`softmax(predictions[:, :2])[:, 1]`，而旧版 `predictions_to_pred()` 把
+`lane[1]`（原始正类 logit）写入了 `metadata["conf"]`。因此旧 C sidecar 的
+数值范围（约 `[-3.05, 2.16]`）与配置中的概率阈值不是同一量纲；旧 LVO
+`conf=0.30/0.35/...` 曲线只能标记为 raw-logit 历史实验。
+
+这不撤销 A 榜直接解码结果：`714942 / 0.40`、`714962 / 0.50` 和
+`715300 / 0.30` 均由模型自身的 softmax decode gate 产生；受影响的是旧
+sidecar 离线过滤及其对 LVO/A 榜冲突的解释。
+
+### 28.2 执行裁决
+
+1. patch 里的 `metadata["conf"]` 改为正类 softmax 概率，并写入明确的
+   `score_semantics`；sidecar 必须声明 schema version、概率范围、`post_nms=true`
+   和 candidate export threshold。
+2. 扫描器只接受 `positive_class_softmax_probability`，缺少语义或 raw-logit
+   范围的旧 sidecar 直接拒绝。修正后的 C 为 eval-only，不重新训练；使用新的
+   `outputs/lvo_clrnet_r50_36ep_c_export_20260906/` 命名空间，禁止与旧产物混用。
+3. 在阈值曲线前，至少用一个阈值执行直接 decode 与离线过滤的等价性检查；检查
+   `.lines.txt` 字节内容和 sidecar 分数数组均一致后，离线扫描结果才可作为证据。
+4. score-aware FP 控制前置：候选级 TP/FP 标签、video-level cross-fit
+   Platt/isotonic 校准、轻量排序特征（score、rank、纵向跨度、线长、候选数、
+   下半幅亮度），再做条件化阈值/输出上限与小范围 `nms_thres/nms_topk` 扫描。
+   裸 union 已失败，后续融合只能走匹配后加权/共识保留，并优先保留更大的
+   pre-NMS candidate pool。
+5. 分辨率与低照度实验排在上述 P0 之后：`800×320 + cut=180` 对
+   `960×480 + cut=0` 是整套预处理对照，需 video-disjoint 廉价筛选和匹配
+   crop/FOV 控制组；低照度只按下半幅 road ROI 亮度条件启用温和 gamma/对比度。
+   fog/rain 继续 NO-GO。
+6. ConvNeXt-T 只作为最后的 15ep screen；在前述轻量方向没有稳定收益前不启动
+   完整主干训练。生产候选仍冻结 `t=0.50`。
+
+### 28.3 生产配置卫生
+
+静态 CLRNet 配置的 `conf_threshold=0.4` 保留为训练/LVO 基准；testA/testB
+生产推理必须显式传入 `model.head.cfg.test_parameters.conf_threshold=0.50`。
+`infer_testA.py` 的默认值和 `run_pipeline.sh` 均固化该 override，并写入
+`infer_command.json` 与 `infer_evidence.json`，避免演练时意外回到 `0.4`。

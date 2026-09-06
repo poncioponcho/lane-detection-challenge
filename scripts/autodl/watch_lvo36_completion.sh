@@ -12,11 +12,11 @@ REMOTE="root@i-1.gpushare.com"
 SSH_PORT="34529"
 REMOTE_OUT="/hy-tmp/lane-outputs"
 D_EXP="${REMOTE_OUT}/lvo_clrnet_r50_36ep_20260905"
-C_EXP="${REMOTE_OUT}/lvo_clrnet_r50_36ep_c_export_20260905"
-LOCAL_C="${ROOT}/outputs/lvo_clrnet_r50_36ep_c_export_20260905"
-SCAN_DIR="${ROOT}/outputs/lvo_conf_checkpoint_scan_20260905"
-MONITOR="${ROOT}/outputs/overnight_monitor_2026-09-05.jsonl"
-LOG="${ROOT}/outputs/lvo36_completion_watch.log"
+C_EXP="${REMOTE_OUT}/lvo_clrnet_r50_36ep_c_export_20260906"
+LOCAL_C="${ROOT}/outputs/lvo_clrnet_r50_36ep_c_export_20260906"
+SCAN_DIR="${ROOT}/outputs/lvo_conf_checkpoint_scan_20260906_probability"
+MONITOR="${ROOT}/outputs/overnight_monitor_2026-09-06_probability.jsonl"
+LOG="${ROOT}/outputs/lvo36_completion_watch_20260906.log"
 ORACLE_PYTHON="/private/tmp/lane-oracle-py312/bin/python"
 LANE_PYTHON="/Users/seyonmacbook/.workbuddy/binaries/python/envs/lane/bin/python"
 LOCK_DIR="${ROOT}/outputs/.lvo36_completion_watch.lock"
@@ -43,7 +43,7 @@ remote_snapshot() {
     ssh "${SSH_OPTS[@]}" "$REMOTE" '
         out=/hy-tmp/lane-outputs
         d=$(cat "$out/lvo36.status" 2>/dev/null || echo missing)
-        c=$(cat "$out/lvo36_c_export.status" 2>/dev/null || echo pending)
+        c=$(cat "$out/lvo36_c_export_20260906.status" 2>/dev/null || echo pending)
         gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | tr -d "\n")
         [ -n "$gpu" ] || gpu=unavailable
         last_iter=$(find /hy-tmp/lane-outputs/lvo_clrnet_r50_36ep_20260905/runs \

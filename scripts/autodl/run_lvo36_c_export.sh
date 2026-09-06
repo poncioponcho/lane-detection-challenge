@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # C-stage eval-only export. It runs only after D is complete and does not
 # retrain or modify any checkpoint/manifest/config. The patched evaluator
-# exports post-NMS candidates and metadata scores at conf=0.0.
+# exports post-NMS candidates and positive-class softmax probability scores at
+# conf=0.0.  The probability unit is required by the offline scan contract.
 
 PROJECT_ROOT=/hy-tmp/lane-detection-challenge
 UNLANEDET_ROOT=/hy-tmp/UnLanedet
@@ -11,13 +12,15 @@ DATA_ROOT=/hy-tmp/datasets/HardLane/Lane
 WEIGHTS_ROOT=/hy-tmp/weights
 OUTPUT_ROOT=/hy-tmp/lane-outputs
 D_EXP="$OUTPUT_ROOT/lvo_clrnet_r50_36ep_20260905"
-C_EXP="$OUTPUT_ROOT/lvo_clrnet_r50_36ep_c_export_20260905"
+# 20260905 C artifacts used the legacy raw-logit sidecar.  Use a new output
+# namespace so a corrected probability export can never be mixed with them.
+C_EXP="$OUTPUT_ROOT/lvo_clrnet_r50_36ep_c_export_20260906"
 MANIFESTS="$D_EXP/manifests"
 CONFIG="$PROJECT_ROOT/configs/unlanedet/clrnet_r50_hardlane.py"
 TRAIN_NET="$UNLANEDET_ROOT/tools/train_net.py"
 PYTHON_BIN=/usr/local/miniconda3/envs/py39/bin/python
-STATUS="$OUTPUT_ROOT/lvo36_c_export.status"
-LOG="$OUTPUT_ROOT/lvo36_c_export.log"
+STATUS="$OUTPUT_ROOT/lvo36_c_export_20260906.status"
+LOG="$OUTPUT_ROOT/lvo36_c_export_20260906.log"
 
 export HARDLANE_PROJECT_ROOT="$PROJECT_ROOT"
 export HARDLANE_DATA_ROOT="$DATA_ROOT"
@@ -122,16 +125,32 @@ done
 for label in midpoint final; do
     LABEL="$label" C_EXP="$C_EXP" MANIFEST="$MANIFESTS/source_manifest_train.jsonl" \
       "$PYTHON_BIN" - <<'PY'
-import json, os
+import json, math, os
 from pathlib import Path
 
 label = os.environ["LABEL"]
 root = Path(os.environ["C_EXP"])
 manifest = Path(os.environ["MANIFEST"])
 score_by_image = {}
+score_semantics = "positive_class_softmax_probability"
+score_schema_version = 1
 for path in sorted((root / label).glob("fold_*/val/prediction_scores.json")):
     payload = json.loads(path.read_text(encoding="utf-8"))
-    score_by_image.update(payload.get("scores_by_image", {}))
+    if payload.get("score_schema_version") != score_schema_version:
+        raise SystemExit(f"unsupported score schema: {path}")
+    if payload.get("score_semantics") != score_semantics:
+        raise SystemExit(f"score semantics mismatch: {path}")
+    if payload.get("score_range") != {"min": 0.0, "max": 1.0, "inclusive": True}:
+        raise SystemExit(f"score range mismatch: {path}")
+    if payload.get("post_nms") is not True:
+        raise SystemExit(f"score sidecar is not post-NMS: {path}")
+    fold_scores = payload.get("scores_by_image", {})
+    if not isinstance(fold_scores, dict):
+        raise SystemExit(f"score sidecar is not an object: {path}")
+    overlap = set(score_by_image).intersection(fold_scores)
+    if overlap:
+        raise SystemExit(f"duplicate scores: {sorted(overlap)[:3]}")
+    score_by_image.update(fold_scores)
 records = [
     json.loads(line)
     for line in manifest.read_text(encoding="utf-8").splitlines()
@@ -142,12 +161,22 @@ if set(score_by_image) != expected:
     raise SystemExit(
         f"{label}: score coverage {len(score_by_image)} != {len(expected)}"
     )
+for image_id, scores in score_by_image.items():
+    if not isinstance(scores, list):
+        raise SystemExit(f"{label}: non-list score entry for {image_id}")
+    for score in scores:
+        if score is None or not math.isfinite(float(score)) or not 0.0 <= float(score) <= 1.0:
+            raise SystemExit(f"{label}: non-probability score for {image_id}: {score!r}")
 (root / label / "prediction_scores.json").write_text(
     json.dumps(
         {
             "status": "pass",
             "checkpoint": label,
             "candidate_export_conf_threshold": 0.0,
+            "score_schema_version": score_schema_version,
+            "score_semantics": score_semantics,
+            "score_range": {"min": 0.0, "max": 1.0, "inclusive": True},
+            "post_nms": True,
             "images": len(score_by_image),
             "scores_by_image": score_by_image,
         },

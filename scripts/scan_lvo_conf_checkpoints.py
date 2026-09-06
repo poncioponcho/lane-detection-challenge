@@ -25,6 +25,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from data.manifest import ManifestRecord, read_manifest
 from eval.oracle_runner import run_official_eval
+from eval.score_sidecar import probability_score, validate_probability_sidecar
 from scan_lvo_geometry import paired_bootstrap, prediction_set, video_id
 
 
@@ -49,6 +50,9 @@ def write_filtered_variant(
     output_root: Path,
 ) -> dict:
     scores_payload = json.loads(score_path.read_text(encoding="utf-8"))
+    export_threshold = validate_probability_sidecar(
+        scores_payload, name=f"{name}: {score_path}"
+    )
     scores_by_image = scores_payload.get("scores_by_image")
     if not isinstance(scores_by_image, dict):
         raise ValueError(f"missing scores_by_image: {score_path}")
@@ -58,11 +62,11 @@ def write_filtered_variant(
             f"{name}: score image set mismatch: "
             f"{len(scores_by_image)} != {len(expected_images)}"
         )
-    export_threshold = float(
-        scores_payload.get("candidate_export_conf_threshold", 0.0)
-    )
-    if not math.isfinite(export_threshold):
-        raise ValueError(f"{name}: non-finite candidate export threshold")
+    if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+        raise ValueError(
+            f"{name}: requested threshold must be a finite probability in [0, 1], "
+            f"got {threshold!r}"
+        )
     if threshold + 1e-12 < export_threshold:
         raise ValueError(
             f"{name}: requested threshold {threshold} is below candidate export "
@@ -85,12 +89,17 @@ def write_filtered_variant(
             )
         numeric_scores = []
         for score in scores:
-            if score is None or not math.isfinite(float(score)):
+            if score is None:
                 raise ValueError(
                     f"{name}: every exported line needs a finite score for "
                     f"{record.image_id}"
                 )
-            numeric_scores.append(float(score))
+            numeric_scores.append(
+                probability_score(
+                    score,
+                    context=f"{name}: score for {record.image_id}",
+                )
+            )
         kept = [
             line for line, score in zip(lines, numeric_scores)
             if score >= threshold
@@ -113,6 +122,8 @@ def write_filtered_variant(
         "lines_after": after,
         "empty_images": empty,
         "score_sidecar": str(score_path),
+        "score_semantics": scores_payload["score_semantics"],
+        "post_nms": scores_payload["post_nms"],
     }
 
 
@@ -252,7 +263,7 @@ def main() -> None:
         "",
         f"- 参考 variant：{reference['name']}。",
         "- 全部分数来自冻结官方 Oracle；CI 单位为 video，成对重采样并汇总 TP/FP/FN。",
-        "- 预测文件内行序未用于排序或打分；过滤依据是 evaluator 导出的 metadata score。",
+        "- 过滤依据是 evaluator 导出的 post-NMS 正类 softmax 概率；旧 raw-logit sidecar 会被拒绝。",
         "",
         "| variant | export conf | threshold | lines | empty | F1 | Δpp vs ref | paired CI(pp) |",
         "|---|---:|---:|---:|---:|---:|---:|---|",

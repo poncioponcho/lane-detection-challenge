@@ -229,13 +229,25 @@ def test_evaluator_exports_predictions_without_f1_for_unlabeled(tmp_path):
 def test_evaluator_exports_finite_line_confidence_sidecar(tmp_path):
     evaluator = _make_evaluator(tmp_path, labeled=False)
     lane = _FakeLane(0.5)
-    lane.metadata = {"conf": 0.73125}
+    lane.metadata = {
+        "conf": 0.73125,
+        "score_semantics": "positive_class_softmax_probability",
+    }
     evaluator.evaluate([[lane]])
     payload = json.loads(
         (tmp_path / "out" / "prediction_scores.json").read_text(encoding="utf-8")
     )
     assert payload["images"] == 1
     assert payload["scores_by_image"]["clip/00003"] == [pytest.approx(0.73125)]
+    assert payload["score_schema_version"] == 1
+    assert payload["score_semantics"] == "positive_class_softmax_probability"
+    assert payload["score_range"] == {
+        "min": 0.0,
+        "max": 1.0,
+        "inclusive": True,
+    }
+    assert payload["post_nms"] is True
+    assert payload["candidate_export_conf_threshold"] == 0.0
 
 
 def test_evaluator_still_scores_labeled_after_unlabeled_support(tmp_path):
@@ -281,6 +293,7 @@ def test_infer_testA_script_matches_unlabeled_split_contract():
     root = Path(__file__).parents[1]
     source = (root / "scripts/autodl/infer_testA.py").read_text(encoding="utf-8")
     assert _literal_module_constant(source, "UNLABELED_SPLITS") == MODULE.UNLABELED_SPLITS
+    assert _literal_module_constant(source, "PRODUCTION_CONF_THRESHOLD") == 0.50
     # The eval must actually be redirected at the unlabeled split...
     for key in (
         "dataloader.test.dataset.manifest_path",
@@ -298,6 +311,9 @@ def test_infer_testA_script_matches_unlabeled_split_contract():
     assert "training_git_head" in source
     assert "selected_checkpoint_sha256" in source
     assert "SHA changed" in source
+    assert "model.head.cfg.test_parameters.conf_threshold" in source
+    pipeline = (root / "scripts/autodl/run_pipeline.sh").read_text(encoding="utf-8")
+    assert "--conf-threshold 0.50" in pipeline
 
 
 def test_autodl_configs_and_scripts_encode_execution_contract():

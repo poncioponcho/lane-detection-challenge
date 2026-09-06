@@ -30,7 +30,23 @@ index bab776c..330b98b 100644
              lane_xs[end + 1:] = -2
              lane_xs[:start][mask] = -2
              lane_ys = self.prior_ys[lane_xs >= 0]
-@@ -445,7 +457,7 @@ class CLRHead(nn.Module):
+@@ -303,10 +315,14 @@ class CLRHead(nn.Module):
+             points = torch.stack(
+                 (lane_xs.reshape(-1, 1), lane_ys.reshape(-1, 1)),
+                 dim=1).squeeze(2)
+             lane = Lane(points=points.cpu().numpy(),
+                         metadata={
+                             'start_x': lane[3],
+                             'start_y': lane[2],
++                            # Keep the sidecar score in the same units as the
++                            # decode-time confidence gate above.  lane[1] is a
++                            # raw positive-class logit, not a probability.
+-                            'conf': lane[1]
++                            'conf': torch.softmax(lane[:2], dim=0)[1],
++                            'score_semantics': 'positive_class_softmax_probability'
+                         })
+             lanes.append(lane)
+@@ -445,7 +461,7 @@ class CLRHead(nn.Module):
                  nms_predictions,
                  scores,
                  overlap=self.cfg.test_parameters.nms_thres,
