@@ -9,6 +9,7 @@ set -Eeuo pipefail
 PROJECT_ROOT="${HARDLANE_PROJECT_ROOT:-/tmp/lane-p0-project-58ca080}"
 UNLANEDET_ROOT="${UNLANEDET_ROOT:-/tmp/lane-p0-unlanedet-58ca080-v2}"
 DATA_ROOT="${HARDLANE_DATA_ROOT:-/hy-tmp/datasets/HardLane/Lane}"
+WEIGHTS_ROOT="${HARDLANE_WEIGHTS_ROOT:-/hy-tmp/weights}"
 D_EXP="${HARDLANE_D_EXP:-/hy-tmp/lane-outputs/lvo_clrnet_r50_36ep_20260905}"
 OUTPUT_ROOT="${HARDLANE_LOWLIGHT_OUTPUT_ROOT:-/tmp/lane-lowlight-eval-screen-20260906}"
 PYTHON_BIN="${HARDLANE_PYTHON:-/usr/local/miniconda3/envs/py39/bin/python}"
@@ -23,7 +24,7 @@ GAMMA="${HARDLANE_LOWLIGHT_GAMMA:-0.85}"
 
 [ ! -e "$OUTPUT_ROOT" ] || { echo "refusing to overwrite $OUTPUT_ROOT" >&2; exit 2; }
 for path in "$PROJECT_ROOT" "$UNLANEDET_ROOT" "$D_EXP" "$MANIFESTS" \
-            "$DATA_ROOT" "$BUILDER" "$BASE_CONFIG" "$TRAIN_NET"; do
+            "$DATA_ROOT" "$WEIGHTS_ROOT" "$BUILDER" "$BASE_CONFIG" "$TRAIN_NET"; do
     [ -e "$path" ] || { echo "missing required path: $path" >&2; exit 3; }
 done
 mkdir -p "$OUTPUT_ROOT"
@@ -31,6 +32,7 @@ printf '%s\n' running > "$STATUS"
 
 export HARDLANE_PROJECT_ROOT="$PROJECT_ROOT"
 export HARDLANE_DATA_ROOT="$DATA_ROOT"
+export HARDLANE_WEIGHTS_ROOT="$WEIGHTS_ROOT"
 export HARDLANE_OUTPUT_ROOT="$OUTPUT_ROOT"
 
 fail() {
@@ -55,6 +57,7 @@ cat > "$OUTPUT_ROOT/protocol.json" <<EOF
   "protocol": "8-fold LVO eval-only conditional low-light screen",
   "model": "clrnet_r50",
   "checkpoint_experiment": "$D_EXP",
+  "weights_root": "$WEIGHTS_ROOT",
   "input": "800x320",
   "cut_height": 180,
   "conditional_gamma": {
