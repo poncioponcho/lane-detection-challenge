@@ -1065,3 +1065,45 @@ sidecar 和 Oracle JSON 均在 `outputs/convnext_screen_20260906_evidence/`（ou
 **撤销条件**：任何候选出现 loss 非 finite、checkpoint/sidecar 覆盖不全、项目 HEAD
 或 UnLanedet patch 不一致、磁盘剩余低于 9GB，立即停止该候选并保留失败证据；不通过
 门槛不能靠重复启动同一 run“碰运气”。
+
+## 三十四、`cls_loss_weight=3.0` LVO 闸门 Red，FP 定向训练方向关闭（2026-09-07）
+
+### 34.1 事实
+
+- 本次唯一进入完整 video-disjoint LVO 的候选为 CLRNet-R50、`800×320 + cut_height=180`、
+  seed `42`、15ep、`model.head.cfg.cls_loss_weight=3.0`；使用修正后的正类 softmax
+  probability sidecar 和冻结官方 Oracle。
+- 8 个 video fold 全部完成，OOF 覆盖 `7100/7100` 张图；AutoDL 项目 HEAD 为
+  `1f8a22fd1266d1234ececd22a4a90ec5bff12ea4`，pinned UnLanedet 为
+  `03921844220adb2e65c840de2d9759478d5c3d4c`。
+- 相对 15ep R50 对照，候选结果为 `TP/FP/FN=18046/4297/6389`、F1=`0.771559`；
+  对照为 `18151/4097/6284`、F1=`0.777628`。ΔF1=`−0.607pp`，其中 FP 增加 200、
+  TP 减少 105。
+- 10,000 次 video-level paired bootstrap（seed=42）的 ΔF1 95% CI 为
+  `[−1.229,+0.103]pp`；LOCO 为 `0/8` 个 video 正向，差异范围
+  `[−0.805,−0.337]pp`。候选 OOF prediction tree SHA-256 为
+  `09dd7063fcebb141f64630dcb0a39f2352cdcb168fabb68f3b7216b706eb57bc`。
+- `cls_loss_weight=4.0` 的 screen 在 AutoDL eval worker 启动时因
+  `BrokenPipeError` 于 iteration `1049` 中断，未形成完整 15ep 独立回放证据；不把这段
+  日志当作 4.0 的性能结论。
+
+完整闸门报告：`outputs/reports/lvo_clsweight3_gate_20260907.md` 与同目录 JSON。
+
+### 34.2 裁决
+
+1. `cls_loss_weight=3.0` 判定为 **Red**：点估计为负、paired CI 下界不大于 0、
+   `0/8` LOCO 正向，四项放行条件均未满足。
+2. 不重启或续跑 `cls_loss_weight=4.0`，不训练任何该方向的 36ep 候选；FP 定向分类
+   损失权重方向关闭，不生成新 testA 包，也不消耗 A 榜额度。
+3. 生产冻结不变：CLRNet-R50 36ep、`800×320 + cut_height=180`、显式
+   `model.head.cfg.test_parameters.conf_threshold=0.50`；A 榜 incumbent 为记录
+   `714962 / 0.73444`。不得重复提交已有的 `submit_testA_t05.zip`。
+
+### 34.3 后续执行
+
+- 立即停止探索型训练，AutoDL 仅允许用于生产推理/打包演练、最终复现和交接，不再为
+  未通过闸门的变体烧卡。
+- 9/10 仍执行 A 榜分布重估与 T60 定模型；在没有新的 video-disjoint 正向证据前，默认
+  继续选择 incumbent。
+- 下一交付优先级为：生产包复核 → `solution.zip` 冻结 → B 榜沙盘演练；所有新候选必须
+  先通过同一 LVO 放行门，不能由标准 val 点估计或失败/中断日志触发提交。

@@ -1,10 +1,11 @@
-# AutoDL GPU 租期压缩执行计划（2026-09-06）
+# AutoDL GPU 租期压缩执行计划（2026-09-06，2026-09-07 收口）
 
 ## 目标
 
-AutoDL 3090 仍有约 6 天租期。当前生产 incumbent 不变，但 GPU 立即用于验证
-“分类目标加权能否压低跨域 FP”的唯一低风险训练假设；所有候选都必须可回退、可复核，
-不得用 GPU 空档替代计划，也不得用标准 val 点估计直接提交。
+AutoDL 3090 仍有租期。原计划验证“分类目标加权能否压低跨域 FP”的唯一低风险训练假设；
+该方向现已完成裁决并关闭。当前生产 incumbent 不变，GPU 不再用于探索型训练；后续仅用于
+生产复现、推理/打包演练、交接和冻结。所有候选都必须可回退、可复核，不得用标准 val 点
+估计直接提交。
 
 ## 固定基线与不变量
 
@@ -39,3 +40,16 @@ AutoDL 3090 仍有约 6 天租期。当前生产 incumbent 不变，但 GPU 立�
 loss 非 finite、覆盖不全、HEAD/patch 不一致或磁盘剩余低于 9GB 时立即停止该 run，
 保留现场并转入 fallback；不重复启动同一失败实验。ConvNeXt、分辨率、低照度、NMS、
 score-aware 和已有模块化后处理方向不因租期压力重新打开。
+
+## 2026-09-07 执行收口覆盖（以 DECISIONS §34 为准）
+
+- `cls_loss_weight=3.0` 已完成 8-video video-disjoint LVO：F1=`0.771559`，相对 R50
+  对照 `−0.607pp`，paired bootstrap 95% CI=`[−1.229,+0.103]pp`，LOCO=`0/8`，
+  判定 **Red**。
+- `cls_loss_weight=4.0` 的 AutoDL eval worker 在 iteration `1049` 因
+  `BrokenPipeError` 中断，未形成有效完整 screen；不重启、不做性能结论。
+- 因此不训练该方向 36ep、不生成新 testA 包、不消耗 A 榜额度。生产保持 CLRNet-R50
+  36ep、`800×320 + cut_height=180`、显式 `conf_threshold=0.50`，incumbent 为
+  `714962 / 0.73444`。
+- 后续顺序：9/10 A 榜分布重估与定模型 → 生产复现/独立回放 → 推理、打包和 B 榜沙盘
+  演练 → `solution.zip` 冻结与交接。若无新的 video-disjoint 正向证据，不再开训练型候选。

@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.7** |
+| 文档版本 | **v2.8** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ v2.5（§31 模块化消融收口）→ v2.6（§32 ConvNeXt screen NO-GO）→ **v2.7**（§33 GPU 租期压缩计划） |
+| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ v2.5（§31 模块化消融收口）→ v2.6（§32 ConvNeXt screen NO-GO）→ v2.7（§33 GPU 租期压缩计划）→ **v2.8**（§34 loss-weight LVO Red） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31；v2.6 传导 §32；v2.7 传导 §33） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31；v2.6 传导 §32；v2.7 传导 §33）｜2026-09-07（v2.8 传导 §34） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -30,6 +30,7 @@
 > **v2.5 变更记录**（2026-09-06，DECISIONS §31）：① 在修正的 positive-class softmax probability sidecar 上完成 16 个 36ep LVO 模块化变体；② 官方 Oracle + video paired bootstrap + LOCO 未发现稳定收益，亮度规则最高仅 +0.110pp；③ 生产继续为 `800×320 + cut=180`、`t=0.50`，不生成新的 A 榜候选。
 > **v2.6 变更记录**（2026-09-06，DECISIONS §32）：① AutoDL 完成 CLRNet-ConvNeXt-Tiny 15ep screen 与 `model_best.pth` 独立回放；② 官方 Oracle 标准 val F1=`0.783872`，相对 CLRNet-R50 15ep 的 `0.783958` 为 `−0.0086pp`，8-cluster paired bootstrap 95% CI=`[−1.6122,+1.3594]pp`；③ screen 标记 NO-GO，不启动 ConvNeXt 36ep，不切换生产主干，生产继续为 CLRNet-R50 36ep、`t=0.50`。
 > **v2.7 变更记录**（2026-09-06，DECISIONS §33）：① ConvNeXt-Tiny screen 已关闭，不再占用后续 GPU；② 租期压缩为 R50 `cls_loss_weight=3.0/4.0` 单变量 15ep screen → 单候选 video-disjoint LVO → 通过才做 36ep；③ 不通过则使用 GPU 做 R50 多种子复现和最终交付演练；④ 生产 incumbent 与 A 榜额度策略不变。
+> **v2.8 变更记录**（2026-09-07，DECISIONS §34）：① `cls_loss_weight=3.0` 已完成 8-video LVO，F1=`0.771559`，相对对照 `−0.607pp`，paired CI=`[−1.229,+0.103]pp`，LOCO=`0/8`，判定 Red；② `4.0` 仅有 eval worker `BrokenPipeError` 中断的半程日志，不重启且不作性能结论；③ FP 定向训练方向关闭，不进入 36ep、不生成新 A 榜候选；④ 后续 GPU 仅用于生产复现、推理/打包演练和交接，默认生产 incumbent 不变。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1/§26 双轨滚动机制；当前工作目标 **0.77（稳前十）**、冲刺线 **0.79（冲前五）**、能力预测 **0.75**，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
@@ -82,7 +83,7 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 15ep screen 已完成但 NO-GO。当前仅做 R50 分类损失权重 screen，候选必须通过 video-disjoint LVO 才能进入完整训练。
+> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 15ep screen 已完成但 NO-GO；R50 `cls_loss_weight=3.0` 已完成 video-disjoint LVO 但判定 Red，`4.0` 中断且不重启。探索型训练现已关闭，后续仅做生产复现、推理/打包演练、交接和冻结。
 
 即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
@@ -941,7 +942,7 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
 >
-> **方向更新（2026-09-06）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma、模块化置信度/亮度/几何消融和 ConvNeXt-Tiny screen 均未形成稳定收益，生产保持 `800×320 + cut=180`。GPU 租期内仅追加 R50 `cls_loss_weight=3/4` screen；候选必须通过 LVO 门槛，fog/rain 继续 NO-GO。
+> **方向更新（2026-09-07）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma、模块化置信度/亮度/几何消融、ConvNeXt-Tiny screen 和 R50 `cls_loss_weight=3.0` LVO 均未形成稳定收益，生产保持 `800×320 + cut=180`。`cls_loss_weight=4.0` 因 eval worker `BrokenPipeError` 未形成有效结果，不重启、不作性能结论；FP 定向训练方向关闭，后续 GPU 仅做生产复现、推理/打包演练和交接，fog/rain 继续 NO-GO。
 
 ---
 
@@ -1175,7 +1176,7 @@ gantt
 | **T56** | 短板桶定向过采样 `sampler.py` | 5 | T24, T14 | ✔ | | 长尾改善 | 9/8–9/9 |
 | **T57** | TTA（水平翻转 + 多尺度结果级融合） | 6 | T50 | ✔ | | TTA 开关 | 9/8 |
 | **T58** | 台账自动化（ledger / ablation 单变量断言 / compute_ledger） | 8 | T43 | ✔ | | `docs/experiments.csv` | 9/5–9/6 |
-| **T59** | **FP 定向 R50 训练 screen**：固定 `800×320 + cut=180`、CULane 初始化、seed=42，仅比较 `cls_loss_weight=3.0/4.0`；最优单候选再做 video-disjoint LVO | 2（screen）+ LVO 按候选 | T43, §32 | | ★ | 两组 screen evidence + LVO/NO-GO 决策 | 9/6–9/8 |
+| **T59** | **FP 定向 R50 训练 screen/LVO（已收口）**：`cls_loss_weight=3.0` 完成 8-video LVO，官方 Oracle F1=`0.771559`，相对 R50 对照 `−0.607pp`，paired CI 下界不大于 0、LOCO=`0/8`，Red；`4.0` 因 eval worker `BrokenPipeError` 中断，未形成有效完整 screen，不重启 | 已有 3.0 LVO/NO-GO 证据；4.0 中断日志仅作审计；不进入 36ep | T43, §32, §34 | | ★ | `outputs/reports/lvo_clsweight3_gate_20260907.md` + JSON | ✅ 9/7 |
 | **T60** | **定模型**（基于 ≥4 次有效实验的 CI 下界对比） | 4 | T50–T57, T59 | | ★ | `docs/decisions.md` | **9/10** |
 | **T61** | 最终重训（更长训练 + EMA，或 2 折交叉确认） | 6（GPU 12h） | T60 | | ★ | 最终权重 | 9/10–9/12 |
 | **T62** | 可复现性套件：README + 干净环境复现演练（差异 ≤0.3pp）+ 逐字节一致 | 10 | T61 | ✔ | | `README.md` | 9/12–9/13 |
@@ -1247,7 +1248,7 @@ T00 骨架(9/1) → T10 基础设施 → T17 Oracle冻结+哈希守护(✅) → 
   → 赢家 36ep(9/4 开跑) → T43(9/5 M2出分, 触发 DECISIONS §15.1 重估)
   → T50 后处理套件 → T51 阈值/NMS/max_output_lanes 扫描(J4 三件套, 网格 {7,8,10,12})
   → T55 分辨率方案组合(cut_height×输入比例, §17.5) → T53 退化增强(雾+雨一组) → T43 全量首评
-  → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
+  → T59 loss-weight LVO(3.0 Red；4.0 中断不重启，9/7) → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
   → T70 B榜首提(9/16) → T72 终提交(9/17 15:00)
 ```
 
