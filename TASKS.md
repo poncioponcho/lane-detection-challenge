@@ -1,11 +1,11 @@
-# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.17（单人版）
+# 恶劣场景下的车道线检测挑战赛 — 任务分解 v2.18（单人版）
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.17（单人版 + §25 AutoDL 可恢复流水线 + §27 A 榜反馈 + §28 sidecar 修正 + §29 NMS NO-GO + §30 分辨率/低照度 NO-GO + §31 模块化消融收口 + §32 ConvNeXt screen NO-GO + §33 GPU 租期压缩计划 + §34 loss-weight LVO Red）** |
+| 文档版本 | **v2.18（单人版 + §25 AutoDL 可恢复流水线 + §27 A 榜反馈 + §28 sidecar 修正 + §29 NMS NO-GO + §30 分辨率/低照度 NO-GO + §31 模块化消融收口 + §32 ConvNeXt screen NO-GO + §33 GPU 租期压缩计划 + §34 loss-weight LVO Red + §35 risk-on 匹配视野高分辨率 screen）** |
 | 状态 | **active**（执行跟踪唯一入口；进度以本文勾选列为准） |
-| 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ v2.9（§25 全种子/历史最优回放/交接包）→ v2.10（§27 A 榜反馈）→ v2.11（§28 sidecar 修正）→ v2.12（§29 NMS NO-GO）→ v2.13（§30 分辨率/低照度 NO-GO）→ v2.14（§31 模块化消融收口）→ v2.15（§32 ConvNeXt screen NO-GO）→ v2.16（§33 GPU 租期压缩计划）→ **v2.17**（§34 loss-weight LVO Red） |
-| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§34｜ `docs/ARCHITECTURE.md` v2.8 §6.5（单人关键路径） |
+| 版本链 | v1 → … → v2.8（§24 预测提交链/T40 收口）→ v2.9（§25 全种子/历史最优回放/交接包）→ v2.10（§27 A 榜反馈）→ v2.11（§28 sidecar 修正）→ v2.12（§29 NMS NO-GO）→ v2.13（§30 分辨率/低照度 NO-GO）→ v2.14（§31 模块化消融收口）→ v2.15（§32 ConvNeXt screen NO-GO）→ v2.16（§33 GPU 租期压缩计划）→ v2.17（§34 loss-weight LVO Red）→ **v2.18**（§35 risk-on 匹配视野高分辨率 screen） |
+| 上游依据 | `docs/DECISIONS.md` §12–§15 / §17–§35｜ `docs/ARCHITECTURE.md` v2.9 §6.5（单人关键路径） |
 | 常量取值 | 目标 **0.77（工作·保前十）/ 0.79（冲刺·冲前五）/ 预测 0.75**（DECISIONS §26 下修，2026-09-05）｜预算 200 元｜单人，一律以 `configs/default.yaml`（v6）为准，本文只引用 |
 | 更新日期 | 2026-09-07（周一）｜距 A 榜截止 7 天｜距 B 榜截止 10 天 |
 
@@ -37,7 +37,7 @@
 4. **B 样条 k≤3 稠密化** → 输出折线密集采样（≥10–20 点，弯道更密），纵向跨度覆盖可见范围。
 5. **按视频段切分验证集**，禁止按图随机切（同段连续帧相似 → F1 虚高 3–8pp）。
 6. **A 榜是探针不是考试**：只做本地 metric 校准与链路验证，不做调参依据。
-7. **当前方向（§26–§34 + LVO 归因）**：`v546797496` 的主要损失是 FP 爆炸，testA 也见宽路/交叉口过检；sidecar 量纲、直接解码等价性、score-aware、相邻阈值、NMS、分辨率、定向低照度、模块化后处理和 ConvNeXt-Tiny screen 均已完成且未放行。R50 `cls_loss_weight=3.0` 已完成 8-video LVO，F1 下降 `0.607pp`，裁定 Red；`4.0` 仅有中断的半程日志，不重启、不作性能结论。FP 定向训练方向关闭，后续回到 R50 生产复现、交付演练和冻结。生产继续冻结 `t=0.50`。旧 raw-logit 曲线、J3 条数敏感度均只保留为历史先验，不单独决定跨域方向。
+7. **当前方向（§26–§35 + LVO 归因）**：`v546797496` 的主要损失是 FP 爆炸，testA 也见宽路/交叉口过检；sidecar 量纲、直接解码等价性、score-aware、相邻阈值、NMS、`960×480 + cut=0`、定向低照度、模块化后处理和 ConvNeXt-Tiny screen 均已完成且未放行。R50 `cls_loss_weight=3.0` 已完成 8-video LVO，F1 下降 `0.607pp`，裁定 Red；`4.0` 仅有中断的半程日志，不重启、不作性能结论。用户已确认 §35 risk-on 例外：只启动一条 **CLRNet-R50、`960×384 + cut_height=180`、seed=42、15ep、8-video LVO** 匹配视野高分辨率 screen；生产继续冻结 `t=0.50`，在 LVO 三项放行门全部通过前不打包、不提交 A 榜。旧 raw-logit 曲线、J3 条数敏感度均只保留为历史先验，不单独决定跨域方向。
 8. **（§17.1 新增）评测双层制**：一切最终裁决（A/B 闸门、冻结定稿、台账结论数）以冻结官方 `score.py`（Oracle）读数为准；本地 metric 仅诊断/扫描，须过差分测试套件方可参与过程判断。
 9. **（§17.6/§18.3）manifest 有序清单制**：`image_id = <clip>/<frame>`；从官方清单逐行构造 + 无重复断言；存在性按 split 区分（labeled 强制图像+GT，testA/testB 只断言图像、gt_path=None）；每段 100 帧仅对已核实 train/testA 强制；缺预测按空预测计 FN；一切聚合与分桶从同一 manifest 派生。
 
@@ -88,6 +88,7 @@
 | ✅ | T3.4 | 分桶诊断：weather / illumination / artifact / geometry + video F1/FP/FN | `outputs/reports/lvo_scene_attribution_20260905.md`；`v546797496` FP/img=1.73 为主要离群，illumination 与 weather 共线 | P0 | ✅ 9/5 |
 | ❌ | T3.5 | ~~短板桶过采样定向补强~~ | **已砍**（DECISIONS §13 = ARCHITECTURE T56：人工高、边际低；定向增强部分已并入 T3.1） | ~~P1~~ | — |
 | ✅ | T3.6 | 分辨率与条件化低照度 eval-only 筛选 | `960×480 + cut=0` 在 `0.40–0.60` 全部退化；下半幅亮度 `≤42`、`gamma=0.85` 全局 Δ=`−0.020pp`，分桶同样无稳定正收益；两项均 NO-GO，生产仍为 `800×320 + cut=180`、`t=0.50`。证据：`docs/lvo_resolution_scan_20260906.md`、`docs/lvo_lowlight_scan_20260906.md` | P0 | ✅ 9/6 |
+| 🔵 | T3.7 | **Risk-on 匹配视野高分辨率训练 screen**：CLRNet-R50、`960×384 + cut_height=180`、seed=42、15ep；保持生产有效视野 `1366×540`，只改变网络输入分辨率 | 独立分支/独立输出目录；8-video LVO 训练与 OOF 全部完成后交 T4.6 聚合；路径：`scripts/autodl/run_lvo_resolution_training_screen.sh`、`scripts/autodl/build_resolution_config.py`、`scripts/autodl/lvo_video_runner.py`；LVO 放行前禁止打包和 A 榜提交 | P0 | 9/7–9/8 |
 
 ### W4 · 调参与定稿（9/8 – 9/14）
 
@@ -98,6 +99,7 @@
 | ⬜ | T4.3 | 本地 val ↔ A 榜相关性台账（每次提交：本地 F1 / 配置 hash / A 榜 F1） | ≥4 组有效样本，能判定系统偏差 | P0 | 9/8–9/14 |
 | ⚠️ | T4.4 | TTA 探索（水平翻转对不对称车道可能有害） | **降级**（DECISIONS §13：1 GPU·h 但需人工接，不进关键路径） | ~~P2~~ | 时间允许 |
 | ❌ | T4.5 | ~~时序/跨帧信息利用~~ | **已砍且不问**（DECISIONS §6/§17.8：帧编号步长 3 但源 FPS 未知，原「1s 间隔 × 60km/h = 16.7m」测算作废；结论理由 = 合规不确定 + 实现成本 + 缺少收益证据） | ~~P3~~ | — |
+| ⬜ | T4.6 | **Risk-on LVO 聚合与止损裁定**：官方 Oracle 全局 ΔF1、video-level paired bootstrap CI、8-video 正向数 | 同时满足 `ΔF1 ≥ +1.0pp`、CI 下界 `>0`、至少 `5/8` 视频正向，才允许进入 36ep；任一不满足立即关闭分支，不生成 A 榜包 | P0 | 9/8 |
 
 ### W5 · 冻结与终局（9/14 – 9/17）
 
@@ -135,7 +137,7 @@
 → ✅ T1.5 A 榜阈值验证 + ✅ T3.1 雾雨 NO-GO + ✅ T3.4 LVO 弱域归因（9/4–9/5）
 → ✅ T4.1 sidecar 量纲修正 + eval-only C + 直接解码/离线过滤等价性检查 → score-aware 压 FP → 相邻阈值/NMS 筛选 → 模块化置信度/亮度/几何消融（均未放行）
 → ✅ T55 分辨率方案与 T53 定向低照度 eval-only 筛选（均 NO-GO）
-→ ✅ ConvNeXt-T 15ep screen（9/6，标准 val 与 R50 持平，NO-GO）→ ✅ T59 R50 FP 定向训练 screen/LVO（3.0 Red；4.0 中断不重启）→ T60 定模型（9/10，A 榜分布重估门槛）→ T61 重训 → T62 复现
+→ ✅ ConvNeXt-T 15ep screen（9/6，标准 val 与 R50 持平，NO-GO）→ ✅ T59 R50 FP 定向训练 screen/LVO（3.0 Red；4.0 中断不重启）→ 🔵 T3.7/T55-R 匹配视野高分辨率 15ep screen → ⬜ T4.6 LVO 放行/止损 → T60 定模型（9/10，A 榜分布重估门槛）→ T61 重训 → T62 复现
 → T5.2 沙盘演练 → T5.1 冻结（9/14）→ T5.3 B 榜首提（9/16）→ T5.5 终提（9/17 15:00）
 ```
 
@@ -149,6 +151,7 @@
 | 9/5–9/6 | ✅ **D→C、概率 sidecar 修正、等价性、score-aware、NMS、分辨率、低照度与模块化消融已完成**；`conf=0.30` 记录 `715300` 得 `0.72613`，保留 `t=0.50` 记录 `714962` 的 `0.73444` 为当前最优；亮度规则最高仅 +0.110pp，未过放行门，继续不盲目消耗剩余额度 | T4.1 / T3.6 |
 | 9/6 ✅ | **ConvNeXt-Tiny 15ep screen**；官方 Oracle 独立回放 F1=`0.783872`，R50 15ep=`0.783958`，Δ=`−0.0086pp`，NO-GO，不切换生产 | §32 |
 | 9/6–9/7 ✅ | **R50 FP 定向训练 screen/LVO 收口**：`cls_loss_weight=3.0` 的 8-video LVO F1=`0.771559`，相对对照 `−0.607pp`，CI=`[−1.229,+0.103]pp`，LOCO=`0/8`，**Red**；`4.0` 中断且不重启。方向关闭，不训练 36ep、不生成 A 榜候选 | T59 / §33–§34 |
+| 9/7–9/8 | 🔵 **Risk-on 匹配视野高分辨率 screen**：`960×384 + cut=180`，独立 8-video 15ep LVO；仅在全局 `ΔF1≥+1.0pp`、paired CI 下界 `>0`、`≥5/8` 视频正向时进入 36ep，否则止损 | T3.7 / T4.6 / §35 |
 | 9/10 | **A 榜重估门槛** + 定模型；ConvNeXt-Tiny 已关闭，候选仅接受通过 LVO 门槛的 R50 变体 | T60 |
 | **9/14** | **A 榜截止 + solution.zip 冻结 + 演练完成** | T5.1 / T5.2 |
 | **9/16–9/17** | **B 榜窗口（41h）** | T5.3 – T5.5 |
@@ -160,7 +163,7 @@
 
 ## 4. 资源与预算（数值以 `configs/default.yaml` 为准）
 
-- **预算**：200 元（已拍板）。R50 `cls_loss_weight=3.0` LVO 已判 Red，`4.0` 不重启；AutoDL 后续只做生产复现、推理/打包演练与交接，不再为未放行候选烧卡，详见 `docs/gpu_lease_plan_20260906.md` 与 DECISIONS §34。
+- **预算**：200 元（已拍板）。R50 `cls_loss_weight=3.0` LVO 已判 Red，`4.0` 不重启；按用户确认，唯一 risk-on 例外是 §35 的 `960×384 + cut=180`、15ep、8-video LVO screen，必须写入独立输出根 `HARDLANE_RISKON_RESOLUTION_ROOT`，并在三项放行门前停止后续训练/提交；其余 AutoDL 只做生产复现、推理/打包演练与交接，详见 `docs/gpu_lease_plan_20260906.md` 与 DECISIONS §34–§35。
 - **本地机**：Mac M4 / 24GB / 磁盘 81GB——只做 CPU 数据契约、评测、后处理、预测格式归一化与打包；不加载大权重、不做模型推理/训练。
 - **AutoDL 纪律**：输出只写持久目录；每 epoch checkpoint + eval；不单信 `model_best.pth`，只认历史 best iteration 对应 checkpoint 的独立回放证据。租期结束/关机前下载 `handoff_baseline.tar.gz` 及 SHA 报告。模型动态证据不得用本地 CPU 结果替代。
 - **依赖锁定**：`pip freeze` 存档（TOP3 复现要求）；本地 venv：`envs/lane`（numpy 2.5.2 / opencv 5.0.0 / scipy 1.18.1）。
@@ -179,6 +182,7 @@
 | R10 | AutoDL 4090 吞吐测算失准 | 开放 | 首个 1 epoch 实测后重算筛选与 36ep 时长 |
 | R11 | **单人带宽**：任何 illness/生活占用直接吃掉唯一人力 | 开放 | ⚠️ 降级项全部让路 P0；关键路径日清 |
 | R12 | 文档常量漂移（2026-09-01 已发生并修复） | **已立制** | DECISIONS §14 四条制度 + `configs/default.yaml` 收口 |
+| R13 | **Risk-on screen 不能跨域增益，或训练成本挤压交付缓冲** | 开放 | §35 独立分支/独立输出；15ep 后执行 `ΔF1≥+1.0pp` + paired CI 下界 `>0` + `≥5/8` 视频正向三门；任一失败立即止损，incumbent 与至少 18–24h 缓冲不动 |
 
 ---
 

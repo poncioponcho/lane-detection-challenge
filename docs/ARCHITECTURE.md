@@ -2,15 +2,15 @@
 
 | 项 | 内容 |
 |---|---|
-| 文档版本 | **v2.8** |
+| 文档版本 | **v2.9** |
 | 状态 | **active**（现行架构基线） |
-| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ v2.5（§31 模块化消融收口）→ v2.6（§32 ConvNeXt screen NO-GO）→ v2.7（§33 GPU 租期压缩计划）→ **v2.8**（§34 loss-weight LVO Red） |
+| 版本链 | v1.0 → … → v2.1（§25 AutoDL 全种子 + 历史最优回放 + 交接包）→ v2.2（§26 LVO/A 榜重估与压 FP 路线）→ v2.3（§27–§28 sidecar 修正与 score-aware 路线）→ v2.4（§29–§30 NMS/分辨率/低照度筛选收口）→ v2.5（§31 模块化消融收口）→ v2.6（§32 ConvNeXt screen NO-GO）→ v2.7（§33 GPU 租期压缩计划）→ v2.8（§34 loss-weight LVO Red）→ **v2.9**（§35 risk-on 匹配视野高分辨率 screen） |
 | 撰写人 | 高见远（架构师） |
 | 修订人 | 齐活林（交付总监）——在 v1.1 上落地 AR-1..AR-5 五处修正 + W/T 编号衔接说明（§6.2）+ §6.5 单人版重排 |
 | 汇报对象 | 齐活林（交付总监） |
 | 上游输入 | `docs/PRD.md`（v2，15 条 P0）、`docs/PRD_v1_目标84.md`（v1，19 条 P0）；目标/预算/范围以 `docs/DECISIONS.md`（§1/§12/§13）为准，常量唯一取值点 `configs/default.yaml` |
 | 下游交付 | 全组开发实施 |
-| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31；v2.6 传导 §32；v2.7 传导 §33）｜2026-09-07（v2.8 传导 §34） |
+| 日期 | 2026-09-01（v1.0 撰写）｜2026-09-01（v1.1–v1.3 修订）｜2026-09-02（v1.4–v2.1 传导 §18–§25）｜2026-09-05（v2.2 传导 §26）｜2026-09-06（v2.3 传导 §27–§28；v2.4 传导 §29–§30；v2.5 传导 §31；v2.6 传导 §32；v2.7 传导 §33）｜2026-09-07（v2.8 传导 §34；v2.9 传导 §35） |
 | 赛事 | 2026 iFLYTEK AI 开发者大赛 · 恶劣场景下的车道线检测挑战赛 |
 
 > **v1.1 变更记录**（相对 v1.0）：① 分层 5→6 层，任务编号 W0–W7 → T00–T72（45 任务）；② 新增「推测→开关→证伪」矩阵；③ 三线并行 Gantt 解决 W1/W2 串行拖到 9/7 的问题；④ 齐活林落地 5 处修正——AR-1 目标常量 0.84 不下调（头部导语 + §0 目标表）、AR-2 答辩模型「仅前三受邀、不翻盘」（§0 Q6 行 + §9.1 Q-B1）、AR-3 预算口径「100 覆盖/200 冗余/300 缓冲」（§9.1 Q-A2 + §9.3 建议#2）、AR-4 CPU 路径标注【未实测】（§5 推理预算表）、AR-5 检对价值 2.40×（§4.6）；⑤ 新增 §6.5 单人版范围重排（DECISIONS §13 拍板后）。
@@ -31,6 +31,7 @@
 > **v2.6 变更记录**（2026-09-06，DECISIONS §32）：① AutoDL 完成 CLRNet-ConvNeXt-Tiny 15ep screen 与 `model_best.pth` 独立回放；② 官方 Oracle 标准 val F1=`0.783872`，相对 CLRNet-R50 15ep 的 `0.783958` 为 `−0.0086pp`，8-cluster paired bootstrap 95% CI=`[−1.6122,+1.3594]pp`；③ screen 标记 NO-GO，不启动 ConvNeXt 36ep，不切换生产主干，生产继续为 CLRNet-R50 36ep、`t=0.50`。
 > **v2.7 变更记录**（2026-09-06，DECISIONS §33）：① ConvNeXt-Tiny screen 已关闭，不再占用后续 GPU；② 租期压缩为 R50 `cls_loss_weight=3.0/4.0` 单变量 15ep screen → 单候选 video-disjoint LVO → 通过才做 36ep；③ 不通过则使用 GPU 做 R50 多种子复现和最终交付演练；④ 生产 incumbent 与 A 榜额度策略不变。
 > **v2.8 变更记录**（2026-09-07，DECISIONS §34）：① `cls_loss_weight=3.0` 已完成 8-video LVO，F1=`0.771559`，相对对照 `−0.607pp`，paired CI=`[−1.229,+0.103]pp`，LOCO=`0/8`，判定 Red；② `4.0` 仅有 eval worker `BrokenPipeError` 中断的半程日志，不重启且不作性能结论；③ FP 定向训练方向关闭，不进入 36ep、不生成新 A 榜候选；④ 后续 GPU 仅用于生产复现、推理/打包演练和交接，默认生产 incumbent 不变。
+> **v2.9 变更记录**（2026-09-07，DECISIONS §35）：① 用户确认 risk-on，但只允许一条可验证的高上限主线：独立分支 `risk-on-res960x384-screen` 上的 CLRNet-R50 `960×384 + cut_height=180`、seed=42、15ep、8-video LVO；② 新增 `T55-R` 与 `T4.6`，训练/评测脚本支持派生 config、输入尺寸、cut height 和 `eval_workers=0`；③ 输出必须写入独立 `HARDLANE_RISKON_RESOLUTION_ROOT`，与生产 incumbent 隔离；④ 只有全局 `ΔF1≥+1.0pp`、paired bootstrap CI 下界 `>0`、至少 `5/8` 视频正向同时满足，才允许 36ep；否则立即止损，不打包、不提交 A 榜。
 > **注**：本文曾顶着 v1.0 的版本头承载 v1.1 内容（2026-09-01 下午审计发现并修正，版本治理失效案例，见 DECISIONS §11/§14）。
 
 > **本架构不裁决目标分数，只登记裁决结果。** 目标采用 DECISIONS §1/§15.1/§26 双轨滚动机制；当前工作目标 **0.77（稳前十）**、冲刺线 **0.79（冲前五）**、能力预测 **0.75**，具体数值一律以 `configs/default.yaml::target` 为唯一代码侧事实源。本架构的唯一使命是：
@@ -83,7 +84,7 @@
 
 ### 1.1 我的倾向（明确表态）
 
-> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 15ep screen 已完成但 NO-GO；R50 `cls_loss_weight=3.0` 已完成 video-disjoint LVO 但判定 Red，`4.0` 中断且不重启。探索型训练现已关闭，后续仅做生产复现、推理/打包演练、交接和冻结。
+> **以 UnLanedet 作为工程底座；双路 15ep 筛选已完成，CLRNet-R50 获选并完成 36ep baseline（DECISIONS §15.2/§26）。** 概率 sidecar 修正、直接解码/离线过滤等价性、score-aware、NMS、分辨率和低照度 eval-only 筛选均已收口且未放行变体；CLRNet-ConvNeXt-T 15ep screen 已完成但 NO-GO；R50 `cls_loss_weight=3.0` 已完成 video-disjoint LVO 但判定 Red，`4.0` 中断且不重启。探索型训练原则上关闭，唯一例外是 §35 的匹配视野高分辨率 15ep screen；它必须在独立分支和输出根中完成，且不通过三项 LVO 放行门就立即止损。
 
 即：**工程上用 UnLanedet，主干选择交给一次 12h 的实证筛选，二者通过 `BaseLaneDetector` 抽象层解耦。**
 
@@ -107,6 +108,7 @@
 | 主干 | 桥接方式 | 定位 | 水位 | 时间点 |
 |---|---|---|---|---|
 | `clrnet_r50` | `clrnet_r50_hardlane.py` + CULane adapted checkpoint | **筛选路 A**（先验：同框架 CULane 最强 ResNet 系） | CULane 复现 79.30 | 双路筛选 9/3 晚 |
+| `clrnet_r50_res960x384` | `clrnet_r50_hardlane.py` 派生 config + CULane adapted checkpoint | **Risk-on T55-R screen**；保持 `cut_height=180` 的有效视野，只提高网络输入到 `960×384`；未通过 LVO 前不具备生产资格 | 待 15ep LVO | 9/7–9/8 |
 | `adnet_r34` | `adnet_r34_hardlane.py` + CULane adapted checkpoint | **筛选路 B**（恶劣场景架构假设待 HardLane 实证） | CULane 复现 77.88（HardLane 论文 80.5 为原版实现，非本生态水位） | 双路筛选 9/3 晚 |
 | `clrnet_convnext_t` | UnLanedet 内置 + CULane 权重 | **已完成 15ep screen，NO-GO（DECISIONS §32）** | CULane 复现 80.21；HardLane screen F1=`0.783872` | — |
 | ~~`clrnet_dla34` / `rvld` / `alpha_simadnet`~~ | — | **已除名（v1.2）**：DLA-34 无权重无 config；RVLD/α-SimADNet 未被 UnLanedet 收录（DECISIONS §15.2，`docs/weight_scout_report.md`） | — | — |
@@ -920,10 +922,11 @@ flowchart LR
 |---|---|---|---|---|---|
 | `res_800x320` | 800×320 | 5.9 px | 2.25× | 45.4 min（基准） | 对照组 |
 | `res_1600x320` | 1600×320 | 11.7 px | 2.25× | ~60 min | CLRNet 常规档对照 |
-| `res_960x480` | 960×480 | 7.1 px | 1.50× | ~68 min | **推荐折中档** |
+| `res_960x384_cut180` | 960×384（有效视野 `1366×540`，`cut=180`） | 7.0 px | 1.41× | 待 AutoDL 实测 | **Risk-on T55-R；匹配生产视野** |
+| `res_960x480_cut0` | 960×480（`cut=0`） | 7.1 px | 1.50× | ~68 min | **已完成 screen，NO-GO** |
 | `res_1366x720` | 1366×720 | 10.0 px | 1.00× | ~82 min | 上限档（需测显存） |
 
-> **v1.3 增补（DECISIONS §17.5）**：分辨率 ablation 升级为「预处理方案组合」裁决——`cut_height` 与输入比例**绑定比较**，不孤立裁决：方案 A（cut=180 + 800×320 直缩，有效画面 1366×540 比例 ≈2.53 ≈ 输入比 2.5）vs 方案 B（cut=0 + 960×480 letterbox）。注意：完全不裁的 1366×720（比例 1.90）直接压到 800×320（2.5）会产生明显比例畸变。每套方案验收必带 **GT→网络→原图坐标 round-trip 测试 + 可视化 overlay**。
+> **v1.3 增补（DECISIONS §17.5）**：分辨率 ablation 升级为「预处理方案组合」裁决——`cut_height` 与输入比例**绑定比较**，不孤立裁决：方案 A（cut=180 + 800×320 直缩，有效画面 1366×540 比例 ≈2.53 ≈ 输入比 2.5）vs 方案 B（cut=0 + 960×480 letterbox）。注意：完全不裁的 1366×720（比例 1.90）直接压到 800×320（2.5）会产生明显比例畸变。**§35 新增控制主线**为同一有效视野下的 `960×384 + cut=180`，用于把“高分辨率本身”与 crop/FOV 变量分离。每套方案验收必带 **GT→网络→原图坐标 round-trip 测试 + 可视化 overlay**。
 
 ### 4.6 「推测 → 开关 → 证伪实验」矩阵（架构核心使命）
 
@@ -937,12 +940,12 @@ PRD 附录指出 8 项结论属于【推测】。下表把每一项绑定到一�
 | S4 | 集成 / TTA +0.5~1.5pp | `tta.enabled` / `tta.hflip` / `tta.scales` | `008_tta_flip` | 双门槛：点估计 ≥ +0.5pp 且 paired CI 下界 > 0；**左右不对称可能有害，必须实测** |
 | S5 | 本地 val 比测试集高 1~2pp | —（观测项） | 每次 A 榜提交回流 | 差值稳定在 ±0.5pp 内才算 metric 链路正确（以 Oracle 为校准基准，§17.1） |
 | S6 | CLAHE 对低照度有效、对逆光/反光有害 | `restore.clahe` / `restore.apply_on` / `scene_whitelist` | `003_restore_clahe` | **分桶 F1 判定**（多维标签）+ 双门槛：点估计 ≥ +1.0pp 且 paired CI 下界 > 0；回退纪律：点估计 <1.0pp 立即回退。**⚠️ v1.3（§17.2）：B 榜无场景标签，条件化仅限可部署自动判别，否则只做离线分桶** |
-| S7 | 分辨率是隐性天花板 | `data.input_size` + `data.cut_height` + `configs/preset/res_*.yaml` | `002_res_960x480` | 双门槛：点估计 ≥ +1.0pp 且 paired CI 下界 > 0，且 epoch 时长增幅 ≤ 80%；按**预处理方案组合**裁决（§17.5） |
+| S7 | 分辨率是隐性天花板 | `data.input_size` + `data.cut_height` + `configs/preset/res_*.yaml` | `002_res_960x480_cut0`（历史 NO-GO）+ `T55-R / 002_res_960x384_cut180` | §35 三门：全局 `ΔF1≥+1.0pp`、paired CI 下界 `>0`、至少 `5/8` 视频正向；按**预处理方案组合**裁决（§17.5），不以单一 clip/val 点估计放行 |
 | S8 | TOP3 门槛 83–87（竞争强度） | —（观测项） | A 榜对手分数每日快照 | 9/10 前基于实际分布修订目标（PM 职责） |
 
 > **纪律**：S1–S4、S6、S7 全部是**单变量实验**，实验前必须调用 `assert_single_variable(baseline_cfg, exp_cfg)` 通过；否则台账拒绝写入。
 >
-> **方向更新（2026-09-07）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma、模块化置信度/亮度/几何消融、ConvNeXt-Tiny screen 和 R50 `cls_loss_weight=3.0` LVO 均未形成稳定收益，生产保持 `800×320 + cut=180`。`cls_loss_weight=4.0` 因 eval worker `BrokenPipeError` 未形成有效结果，不重启、不作性能结论；FP 定向训练方向关闭，后续 GPU 仅做生产复现、推理/打包演练和交接，fog/rain 继续 NO-GO。
+> **方向更新（2026-09-07）**：原条数敏感度与旧 raw/conf 扫描均保留为历史先验，但不能覆盖跨域归因；sidecar 已改为正类 softmax probability 并通过等价性检查。真实 A 榜 conf=`0.50` 仍优于 conf=`0.40`，生产候选继续冻结 `t=0.50`；score-aware、NMS、`960×480 + cut=0`、条件化低照度 gamma、模块化置信度/亮度/几何消融、ConvNeXt-Tiny screen 和 R50 `cls_loss_weight=3.0` LVO 均未形成稳定收益，生产保持 `800×320 + cut=180`。用户确认的唯一 risk-on 例外是 `960×384 + cut=180` 的 15ep、8-video LVO screen；`cls_loss_weight=4.0` 因 eval worker `BrokenPipeError` 未形成有效结果，不重启、不作性能结论。T55-R 只有在全局 `ΔF1≥+1.0pp`、paired CI 下界 `>0`、至少 `5/8` 视频正向同时满足时才进入 36ep，否则关闭；A 榜不提前消耗，fog/rain 继续 NO-GO。
 
 ---
 
@@ -1173,11 +1176,12 @@ gantt
 | **T53** | 退化增强各算子（gamma/雾/雨/反光/阴影/模糊/噪声） | 12 | T31 | ✔ | | `degrade.py` | 9/5–9/7 |
 | **T54** | 复原前置 CLAHE / 自适应 gamma / 暗通道去雾 | 5 | T31 | ✔ | | `restore.py` | 9/6 |
 | **T55** | 预处理方案组合 A/B：`cut=180 + 800×320` vs `cut=0 + 960×480 letterbox`；先完成 eval-only screen，候选在 `0.40–0.60` 全部退化，NO-GO；结论只归因整套管线，单因素归因需追加匹配分辨率控制组 | eval-only 已完成 | T42 | | | `docs/lvo_resolution_scan_20260906.md` | 9/6 |
+| **T55-R** | **Risk-on 匹配视野高分辨率训练 screen**：CLRNet-R50、`960×384 + cut_height=180`、seed=42、15ep；同一 `1366×540` 有效视野，只改变输入分辨率；8-video LVO 与官方 Oracle 回放固定 `eval_workers=0` | 15ep screen；仅通过 §35 三门才允许 36ep | T42, T23, §35 | | ★ | `scripts/autodl/run_lvo_resolution_training_screen.sh`；输出根 `HARDLANE_RISKON_RESOLUTION_ROOT` | 9/7–9/8 |
 | **T56** | 短板桶定向过采样 `sampler.py` | 5 | T24, T14 | ✔ | | 长尾改善 | 9/8–9/9 |
 | **T57** | TTA（水平翻转 + 多尺度结果级融合） | 6 | T50 | ✔ | | TTA 开关 | 9/8 |
 | **T58** | 台账自动化（ledger / ablation 单变量断言 / compute_ledger） | 8 | T43 | ✔ | | `docs/experiments.csv` | 9/5–9/6 |
 | **T59** | **FP 定向 R50 训练 screen/LVO（已收口）**：`cls_loss_weight=3.0` 完成 8-video LVO，官方 Oracle F1=`0.771559`，相对 R50 对照 `−0.607pp`，paired CI 下界不大于 0、LOCO=`0/8`，Red；`4.0` 因 eval worker `BrokenPipeError` 中断，未形成有效完整 screen，不重启 | 已有 3.0 LVO/NO-GO 证据；4.0 中断日志仅作审计；不进入 36ep | T43, §32, §34 | | ★ | `outputs/reports/lvo_clsweight3_gate_20260907.md` + JSON | ✅ 9/7 |
-| **T60** | **定模型**（基于 ≥4 次有效实验的 CI 下界对比） | 4 | T50–T57, T59 | | ★ | `docs/decisions.md` | **9/10** |
+| **T60** | **定模型**（基于 ≥4 次有效实验的 CI 下界对比；T55-R 未过门时不得把它当候选） | 4 | T50–T57, T59, T55-R, T4.6 | | ★ | `docs/decisions.md` | **9/10** |
 | **T61** | 最终重训（更长训练 + EMA，或 2 折交叉确认） | 6（GPU 12h） | T60 | | ★ | 最终权重 | 9/10–9/12 |
 | **T62** | 可复现性套件：README + 干净环境复现演练（差异 ≤0.3pp）+ 逐字节一致 | 10 | T61 | ✔ | | `README.md` | 9/12–9/13 |
 | **T63** | B 榜沙盘演练 ×2（含空目录/缺文件异常注入，计时 ≤90min） | 8 | T15, T62 | | ★ | `docs/runbook_b_phase.md` | 9/13–9/14 |
@@ -1198,7 +1202,7 @@ gantt
 ```
 T00 → T10 → T11 → T12 ────────────────────────┐
 T00 → T10 → T20 → T19 → T18 ─────────────────┤
-T00 → T10 → T20 → T21 → T22 → T24 → T23 ────────┤→ T31 → T40（原生执行面）→ T41（AutoDL 动态门）→ T42 → T43 → T50/T53/T55 → T59 → T60
+T00 → T10 → T20 → T21 → T22 → T24 → T23 ────────┤→ T31 → T40（原生执行面）→ T41（AutoDL 动态门）→ T42 → T43 → T50/T53/T55 → T59 → T55-R → T4.6 → T60
 T00 → T01 → T30 ─────────────────────────────────────────────┘                                              ↓
                                                   T61 → T62 → T63 → T64 → T65 → T70 → T71 → T72
 ```
@@ -1248,7 +1252,7 @@ T00 骨架(9/1) → T10 基础设施 → T17 Oracle冻结+哈希守护(✅) → 
   → 赢家 36ep(9/4 开跑) → T43(9/5 M2出分, 触发 DECISIONS §15.1 重估)
   → T50 后处理套件 → T51 阈值/NMS/max_output_lanes 扫描(J4 三件套, 网格 {7,8,10,12})
   → T55 分辨率方案组合(cut_height×输入比例, §17.5) → T53 退化增强(雾+雨一组) → T43 全量首评
-  → T59 loss-weight LVO(3.0 Red；4.0 中断不重启，9/7) → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
+  → T59 loss-weight LVO(3.0 Red；4.0 中断不重启，9/7) → T55-R `960×384+cut180` 15ep screen → T4.6 三门 LVO 放行/止损 → T60 定模型(9/10) → T61 最终重训(单折) → T62 复现演练 → T63 沙盘×2 → T65 冻结(9/14 24:00)
   → T70 B榜首提(9/16) → T72 终提交(9/17 15:00)
 ```
 

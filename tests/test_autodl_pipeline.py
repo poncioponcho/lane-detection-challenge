@@ -192,6 +192,12 @@ def test_runtime_eval_worker_override_disables_persistent_workers():
         "dataloader.test.persistent_workers=False"
 
 
+def test_risk_on_lvo_screen_script_is_shell_valid():
+    script = ROOT / "scripts/autodl/run_lvo_resolution_training_screen.sh"
+    result = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
 def test_training_prerequisites_bind_project_and_checkpoint_sha(tmp_path):
     output = tmp_path / "output"
     weights = tmp_path / "weights"
@@ -396,6 +402,7 @@ def test_lvo_runner_propagates_experiment_override_to_train_and_eval_commands():
     runner.python_bin = "/opt/python/bin/python"
     runner.train_net = Path("/opt/UnLanedet/tools/train_net.py")
     runner.base_config = Path("/opt/project/configs/unlanedet/clrnet_r50_hardlane.py")
+    runner.eval_workers = 0
     runner.override = mods["override"]
     runner.experiment_overrides = mods["parse_experiment_overrides"](
         ["model.head.cfg.cls_loss_weight=3.0"]

@@ -1107,3 +1107,44 @@ sidecar 和 Oracle JSON 均在 `outputs/convnext_screen_20260906_evidence/`（ou
   继续选择 incumbent。
 - 下一交付优先级为：生产包复核 → `solution.zip` 冻结 → B 榜沙盘演练；所有新候选必须
   先通过同一 LVO 放行门，不能由标准 val 点估计或失败/中断日志触发提交。
+
+## 三十五、Risk-on：匹配视野的高分辨率重训 screen（2026-09-07）
+
+**触发与用户裁决**：当前 incumbent `714962 / 0.73444` 与最新 A 榜前三线
+`0.79219` 相差约 `5.775pp`，已没有值得直接提交的旧包。用户确认将风险偏好上调，
+但今日最多消耗一笔 A 榜额度；若额度可结转则暂缓提交。该裁决有意偏离 §34 的
+“探索训练关闭”策略，但不改变 incumbent、不覆盖主线、不把已知退化包当作激进候选。
+
+### 35.1 实验范围
+
+- 建立独立本地分支 `risk-on-res960x384-screen`；`main`、私有远端既有快照、
+  `outputs/submit_testA_t05.zip` 和 incumbent 权重均保持不变。
+- 第一候选固定为 **CLRNet-R50、`960×384 + cut_height=180`、seed=42、15ep、
+  CULane adapted 权重**。相对于生产 `800×320 + cut=180`，只改变网络输入分辨率；
+  有效源画面仍为 `1366×540`，输入纵横比保持 `2.5:1`，因此不把此前
+  `960×480 + cut=0` 的 crop/FOV 失败误判为“高分辨率无效”。
+- 训练和回放使用同一 8-video LVO、冻结官方 Oracle、同一 checkpoint policy；
+  验证 DataLoader 使用 `num_workers=0`，避免已知的云端 worker 启动故障污染实验。
+- 融合、hard-negative/domain augmentation 和无标签 test 适配暂不并行启动；只有
+  第一候选完成止损判断后，才进入第二梯队。无组委会明确许可，不做伪标签/域适配。
+
+### 35.2 放行与止损
+
+15ep screen 不产生 A 榜候选。只有同时满足以下条件，才允许对该变体做 36ep：
+
+1. 相对同协议 CLRNet-R50 15ep LVO，官方 Oracle 全局 `ΔF1 ≥ +1.0pp`；
+2. video-level paired bootstrap 95% CI 下界严格大于 `0`；
+3. 8 个 held-out video 中至少 `5/8` 个差异为正（“多数视频正向”）。
+
+任一条件不满足即关闭该分支，不重启碰运气；保留实验现场并回到 incumbent 交付。
+只有 LVO 放行后，才最多生成一个新的 A 榜 exploratory probe；该 probe 必须相对
+incumbent 至少 `+0.5pp` 才考虑第二笔额度。`t06`、`conf=0.35` 以及历史已知低分
+包不作为主方案。
+
+### 35.3 排程
+
+- 9/7：生成派生 config，启动 8-fold 15ep LVO screen；独立目录不得覆盖历史 LVO。
+- 9/8：聚合 OOF、官方 Oracle、paired bootstrap 和 video-level 正向数，执行止损。
+- 9/9–9/10：仅对通过者做 36ep；否则停止训练，转向复现/交付演练。
+- 9/10 之后：最多用一个通过 LVO 的候选做 A 榜探针；incumbent 始终保留，最终仍
+  需独立回放、沙盘演练和 18–24 小时故障缓冲。

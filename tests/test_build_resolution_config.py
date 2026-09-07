@@ -20,6 +20,17 @@ def test_build_resolution_config_changes_only_preprocess_declarations(tmp_path):
     assert "cut_height = 180" not in text
 
 
+def test_build_matched_fov_risk_on_candidate(tmp_path):
+    output = tmp_path / "risk_on_resolution.py"
+    build(BASE, output, 960, 384, 180)
+    text = output.read_text(encoding="utf-8")
+    assert "img_w = 960" in text
+    assert "img_h = 384" in text
+    assert "cut_height = 180" in text
+    assert "img_w = 800" not in text
+    assert "img_h = 320" not in text
+
+
 def test_build_resolution_config_rejects_unexpected_base(tmp_path):
     base = tmp_path / "bad.py"
     base.write_text("img_w = 800\nimg_h = 320\n", encoding="utf-8")

@@ -130,7 +130,15 @@ class LVORunner:
         self.project_head = ""
         self.unlanedet_head = ""
         self.environment: dict = {}
-        self.base_config = self.project_root / "configs/unlanedet/clrnet_r50_hardlane.py"
+        self.base_config = (
+            args.base_config.resolve()
+            if args.base_config is not None
+            else self.project_root / "configs/unlanedet/clrnet_r50_hardlane.py"
+        )
+        self.input_width = args.input_width
+        self.input_height = args.input_height
+        self.cut_height = args.cut_height
+        self.eval_workers = args.eval_workers
         self.train_net = self.unlanedet_root / "tools/train_net.py"
         self.adapted_checkpoint = self.weights_root / "adapted_clrnet_r50_hardlane.pth"
         self.events_path = self.experiment_root / "runner_events.jsonl"
@@ -153,7 +161,9 @@ class LVORunner:
         self.environment = self.mods["inspect_cuda_python"](self.python_bin)
         config_text = self.base_config.read_text(encoding="utf-8")
         required_config_fragments = (
-            "img_w = 800", "img_h = 320", "cut_height = 180",
+            f"img_w = {self.input_width}",
+            f"img_h = {self.input_height}",
+            f"cut_height = {self.cut_height}",
             "manifest_train_v1_seed42.jsonl",
             "manifest_val_v1_seed42.jsonl",
         )
@@ -219,8 +229,11 @@ class LVORunner:
             "experiment_overrides": self.experiment_overrides,
             "epochs": 15,
             "batch_size": 12,
-            "input": "800x320",
-            "cut_height": 180,
+            "input": f"{self.input_width}x{self.input_height}",
+            "input_width": self.input_width,
+            "input_height": self.input_height,
+            "cut_height": self.cut_height,
+            "eval_workers": self.eval_workers,
             "conf_threshold": 0.4,
             "checkpoint_policy": "fixed model_final after exactly 15 epochs; no holdout selection",
             "project_git_head": self.project_head,
@@ -358,6 +371,8 @@ class LVORunner:
             self.override("dataloader.test.dataset.manifest_path", fold["holdout_manifest"]),
             self.override("dataloader.test.dataset.split", "val"),
             self.override("model.head.cfg.test_parameters.conf_threshold", 0.4),
+            self.override("dataloader.test.num_workers", self.eval_workers),
+            self.override("dataloader.test.persistent_workers", self.eval_workers > 0),
             "train.seed=42",
             "train.cudnn_benchmark=False",
         ])
@@ -374,6 +389,8 @@ class LVORunner:
             self.override("dataloader.test.dataset.manifest_path", fold["holdout_manifest"]),
             self.override("dataloader.test.dataset.split", "val"),
             self.override("model.head.cfg.test_parameters.conf_threshold", 0.4),
+            self.override("dataloader.test.num_workers", self.eval_workers),
+            self.override("dataloader.test.persistent_workers", self.eval_workers > 0),
             "train.seed=42", "train.cudnn_benchmark=False",
         ]
 
@@ -431,8 +448,11 @@ class LVORunner:
             "holdout_clips": len({record.clip_id for record in holdout_records}),
             "iterations_per_epoch": iter_per_epoch,
             "target_max_iter": target_iter,
-            "input": "800x320",
-            "cut_height": 180,
+            "input": f"{self.input_width}x{self.input_height}",
+            "input_width": self.input_width,
+            "input_height": self.input_height,
+            "cut_height": self.cut_height,
+            "eval_workers": self.eval_workers,
             "conf_threshold": 0.4,
             "checkpoint_policy": "fixed model_final; no holdout selection",
             "project_git_head": self.project_head,
@@ -604,6 +624,21 @@ def main() -> None:
     parser.add_argument("--manifests-root", type=Path, required=True)
     parser.add_argument("--python-bin", required=True)
     parser.add_argument(
+        "--base-config",
+        type=Path,
+        default=None,
+        help="optional derived config; defaults to the frozen 800x320/cut180 config",
+    )
+    parser.add_argument("--input-width", type=int, default=800)
+    parser.add_argument("--input-height", type=int, default=320)
+    parser.add_argument("--cut-height", type=int, default=180)
+    parser.add_argument(
+        "--eval-workers",
+        type=int,
+        default=0,
+        help="validation DataLoader workers; 0 disables multiprocessing",
+    )
+    parser.add_argument(
         "--override",
         dest="overrides",
         action="append",
@@ -614,6 +649,10 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-complete", action="store_true")
     args = parser.parse_args()
+    if args.input_width <= 0 or args.input_height <= 0 or args.cut_height < 0:
+        raise SystemExit("input dimensions must be positive and cut-height non-negative")
+    if args.eval_workers < 0:
+        raise SystemExit("--eval-workers must be non-negative")
     runner = LVORunner(args)
     if args.mode == "smoke":
         runner.run_smoke()
