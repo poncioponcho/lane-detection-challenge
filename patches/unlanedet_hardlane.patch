@@ -1,0 +1,70 @@
+diff --git a/unlanedet/model/CLRNet/clr_head.py b/unlanedet/model/CLRNet/clr_head.py
+index bab776c..330b98b 100644
+--- a/unlanedet/model/CLRNet/clr_head.py
++++ b/unlanedet/model/CLRNet/clr_head.py
+@@ -231,6 +231,18 @@ class CLRHead(nn.Module):
+             predictions[:, :,
+                         2:5] += reg[:, :, :3]  # also reg theta angle here
+             predictions[:, :, 5] = reg[:, :, 3]  # length
++            # HardLane patch: clamp the refined theta so fp16 autocast cannot
++            # degenerate torch.tan(...): theta near 0/1 makes |tan| ~1e-5 and the
++            # division overflows fp16 to inf, poisoning the refine loop with inf
++            # prior coords and NaN reg loss (observed as AddmmBackward0 NaN on
++            # gate iter 0). |tan| >= tan(0.01*pi) ~ 0.031 keeps the quotient < 2e4.
++            # Must rebuild out-of-place via torch.cat: the [6]/[7]/[8] writes
++            # below are in-place, so an indexed clamp write would bump the base
++            # version counter and break ClampBackward1's saved view (iter0 crash).
++            theta = predictions[..., 4].clamp(0.01, 0.99)
++            predictions = torch.cat(
++                [predictions[..., :4], theta.unsqueeze(-1), predictions[..., 5:]],
++                dim=-1)
+ 
+             def tran_tensor(t):
+                 return t.unsqueeze(2).clone().repeat(1, 1, self.n_offsets)
+@@ -288,7 +300,7 @@ class CLRHead(nn.Module):
+             # if the prediction does not start at the bottom of the image,
+             # extend its prediction until the x is outside the image
+             mask = ~((((lane_xs[:start] >= 0.) & (lane_xs[:start] <= 1.)
+-                       ).cpu().numpy()[::-1].cumprod()[::-1]).astype(np.bool))
++                       ).cpu().numpy()[::-1].cumprod()[::-1]).astype(bool))
+             lane_xs[end + 1:] = -2
+             lane_xs[:start][mask] = -2
+             lane_ys = self.prior_ys[lane_xs >= 0]
+@@ -303,10 +315,14 @@ class CLRHead(nn.Module):
+             points = torch.stack(
+                 (lane_xs.reshape(-1, 1), lane_ys.reshape(-1, 1)),
+                 dim=1).squeeze(2)
+             lane = Lane(points=points.cpu().numpy(),
+                         metadata={
+                             'start_x': lane[3],
+                             'start_y': lane[2],
++                            # Keep the sidecar score in the same units as the
++                            # decode-time confidence gate above.  lane[1] is a
++                            # raw positive-class logit, not a probability.
+-                            'conf': lane[1]
++                            'conf': torch.softmax(lane[:2], dim=0)[1],
++                            'score_semantics': 'positive_class_softmax_probability'
+                         })
+             lanes.append(lane)
+@@ -445,7 +461,7 @@ class CLRHead(nn.Module):
+                 nms_predictions,
+                 scores,
+                 overlap=self.cfg.test_parameters.nms_thres,
+-                top_k=self.cfg.max_lanes)
++                top_k=self.cfg.test_parameters.nms_topk)
+             keep = keep[:num_to_keep]
+             predictions = predictions[keep]
+ 
+diff --git a/unlanedet/model/CondlaneNet/head.py b/unlanedet/model/CondlaneNet/head.py
+index 647fc84..3a5a074 100644
+--- a/unlanedet/model/CondlaneNet/head.py
++++ b/unlanedet/model/CondlaneNet/head.py
+@@ -9,7 +9,7 @@ import torch.nn.functional as F
+ from ..module.core.lane import Lane
+ from ...layers import Conv2d,get_norm,Activation
+ 
+-torch.autograd.set_detect_anomaly(True)
++torch.autograd.set_detect_anomaly(False)
+ 
+ def compute_locations2(shape, device):
+     pos = torch.arange(

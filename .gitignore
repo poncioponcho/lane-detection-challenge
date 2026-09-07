@@ -1,0 +1,16 @@
+# 数据与产物（10GB 级，不入库）——只放行小型人工标注事实源
+/data/*
+!/data/processed/
+/data/processed/*
+!/data/processed/scene_labels.json
+!/data/processed/manifest_train_v1_seed42.jsonl
+!/data/processed/manifest_val_v1_seed42.jsonl
+/outputs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
