@@ -61,7 +61,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--skip-if-complete", action="store_true")
+    parser.add_argument(
+        "--eval-workers",
+        type=int,
+        default=0,
+        help=(
+            "validation DataLoader workers for replay; defaults to 0 to avoid "
+            "multiprocessing startup failures"
+        ),
+    )
     args = parser.parse_args()
+    if args.eval_workers < 0:
+        raise SystemExit("--eval-workers must be non-negative")
 
     project_root = required_absolute_env("HARDLANE_PROJECT_ROOT")
     required_absolute_env("HARDLANE_DATA_ROOT")
@@ -136,6 +147,8 @@ def main() -> None:
         override("train.init_checkpoint", checkpoint),
         override("train.output_dir", eval_dir),
         override("dataloader.evaluator.output_basedir", eval_dir / "val"),
+        override("dataloader.test.num_workers", args.eval_workers),
+        override("dataloader.test.persistent_workers", args.eval_workers > 0),
         "train.seed=42",
         "train.cudnn_benchmark=False",
     ]

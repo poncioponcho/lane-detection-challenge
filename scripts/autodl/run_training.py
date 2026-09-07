@@ -166,6 +166,7 @@ def validate_launch_history(
     model: str,
     project_head: str,
     expected_overrides: list[str] | None = None,
+    expected_runtime_overrides: list[str] | None = None,
 ) -> None:
     if not path.is_file():
         return
@@ -188,6 +189,15 @@ def validate_launch_history(
                 f"refusing resume with different experiment overrides at "
                 f"{path}:L{line_number}: expected {expected_overrides}, "
                 f"found {launch.get('experiment_overrides', [])}"
+            )
+        if (
+            expected_runtime_overrides is not None
+            and launch.get("runtime_overrides", []) != expected_runtime_overrides
+        ):
+            raise SystemExit(
+                f"refusing resume with different runtime overrides at "
+                f"{path}:L{line_number}: expected {expected_runtime_overrides}, "
+                f"found {launch.get('runtime_overrides', [])}"
             )
 
 
@@ -273,6 +283,7 @@ def recover_final_evaluation(
     checkpoint: Path,
     project_root: Path,
     metric_iteration: int,
+    runtime_overrides: list[str] | None = None,
 ) -> dict:
     recovery_dir = run_dir / "recovered_final_eval"
     recovery_dir.mkdir(parents=True, exist_ok=True)
@@ -289,6 +300,7 @@ def recover_final_evaluation(
         override("dataloader.evaluator.output_basedir", recovery_dir / "val"),
         override("train.seed", 42),
         override("train.cudnn_benchmark", False),
+        *(runtime_overrides or []),
     ]
     command_path = recovery_dir / "eval_command.json"
     command_path.write_text(
@@ -358,6 +370,15 @@ def main() -> None:
         metavar="KEY=VALUE",
         help="single-variable training override; may be repeated",
     )
+    parser.add_argument(
+        "--eval-workers",
+        type=int,
+        default=None,
+        help=(
+            "override validation DataLoader workers; 0 disables multiprocessing "
+            "and persistent workers (useful after worker-start failures)"
+        ),
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--resume", action="store_true")
     mode.add_argument("--auto-resume", action="store_true")
@@ -372,7 +393,20 @@ def main() -> None:
     target_iter = args.max_iter or args.epochs * ITERATIONS_PER_EPOCH
     if target_iter <= 0:
         raise SystemExit("--max-iter must be positive")
+    if args.eval_workers is not None and args.eval_workers < 0:
+        raise SystemExit("--eval-workers must be non-negative")
     experiment_overrides = parse_experiment_overrides(args.override)
+    runtime_overrides = []
+    if args.eval_workers is not None:
+        runtime_overrides.extend(
+            [
+                override("dataloader.test.num_workers", args.eval_workers),
+                override(
+                    "dataloader.test.persistent_workers",
+                    args.eval_workers > 0,
+                ),
+            ]
+        )
 
     project_root = required_absolute_env("HARDLANE_PROJECT_ROOT")
     required_absolute_env("HARDLANE_DATA_ROOT")
@@ -428,6 +462,7 @@ def main() -> None:
             args.model,
             project_head,
             experiment_overrides,
+            runtime_overrides,
         )
         validate_run(run_dir, args.model, target_iter, project_root)
         print(json.dumps({
@@ -458,6 +493,7 @@ def main() -> None:
             args.model,
             project_head,
             experiment_overrides,
+            runtime_overrides,
         )
         import torch
 
@@ -491,6 +527,7 @@ def main() -> None:
                     last_checkpoint,
                     project_root,
                     target_iter,
+                    runtime_overrides,
                 )
             result = validate_run(run_dir, args.model, target_iter, project_root)
             print(json.dumps({
@@ -514,6 +551,7 @@ def main() -> None:
     command.extend(
         [
             *experiment_overrides,
+            *runtime_overrides,
             override("train.max_iter", target_iter),
             override(
                 "train.eval_period",
@@ -535,6 +573,8 @@ def main() -> None:
         "epochs_label": args.epochs,
         "target_max_iter": target_iter,
         "experiment_overrides": experiment_overrides,
+        "runtime_overrides": runtime_overrides,
+        "eval_workers": args.eval_workers,
         "resume": resume,
         "command": command,
         "python": sys.version,

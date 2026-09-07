@@ -185,6 +185,13 @@ def test_evidence_completion_allows_longer_resume_probe():
     assert not RUN.evidence_is_complete(_EvidencePath(), "clrnet_r50", 526, "b" * 40)
 
 
+def test_runtime_eval_worker_override_disables_persistent_workers():
+    assert RUN.override("dataloader.test.num_workers", 0) == \
+        "dataloader.test.num_workers=0"
+    assert RUN.override("dataloader.test.persistent_workers", False) == \
+        "dataloader.test.persistent_workers=False"
+
+
 def test_training_prerequisites_bind_project_and_checkpoint_sha(tmp_path):
     output = tmp_path / "output"
     weights = tmp_path / "weights"

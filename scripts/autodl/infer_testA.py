@@ -183,6 +183,11 @@ def main() -> None:
         override("dataloader.evaluator.output_basedir", output_dir / args.split),
         override("dataloader.test.dataset.manifest_path", manifest),
         override("dataloader.test.dataset.split", args.split),
+        # B/A inference is the delivery path. Keep it single-process so a
+        # cloud worker/SSH stdout failure cannot turn a valid checkpoint into
+        # a partial prediction tree.
+        override("dataloader.test.num_workers", 0),
+        override("dataloader.test.persistent_workers", False),
         "train.seed=42",
         "train.cudnn_benchmark=False",
     ]
