@@ -43,3 +43,16 @@
 - **LVO runner 不清理中间 checkpoint（2026-09-07 实测）**：`lvo_video_runner.py` 每折只取 `model_final.pth`，无 `unlink/rmtree` 逻辑；`checkpointer.period=525` × 15ep → 每折 15–17 个 × 293MB ≈ 4.4GB，8 折 35.2GB。**起任何 8 折 LVO 前必须先验磁盘**（>40GB 安全）。安全清理判据：`fold_state.json` 的 `status=="pass"` 才代表训练+eval+预测集校验全部完成，此时删 `model_*.pth`（保留 `model_final.pth`）零风险。
 - **吞吐基线（3090，960×384，batch 12）**：`0.2854 s/iter` → 7875 iter ≈ 37.5 min/折，含 eval ≈ 41–42 min/折，8 折 ≈ 5.5–6h。看到"低 iter 数"不要线性外推总时长，先确认采样时刻。
 - **非 identity 跨环境审计已闭环（DECISIONS §19，2026-09-02）**：本地 metric（cv2 5.0/scipy 1.18/numpy 2.5）vs 官方 pins 跨环境，1034 渲染用例 + 576 图整图差分逐比特/逐图零分歧（TP=1488/FP=812/FN=521/F1=0.690647，case SHA `6d3b1061…fbc96f`，复跑 `scripts/run_nonidentity_diff.py`）→ **本地诊断 metric 放行训练期扫描；成绩只认 Oracle 全局单次调用，per-clip 禁止平均**（逐图均值偏离全局 −0.99pp）。提交双防线落地：export 序列化后去重<2 拒绝 + verify 独立复核（逗号/严格 1 位小数/去重<2/边界 >1365·>719/≤64条/≤2048点/全链 smoke）；manifest image_path 四要素校验；`interp_lane` 去重已移除（数组/JSON 失败语义=Oracle）；画布常量收口 `common.types.CANVAS_W/H`。该批次 66 tests，§20 后 74，§21 后 76，§22 后当前 80；原致命 zip 已 FAIL。
+
+## 实例与代码同步（恒源云 bundle 工作流，2026-09-08 闭环）
+
+- **实例** = 恒源云 `i-1.gpushare.com:34529`，root + 密钥 `~/.ssh/lane_id`（BatchMode 非交互可用；交互 SSH 偶发挂起，长命令建议拆短或改 scp）。repo `/hy-tmp/lane-detection-challenge`（分支 risk-on-res960x384-screen），UnLanedet `/hy-tmp/UnLanedet`；数据盘 `/hy-tmp` 100G。
+- **代码同步 = git bundle 工作流**（非 git pull）：本地 `git bundle create /tmp/hardlane_292d559_to_HEAD.bundle 292d559..HEAD`（暴露 HEAD ref、prereq=292d559）→ `scp` 到 `/hy-tmp/bundles/hardlane_292d559_to_HEAD.bundle.new` → 实例 `mv` 原子替换。
+- **phase-2/T3 消费 bundle**：`scripts/autodl/run_phase2_vat_*.sh`/`run_t3_clrernet_*.sh` 设 `BUNDLE=/hy-tmp/bundles/hardlane_292d559_to_HEAD.bundle`，做 `git fetch "$BUNDLE" HEAD && git merge --ff-only FETCH_HEAD`（merge 前先 `rm` 未跟踪 VAT 副本，merge 后断言 required 路径已 tracked）。ff 要求 bundle HEAD 是实例 HEAD 的后代。
+- **链训练中不动实例 HEAD**：HEAD 停 292d559，修复/VAT 代码以未跟踪副本存在于工作树；phase-2/T3 启动时才 ff-merge 到 bundle HEAD。
+- **实例 `origin` 远端指向 `/hy-tmp/lane-challenge.bundle`（陈旧 main@a80a633，phase-2 不用，勿据此判断同步状态）**。
+- **推 GitHub**：`git -c credential.helper='!/opt/homebrew/bin/gh auth git-credential' -c url.'https://github.com/'.insteadOf='git@github.com:' push origin <branch>`（gh 在 `/opt/homebrew/bin/gh`，SSH passphrase 卡死，勿用 SSH push）。
+
+## D6/Q6 solution.zip 体积裁决（DECISIONS §36.6，2026-09-08）
+
+- 官方规则页（challenge.xfyun.cn ssgy，全文 `docs/official_rules.md`）**未对 solution.zip 设体积上限**——"<200MB"字面属 `submit.zip`（预测包）；solution.zip 仅需 SHA-256+字节一致+完整代码/权重/配置/依赖，**权重必须内嵌**。PRD P1-C21/R13 的 <200MB 是团队自设纪律（非官方规则）。→ T2 多权重 ensemble 不被官方体积挡，Soup 兜底。伪标签/域适配：官方"测试集禁训"+§35.1 双禁。
