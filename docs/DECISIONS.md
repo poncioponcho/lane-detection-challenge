@@ -1148,3 +1148,58 @@ incumbent 至少 `+0.5pp` 才考虑第二笔额度。`t06`、`conf=0.35` 以及�
 - 9/9–9/10：仅对通过者做 36ep；否则停止训练，转向复现/交付演练。
 - 9/10 之后：最多用一个通过 LVO 的候选做 A 榜探针；incumbent 始终保留，最终仍
   需独立回放、沙盘演练和 18–24 小时故障缓冲。
+
+## §36 冲刺前三总攻（risk-on 全面升级，2026-09-08 用户拍板）
+
+### 36.1 裁决前提（用户原话）
+
+「我们目标是冲击前三，否则项目相当于白做」「云 gpu 是按周包的不需要节约成本」
+「采纳，不租第二台gpu，t4启动，总之能做的优化都做」。
+
+- 风险偏好从 §34/§35 的「保交付优先」升级为「前三 or nothing」；GPU 成本约束解除。
+- 单实例作战（不租第二台 GPU）：恒源云 `i-1.gpushare.com:34529`，RTX 3090 24GB，
+  `/hy-tmp` 数据盘。注意：9/7–9/8 报告中「AutoDL」为沿用旧称，实例实际为恒源云。
+- 采纳方案：`docs/top3_sprint_plan_20260908.md`（五轨 T1–T5）+
+  `docs/attack_top3_plan_20260908.md` 轨 B 的澄清项。伪标签/域适配维持 §35.1 禁令。
+
+### 36.2 事实修正（较 top3_sprint_plan v1.0 的勘误）
+
+1. 实例为 3090 非 4090；36ep 训练实测 ≈83min（18900 iter @0.26s/iter），
+   **非计划中的 14–18h**。五轨 GPU 总成本较计划缩水约一个数量级，单卡足够。
+2. A 榜 incumbent 确证为 63 段 36ep 模型（`runs/baseline_clrnet_r50_36ep`，
+   testA 推理 checkpoint `model_0016799.pth`，val best 0.8089 / final 0.8082）。
+3. 9/4 曾有一次全量 71 段训练 `runs/full_clrnet_r50_all71_18900`（max_iter 18900，
+   val F1 0.8751 为泄漏口径），**权重已被清理、从未提交**；证明全量训练管线可行。
+4. 15ep 基线 8 折权重已被清理循环删除；仍在位的集成素材：8× 36ep LVO fold
+   权重（`lvo_clrnet_r50_36ep_20260905`）、8× 960×384 fold 权重（judged RED 但
+   可作集成多样性成员）、incumbent 38 个 checkpoint。
+5. 冻结 Oracle 运行环境（`/private/tmp/lane-oracle-py312`）已被系统清理丢失；
+   冻结源码（`src/eval/official_oracle/`，SHA 守护完好）在仓库内，按
+   py3.12 + numpy 2.1.3 / scipy 1.15.3 / opencv 4.12.0.88 重建。
+
+### 36.3 执行纪律（本节为裁决，超出部分见 top3_sprint_plan §9 止损线）
+
+- 训练方向封板：9/12 22:00；solution.zip 冻结：9/15 24:00 前；B 榜 9/16–9/17。
+- **A 榜每次提交前必须经用户人工确认**（不变）。
+- 多种子/全量 run 的新增 launcher 能力（`--seed`/`--train-manifest`/
+  `--iters-per-epoch`/`--eval-every-epochs`/`--max-to-keep`）必须记录进
+  `launches.jsonl`；同一 run 禁止跨 commit 续跑纪律维持。
+- T2 集成证据实验设计（诚实性关键）：**63 段同 split 多种子（seed 42/43/44）
+  在 v1 val（8 段）上做 3 模型共识融合 vs 单模对照**。8 折 LVO fold 模型互相
+  评对方 holdout 属于泄漏（其余折模型见过该折视频），禁止用该设计产出「证据」；
+  fold 模型只可作为 A/B 榜集成的合法成员。
+- 证据实验的 fusion 增益对照基线 = incumbent final（iter 18900）val 预测，
+  非 best checkpoint（同 checkpoint 口径）。
+- T4（VAT 对抗一致性 + 困难段过采样）：15ep val screen 先行（~80min/run），
+  通过（Δ≥+0.5pp）才进 8 折 LVO 三门；9/11 22:00 止损门维持。
+- 冻结 Oracle 重建后必须先跑已知答案回归（OOF 基线 0.777628 重放比对）再投用。
+
+### 36.4 排程（9/8 12:47 起）
+
+- 9/8 下午：launcher 改造 + §36 落盘 + 同步实例；启动链式训练
+  `seed43(63段) → seed44(63段) → all71_s42 → all71_s43 → all71_s44`（36ep 各
+  ~1.6–1.9h，预计 9/9 00:00 前完成）；本地重建冻结 Oracle + 写融合脚本。
+- 9/9：T2 证据实验出数（三门）；all71 单模 A 榜探针（需用户确认）；
+  T4 VAT/过采样代码上实例冒烟 + 15ep val screen；T3 CLRerNet 可行性核查。
+- 9/10–9/11：T4/T3 通过者 8 折 LVO；A 榜探针（阶梯见 top3_sprint_plan §7）。
+- 9/12 22:00 训练封板；9/13–9/15 冻结与沙盘；9/16 B 榜作战。

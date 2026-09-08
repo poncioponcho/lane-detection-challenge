@@ -284,6 +284,7 @@ def recover_final_evaluation(
     project_root: Path,
     metric_iteration: int,
     runtime_overrides: list[str] | None = None,
+    seed: int = 42,
 ) -> dict:
     recovery_dir = run_dir / "recovered_final_eval"
     recovery_dir.mkdir(parents=True, exist_ok=True)
@@ -298,7 +299,7 @@ def recover_final_evaluation(
         override("train.init_checkpoint", checkpoint),
         override("train.output_dir", recovery_dir),
         override("dataloader.evaluator.output_basedir", recovery_dir / "val"),
-        override("train.seed", 42),
+        override("train.seed", seed),
         override("train.cudnn_benchmark", False),
         *(runtime_overrides or []),
     ]
@@ -379,6 +380,43 @@ def main() -> None:
             "and persistent workers (useful after worker-start failures)"
         ),
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="training seed (recorded in launches.jsonl; multi-seed ensembles)",
+    )
+    parser.add_argument(
+        "--train-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "override the training manifest path (e.g. the full 71-clip "
+            "manifest_train.jsonl); recorded as a runtime override"
+        ),
+    )
+    parser.add_argument(
+        "--iters-per-epoch",
+        type=int,
+        default=ITERATIONS_PER_EPOCH,
+        help=(
+            "iterations per epoch used to size max_iter/eval/checkpoint "
+            "periods; 525 for the 63-clip split (6300 imgs, batch 12), "
+            "592 for the full 71-clip manifest (7100 imgs, batch 12)"
+        ),
+    )
+    parser.add_argument(
+        "--eval-every-epochs",
+        type=int,
+        default=1,
+        help="validation eval period in epochs (1 = every epoch)",
+    )
+    parser.add_argument(
+        "--max-to-keep",
+        type=int,
+        default=40,
+        help="periodic checkpoint retention count (final+best are separate)",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--resume", action="store_true")
     mode.add_argument("--auto-resume", action="store_true")
@@ -390,11 +428,20 @@ def main() -> None:
         raise SystemExit("--epochs must be positive")
     if not SAFE_RUN_NAME.fullmatch(args.run_name):
         raise SystemExit("--run-name must match [a-z0-9][a-z0-9_.-]{0,79}")
-    target_iter = args.max_iter or args.epochs * ITERATIONS_PER_EPOCH
-    if target_iter <= 0:
-        raise SystemExit("--max-iter must be positive")
     if args.eval_workers is not None and args.eval_workers < 0:
         raise SystemExit("--eval-workers must be non-negative")
+    if args.iters_per_epoch <= 0:
+        raise SystemExit("--iters-per-epoch must be positive")
+    if args.eval_every_epochs <= 0:
+        raise SystemExit("--eval-every-epochs must be positive")
+    if args.max_to_keep <= 0:
+        raise SystemExit("--max-to-keep must be positive")
+    target_iter = args.max_iter or args.epochs * args.iters_per_epoch
+    if target_iter <= 0:
+        raise SystemExit("--max-iter must be positive")
+    eval_period = args.iters_per_epoch * args.eval_every_epochs
+    if target_iter % eval_period != 0:
+        eval_period = target_iter
     experiment_overrides = parse_experiment_overrides(args.override)
     runtime_overrides = []
     if args.eval_workers is not None:
@@ -406,6 +453,20 @@ def main() -> None:
                     args.eval_workers > 0,
                 ),
             ]
+        )
+    train_manifest_lines = None
+    if args.train_manifest is not None:
+        train_manifest = args.train_manifest.expanduser().resolve()
+        if not train_manifest.is_file():
+            raise SystemExit(f"--train-manifest does not exist: {train_manifest}")
+        train_manifest_lines = sum(
+            1 for line in train_manifest.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+        if train_manifest_lines <= 0:
+            raise SystemExit(f"--train-manifest is empty: {train_manifest}")
+        runtime_overrides.append(
+            override("dataloader.train.dataset.manifest_path", train_manifest)
         )
 
     project_root = required_absolute_env("HARDLANE_PROJECT_ROOT")
@@ -528,6 +589,7 @@ def main() -> None:
                     project_root,
                     target_iter,
                     runtime_overrides,
+                    seed=args.seed,
                 )
             result = validate_run(run_dir, args.model, target_iter, project_root)
             print(json.dumps({
@@ -553,17 +615,12 @@ def main() -> None:
             *experiment_overrides,
             *runtime_overrides,
             override("train.max_iter", target_iter),
-            override(
-                "train.eval_period",
-                ITERATIONS_PER_EPOCH
-                if target_iter % ITERATIONS_PER_EPOCH == 0
-                else target_iter,
-            ),
-            override("train.checkpointer.period", ITERATIONS_PER_EPOCH),
-            override("train.checkpointer.max_to_keep", 40),
+            override("train.eval_period", eval_period),
+            override("train.checkpointer.period", args.iters_per_epoch),
+            override("train.checkpointer.max_to_keep", args.max_to_keep),
             override("train.output_dir", run_dir),
             override("dataloader.evaluator.output_basedir", run_dir / "val"),
-            override("train.seed", 42),
+            override("train.seed", args.seed),
             override("train.cudnn_benchmark", False),
         ]
     )
@@ -572,6 +629,15 @@ def main() -> None:
         "model": args.model,
         "epochs_label": args.epochs,
         "target_max_iter": target_iter,
+        "iters_per_epoch": args.iters_per_epoch,
+        "eval_period": eval_period,
+        "seed": args.seed,
+        "train_manifest": (
+            str(args.train_manifest.expanduser().resolve())
+            if args.train_manifest is not None
+            else None
+        ),
+        "train_manifest_lines": train_manifest_lines,
         "experiment_overrides": experiment_overrides,
         "runtime_overrides": runtime_overrides,
         "eval_workers": args.eval_workers,
