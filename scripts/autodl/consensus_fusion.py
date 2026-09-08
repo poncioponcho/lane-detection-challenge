@@ -18,9 +18,10 @@ Algorithm (per image):
      seeds whose mean |dx| over the overlapping y-range < --max-dx;
   3. connected components are consensus clusters; a cluster is KEPT only if it
      contains lanes from >= --quorum distinct seeds;
-  4. the kept lane's geometry = the highest-mean-confidence member's lane
-     (avoids resampling artefacts; pointwise-median is a documented option),
-     and its confidence = the MEAN of the members' confidences.
+  4. the kept lane's geometry defaults to the highest-mean-confidence
+     member's lane (avoids resampling artefacts); ``--geometry median`` can
+     instead denoise the x coordinates pointwise on that member's y grid while
+     preserving its endpoint coverage. Its confidence is the MEAN of members.
 
 Single-seed-unique lines (clusters with < quorum seeds) are dropped by design.
 Output: <out>/<clip>/<img>.lines.txt + (with --emit-scores) a merged
@@ -70,12 +71,62 @@ def load_scores(json_path: Path) -> dict[str, list[float]]:
     return data["scores_by_image"]
 
 
+def _interpolate_on_base_grid(
+    lane: np.ndarray, base_y: np.ndarray, fallback_x: np.ndarray
+) -> np.ndarray:
+    """Interpolate one lane on the selected member's y grid safely.
+
+    Outside a member's observed y range we keep the selected member's x.  This
+    avoids shortening a consensus line merely because one agreeing seed
+    emitted fewer endpoint samples.
+    """
+    ordered = lane[np.argsort(lane[:, 1])]
+    y = ordered[:, 1]
+    x = ordered[:, 0]
+    y, unique = np.unique(y, return_index=True)
+    x = x[unique]
+    inside = (base_y >= y[0]) & (base_y <= y[-1])
+    result = fallback_x.copy()
+    if np.any(inside):
+        result[inside] = np.interp(base_y[inside], y, x)
+    return result
+
+
+def _fused_geometry(
+    member_nodes: list[tuple[int, int, np.ndarray, float]],
+    geometry: str,
+) -> np.ndarray:
+    """Choose or denoise the geometry for one retained consensus cluster."""
+    best = max(member_nodes, key=lambda mn: mn[3])
+    base = best[2]
+    if geometry == "best" or len(member_nodes) == 1:
+        return base
+    ordered = base[np.argsort(base[:, 1])]
+    base_y = ordered[:, 1]
+    fallback_x = ordered[:, 0]
+    aligned = np.vstack([
+        _interpolate_on_base_grid(node[2], base_y, fallback_x)
+        for node in member_nodes
+    ])
+    if geometry == "median":
+        fused_x = np.median(aligned, axis=0)
+    elif geometry == "mean":
+        fused_x = np.mean(aligned, axis=0)
+    else:
+        raise ValueError(f"unsupported consensus geometry: {geometry!r}")
+    fused = np.column_stack((fused_x, base_y))
+    # Match the source/export convention (descending y) regardless of the
+    # internal interpolation order.
+    return fused[np.argsort(-fused[:, 1])]
+
+
 def fuse_image(
     seed_lanes: list[list[np.ndarray]],
     seed_scores: list[list[float]],
     quorum: int,
     max_dx: float,
-) -> tuple[list[np.ndarray], list[float]]:
+    geometry: str = "best",
+) -> tuple[list[np.ndarray], list[float], int]:
     """Return (fused_lanes, fused_scores) for one image."""
     n_seeds = len(seed_lanes)
     # nodes: (seed_idx, lane_idx, lane, score)
@@ -129,10 +180,7 @@ def fuse_image(
         if len(distinct_seeds) < quorum:
             subquorum_lanes += len(member_nodes)
             continue  # single-seed-unique or sub-quorum → drop
-        # geometry = highest-confidence member's lane (avoids resampling
-        # artefacts; pointwise-median is a documented option)
-        best = max(member_nodes, key=lambda mn: mn[3])
-        fused_lanes.append(best[2])
+        fused_lanes.append(_fused_geometry(member_nodes, geometry))
         fused_scores.append(float(np.mean([mn[3] for mn in member_nodes])))
 
     # sort by descending confidence (matches export convention)
@@ -159,6 +207,10 @@ def main() -> None:
     ap.add_argument("--out", required=True, help="output predictions dir")
     ap.add_argument("--quorum", type=int, default=0, help=">=N seeds; 0 => majority (n//2+1)")
     ap.add_argument("--max-dx", type=float, default=15.0, help="match threshold px (mean |dx|)")
+    ap.add_argument(
+        "--geometry", choices=("best", "median", "mean"), default="best",
+        help="geometry for a retained cluster: best member or pointwise denoising",
+    )
     ap.add_argument("--emit-scores", action="store_true", help="write merged prediction_scores.json")
     args = ap.parse_args()
 
@@ -173,7 +225,10 @@ def main() -> None:
     quorum = args.quorum if args.quorum > 0 else (n_seeds // 2 + 1)
     if quorum > n_seeds:
         raise SystemExit(f"quorum {quorum} > n_seeds {n_seeds}")
-    print(f"[consensus] seeds={n_seeds} quorum={quorum} max_dx={args.max_dx}")
+    print(
+        f"[consensus] seeds={n_seeds} quorum={quorum} max_dx={args.max_dx} "
+        f"geometry={args.geometry}"
+    )
 
     # load all sidecars
     seed_scores = [load_scores(sj) for _, sj in seeds]
@@ -194,7 +249,7 @@ def main() -> None:
         seed_lanes = [load_lanes(pd / f"{img}.lines.txt") for pd, _ in seeds]
         per_img_scores = [seed_scores[s].get(img, []) for s in range(n_seeds)]
         fused_lanes, fused_scores, subquorum = fuse_image(
-            seed_lanes, per_img_scores, quorum, args.max_dx)
+            seed_lanes, per_img_scores, quorum, args.max_dx, args.geometry)
         kept_total += len(fused_lanes)
         input_total += sum(len(l) for l in seed_lanes)
         dropped_total += subquorum
