@@ -90,6 +90,7 @@ param_config = OmegaConf.create(
         "bg_weight": 0.4,
         "featuremap_out_channel": 192,
         "num_classes": num_classes,
+        "seg_mask_mode": "overflow_background",
         "dataset_type": "HardLane",
     }
 )

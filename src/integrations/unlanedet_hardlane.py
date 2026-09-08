@@ -57,6 +57,19 @@ LOGGER = logging.getLogger(__name__)
 CANVAS_W = 1366
 CANVAS_H = 720
 
+# The released HardLane PNGs are indexed instance masks, but their positive
+# palette values are the source dataset's ``lane_id`` values rather than a
+# per-image contiguous class index.  The CLRNet auxiliary head has only
+# ``max_lanes + 1`` classes, so feeding those ids verbatim is unsafe when a
+# lane_id is 9 or 10.  Keep the historical behavior as the default and expose
+# alternatives only for isolated experiments; the line annotation path is
+# unchanged by this setting.
+SEG_MASK_MODES = frozenset({
+    "overflow_background",
+    "binary_union",
+    "compact_instances",
+})
+
 # Splits whose manifest rows carry a GT path (train/val) versus the competition
 # prediction-only splits (testA/testB). Unlabeled rows have gt_path = None and
 # must not be required to ship anno_txt/Annotations files: the released
@@ -226,6 +239,66 @@ def read_palette_indices(path: str | Path) -> np.ndarray:
     return mask.astype(np.uint8, copy=False)
 
 
+def segmentation_mask_mode(cfg) -> str:
+    """Return the validated auxiliary-segmentation encoding mode.
+
+    ``overflow_background`` preserves the pre-existing training contract:
+    ids outside the configured class budget become background.  The other
+    modes are deliberately opt-in so incumbent runs remain byte-for-byte
+    reproducible at the dataset-contract level.
+    """
+    value = cfg.get("seg_mask_mode", "overflow_background") if cfg is not None else None
+    mode = "overflow_background" if value is None else str(value)
+    if mode not in SEG_MASK_MODES:
+        raise ValueError(
+            f"seg_mask_mode must be one of {sorted(SEG_MASK_MODES)}, got {mode!r}"
+        )
+    return mode
+
+
+def encode_segmentation_mask(
+    mask: np.ndarray, *, mode: str, num_classes: int
+) -> np.ndarray:
+    """Encode a palette mask for the CLRNet auxiliary NLL loss.
+
+    ``binary_union`` treats every non-zero palette id as lane foreground.  It
+    removes the arbitrary source lane-id semantics while retaining all lane
+    pixels.  ``compact_instances`` preserves distinct positive ids but
+    remaps them to 1..N in sorted source-id order for an experiment that wants
+    instance-style supervision.  Both paths fail closed if the target class
+    budget cannot represent the remapped mask.
+    """
+    array = np.asarray(mask)
+    if array.ndim != 2:
+        raise ValueError(f"segmentation mask must be 2-D, got {array.shape}")
+    if not isinstance(num_classes, (int, np.integer)) or int(num_classes) < 2:
+        raise ValueError(f"num_classes must be an integer >= 2, got {num_classes!r}")
+    mode = str(mode)
+    if mode not in SEG_MASK_MODES:
+        raise ValueError(
+            f"seg_mask_mode must be one of {sorted(SEG_MASK_MODES)}, got {mode!r}"
+        )
+
+    if mode == "binary_union":
+        return (array > 0).astype(np.uint8, copy=False)
+
+    positive_ids = [int(value) for value in np.unique(array) if int(value) > 0]
+    if mode == "compact_instances":
+        if len(positive_ids) >= int(num_classes):
+            raise ValueError(
+                f"{len(positive_ids)} positive mask ids exceed the {int(num_classes) - 1} "
+                "foreground classes available for compact_instances"
+            )
+        encoded = np.zeros(array.shape, dtype=np.uint8)
+        for new_id, source_id in enumerate(positive_ids, start=1):
+            encoded[array == source_id] = new_id
+        return encoded
+
+    # Historical mode: preserve in-budget ids and intentionally map overflow
+    # to background.  This is kept for reproducibility of all prior screens.
+    return np.where(array >= int(num_classes), 0, array).astype(np.uint8, copy=False)
+
+
 def _safe_relative_path(raw: str, expected_prefix: str) -> PurePosixPath:
     path = PurePosixPath(raw)
     if path.is_absolute() or ".." in path.parts or not path.parts:
@@ -318,12 +391,15 @@ class HardLaneDataset(BaseDataset):
             self.conditional_gamma_luma_threshold,
             self.conditional_gamma_value,
         ) = conditional_gamma_settings(cfg)
+        self.seg_mask_mode = segmentation_mask_mode(cfg)
+        self._seg_mode_warning_logged = False
         LOGGER.info(
             "Conditional gamma: enabled=%s threshold=%.3f gamma=%.3f",
             self.conditional_gamma_enabled,
             self.conditional_gamma_luma_threshold,
             self.conditional_gamma_value,
         )
+        LOGGER.info("Segmentation mask mode: %s", self.seg_mask_mode)
         self.manifest_path = str(manifest_path)
         self.load_annotations()
 
@@ -427,27 +503,30 @@ class HardLaneDataset(BaseDataset):
             mask = read_palette_indices(data_info["mask_path"])
             if tuple(mask.shape) != (CANVAS_H, CANVAS_W):
                 raise ValueError(f"unexpected mask shape {mask.shape}: {data_info['mask_path']}")
-            # HardLane palette ids can exceed the seg head's class budget: the
-            # pinned GenerateLaneLine feeds raw mask values into the seg NLL loss
-            # (clr_head.py), whose class count is num_classes = max_gt_lanes + 1
-            # = 9. Ids 9/10 appear in 51/7100 images and made nll_loss trigger a
-            # device-side assert once shuffling sampled one of them (observed as
-            # "CUDA error: device-side assert triggered" at gate iter 5). Collapse
-            # overflowing ids into background: seg is auxiliary supervision and
-            # the primary lane-line GT comes from anno_txt, so no line-level
-            # label is lost.
+            # HardLane palette ids can exceed the seg head's class budget. The
+            # selected encoding is applied before GenerateLaneLine wraps the
+            # array in imgaug's SegmentationMapsOnImage and before clr_head.py
+            # feeds it to NLLLoss. The primary lane-line GT still comes from
+            # anno_txt and is not changed by this auxiliary-only experiment.
             # adnet's param_config has no num_classes (no seg head); fall back
             # to max_lanes + 1, which equals the clrnet value (9).
             num_seg_classes = int(
                 self.cfg.get("num_classes", int(self.cfg.max_lanes) + 1)
             )
-            if mask.max(initial=0) >= num_seg_classes:
+            if (
+                mask.max(initial=0) >= num_seg_classes
+                or self.seg_mask_mode != "overflow_background"
+            ) and not self._seg_mode_warning_logged:
                 LOGGER.warning(
-                    "HardLane mask %s has seg ids >= num_classes(%d); collapsing to background",
+                    "HardLane mask %s using seg_mask_mode=%s with num_classes(%d)",
                     data_info["image_id"],
+                    self.seg_mask_mode,
                     num_seg_classes,
                 )
-                mask = np.where(mask >= num_seg_classes, 0, mask).astype(np.uint8, copy=False)
+                self._seg_mode_warning_logged = True
+            mask = encode_segmentation_mask(
+                mask, mode=self.seg_mask_mode, num_classes=num_seg_classes
+            )
 
         sample = self.processes(self._build_raw_sample(data_info, image, mask))
         if self.training and not _sample_tensors_finite(sample):

@@ -43,6 +43,7 @@ EXPERIMENT_OVERRIDE_KEYS = frozenset(
         "model.head.cfg.xyt_loss_weight",
         "model.head.cfg.iou_loss_weight",
         "model.head.cfg.seg_loss_weight",
+        "model.head.cfg.seg_mask_mode",
         "optimizer.lr",
         "optimizer.weight_decay",
         "model.vat_weight",

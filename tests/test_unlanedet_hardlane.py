@@ -116,6 +116,31 @@ def test_read_palette_indices_rejects_rgb(tmp_path, monkeypatch):
         MODULE.read_palette_indices(path)
 
 
+def test_segmentation_mask_encodings_preserve_all_positive_pixels():
+    mask = np.array([[0, 1, 9], [10, 2, 0]], dtype=np.uint8)
+    assert MODULE.segmentation_mask_mode(None) == "overflow_background"
+    assert MODULE.encode_segmentation_mask(
+        mask, mode="overflow_background", num_classes=9
+    ).tolist() == [[0, 1, 0], [0, 2, 0]]
+    assert MODULE.encode_segmentation_mask(
+        mask, mode="binary_union", num_classes=9
+    ).tolist() == [[0, 1, 1], [1, 1, 0]]
+    assert MODULE.encode_segmentation_mask(
+        mask, mode="compact_instances", num_classes=9
+    ).tolist() == [[0, 1, 3], [4, 2, 0]]
+
+
+def test_segmentation_mask_mode_rejects_unknown_values():
+    with pytest.raises(ValueError, match="seg_mask_mode"):
+        MODULE.segmentation_mask_mode({"seg_mask_mode": "unknown"})
+    with pytest.raises(ValueError, match="positive mask ids"):
+        MODULE.encode_segmentation_mask(
+            np.array([[1, 2]], dtype=np.uint8),
+            mode="compact_instances",
+            num_classes=2,
+        )
+
+
 def test_read_manifest_rows_checks_order_split_and_paths(tmp_path):
     manifest = tmp_path / "manifest.jsonl"
     manifest.write_text(json.dumps(_row()) + "\n", encoding="utf-8")
