@@ -1203,3 +1203,34 @@ incumbent 至少 `+0.5pp` 才考虑第二笔额度。`t06`、`conf=0.35` 以及�
   T4 VAT/过采样代码上实例冒烟 + 15ep val screen；T3 CLRerNet 可行性核查。
 - 9/10–9/11：T4/T3 通过者 8 折 LVO；A 榜探针（阶梯见 top3_sprint_plan §7）。
 - 9/12 22:00 训练封板；9/13–9/15 冻结与沙盘；9/16 B 榜作战。
+
+### 36.5 执行日志（9/8）
+
+- 06:08 UTC：T1 五连链启动（run_top3_chain_20260908.sh，05:08 UTC 起跑
+  seed43，~9h 预计 12:30 UTC 完成）；phase-2 值守 06:06 上线。
+- 06:35 UTC：**T3 CLRerNet 值守上线**（实例 /hy-tmp/lane-outputs/
+  t3_clrernet_20260908.sh）。链式排程变为三段：T1 链 → phase-2
+  （VAT/过采样三 screen）→ T3（clrernet_r50_15ep screen）。
+  T3 实现要点（commit f60e1fa）：
+  - `HardCLRerHead`（src/integrations/unlanedet_clrernet.py）：pinned
+    CLRerHead 子类，参数布局与 CLRHead 完全同名（iou_loss 无参数），复用
+    adapted_clrnet_r50 checkpoint，15ep screen 与 screen_clrnet 0.7840
+    严格可比（同数据/增广/调度/损失权重/初始权重，只换头）。
+  - **几何补丁**：pinned CLRerNet 三处 CULane 几何（assign.py 模块级
+    lane_iou_dynamic/lane_iou_cost 单例 + CLRerHead.__init__ 的 LaneIoULoss
+    默认 img_w=1640）在 HardCLRerHead 构造时统一重绑为 800×320；
+    `assign()` 运行时从模块 globals 解析，改绑有效（grep 证实无其他
+    直接 import 点）。
+  - 冒烟（smoke_clrernet_training.py）：几何断言（三处 img_w 必须 800）+
+    fp32/AMP 前反向守卫（动态 GradScaler 重试）+ 直接调用 dynamic assign
+    断言非空 GT 批匹配数 > 0 + eval 张量形状检查。
+  - T3 值守脚本：等 phase-2 任意退出态（含 aborted_*，phase-2 死亡时由
+    进程存活 + GPU 排空双守卫兜底）→ 同一 bundle ff-merge（幂等）→
+    重生成证据 → CLRerNet 冒烟 → 启动 screen → F1 对比表。
+- **拦截到的隐患**：`smoke_vat_training.py` 的动态 GradScaler 修复此前
+  仅存在于实例未跟踪副本，未进 efa4bb0——phase-2 的「rm 未跟踪 → merge
+  efa4bb0」会把冒烟回滚到固定 2^16 scale 旧版，init loss~11 必溢出 fp16
+  → VAT 冒烟误报 → phase-2 必然 abort。已提交修复（commit 6dfa937）并把
+  实例 bundle 原子替换为 292d559→f60e1fa（含该修复），phase-2 与 T3
+  共用同一 bundle 文件，merge 幂等。
+- 当前实例 HEAD 仍为 292d559（链训练中不动 HEAD 纪律）；本地 HEAD f60e1fa。
