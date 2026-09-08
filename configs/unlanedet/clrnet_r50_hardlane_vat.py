@@ -4,6 +4,13 @@ Identical to clrnet_r50_hardlane.py except the model is wrapped in
 src.integrations.unlanedet_vat.VATCLRNet, which adds the ``loss_vat``
 consistency term during training.  The state_dict layout is unchanged, so
 checkpoints remain interchangeable with the plain CLRNet baseline.
+
+vat_weight=2000 is calibrated, not guessed: on an init-weight probe with
+vat_eps=0.05 the unscaled loss_vat is ~4e-6 and its backbone gradient
+abs_sum is ~2.9 vs ~48800 for the task losses (ratio 5.8e-5), i.e. weight=1
+would be invisible under AdamW.  2000 targets a ~12% gradient share at init;
+the loss VALUE stays below 0.1% of the total early in training and the
+per-iteration trainer logs expose the loss_vat trajectory for calibration.
 """
 import os
 import sys
@@ -109,7 +116,7 @@ model = L(VATCLRNet)(
         sample_points=36,
         cfg=param_config,
     ),
-    vat_weight=1.0,
+    vat_weight=2000.0,
     vat_eps=0.05,
     vat_xi=0.01,
     vat_power_iters=1,

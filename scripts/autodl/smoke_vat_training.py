@@ -7,9 +7,11 @@ Checks, on real train batches (empty-GT and nonempty-GT) and one val batch:
   2. the same holds under the AMP autocast the trainer actually uses;
   3. ``vat_weight=0`` degrades to the plain CLRNet loss dict (no loss_vat);
   4. eval-mode forward returns plain predictions without any loss keys;
-  5. backward on ``loss_vat`` alone reaches nonzero finite gradients on
-     backbone, neck AND head (guards against a detached consistency loss
-     that would silently regularize only part of the model).
+  5. backward on ``loss_vat`` alone (fp32 structural probe) reaches nonzero
+     finite gradients on backbone, neck AND head — guards against a detached
+     consistency loss that would silently regularize only part of the model;
+  6. the GradScaler-scaled summed-loss backward (real AMPTrainer path) also
+     produces finite nonzero gradients after unscaling.
 
 Writes a JSON report next to the dataloader/loss smoke evidence.
 """
@@ -73,17 +75,22 @@ def finite_train_forward(torch, np, model, batch, label: str, autocast: bool) ->
 
 
 def vat_only_backward(torch, model, batch, label: str) -> dict:
-    """Backward ``loss_vat`` alone; it must reach backbone, neck and head."""
+    """Backward ``loss_vat`` alone; it must reach backbone, neck and head.
+
+    Runs in pure fp32: this is a structural graph-connectivity probe, and an
+    unscaled AMP backward legitimately underflows such a small loss to exact
+    zero in fp16 (the real trainer's GradScaler protects that path, which the
+    following scaled check reproduces).
+    """
     model.train()
     model.zero_grad(set_to_none=True)
-    with torch.autocast("cuda"):
-        losses = model(batch)
+    losses = model(batch)
     losses["loss_vat"].backward()
     groups = []
     modules = [("backbone", model.backbone), ("neck", model.neck), ("head", model.head)]
     if getattr(model, "aggregator", None) is not None:
         modules.append(("aggregator", model.aggregator))
-    report = {}
+    report = {"loss_vat": float(losses["loss_vat"].detach())}
     for group_name, module in modules:
         grads = [p.grad for p in module.parameters() if p.grad is not None]
         if not grads:
@@ -96,9 +103,42 @@ def vat_only_backward(torch, model, batch, label: str) -> dict:
                 f"{label}: loss_vat gradient is zero on every {group_name} parameter "
                 "(the consistency loss got detached from the model graph)"
             )
-        report[group_name] = {"with_grad": len(grads), "nonzero": nonzero}
+        report[group_name] = {
+            "with_grad": len(grads),
+            "nonzero": nonzero,
+            "abs_sum": sum(g.abs().sum().item() for g in grads),
+        }
         groups.append(group_name)
     report["groups_reached"] = groups
+    return report
+
+
+def vat_scaled_amp_backward(torch, model, batch, label: str) -> dict:
+    """Reproduce the real AMPTrainer path: GradScaler-scaled summed-loss backward."""
+    model.train()
+    model.zero_grad(set_to_none=True)
+    scaler = torch.cuda.amp.GradScaler(init_scale=2.0 ** 16, growth_interval=10 ** 9)
+    with torch.autocast("cuda"):
+        losses = model(batch)
+    total = sum(losses.values())
+    scaler.scale(total).backward()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.0)
+    scaler.unscale_(optimizer)
+    report = {"scaled_loss_vat_share": float(
+        losses["loss_vat"].detach() / total.detach())}
+    modules = [("backbone", model.backbone), ("neck", model.neck), ("head", model.head)]
+    for group_name, module in modules:
+        grads = [p.grad for p in module.parameters() if p.grad is not None]
+        if not grads:
+            raise AssertionError(f"{label}: scaled backward reached no {group_name} parameters")
+        if not all(bool(torch.isfinite(g).all().item()) for g in grads):
+            raise FloatingPointError(f"{label}: non-finite {group_name} gradients after unscale")
+        nonzero = sum(1 for g in grads if g.abs().sum().item() > 0.0)
+        if nonzero == 0:
+            raise AssertionError(
+                f"{label}: scaled AMP backward left every {group_name} gradient zero"
+            )
+        report[group_name] = {"nonzero": nonzero}
     return report
 
 
@@ -157,6 +197,8 @@ def main() -> None:
             torch, np, model, batch, f"{label}/amp", autocast=True)
     report["vat_only_backward"] = vat_only_backward(
         torch, model, nonempty_batch, "nonempty/vat_only")
+    report["vat_scaled_amp_backward"] = vat_scaled_amp_backward(
+        torch, model, nonempty_batch, "nonempty/vat_scaled_amp")
 
     model.vat_weight = 0.0
     model.train()
