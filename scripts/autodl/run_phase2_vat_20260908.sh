@@ -97,8 +97,11 @@ log "merged to $head"
 
 # Prerequisite evidence must be regenerated at the new HEAD or the launcher
 # refuses to start (stale-evidence guard).
-if ! "$PYTHON_BIN" "$PROJECT_ROOT/scripts/autodl/probe_weights.py" \
-        --no-download --output "$OUTPUT_ROOT/weight_probe.json" >> "$LOG" 2>&1; then
+# The pinned UnLanedet modelzoo configs resolve "config/common/train.py"
+# relative to CWD, so the probe must run from UNLANEDET_ROOT (same as
+# run_pipeline.sh does).
+if ! (cd "$UNLANEDET_ROOT" && "$PYTHON_BIN" "$PROJECT_ROOT/scripts/autodl/probe_weights.py" \
+        --no-download --output "$OUTPUT_ROOT/weight_probe.json") >> "$LOG" 2>&1; then
     write_status aborted_probe
     log "weight probe failed"
     exit 7
