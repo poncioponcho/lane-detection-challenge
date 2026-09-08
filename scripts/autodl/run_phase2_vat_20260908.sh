@@ -77,12 +77,19 @@ while true; do
 done
 log "chain complete"
 
-# Merge the committed VAT work.  The three files below were uploaded earlier
-# as untracked smoke copies; remove them so the merge can create them.
+# Merge the committed VAT work.  The three files below exist as untracked
+# copies only when an earlier attempt died BEFORE its merge; once tracked at
+# HEAD they must NOT be rm'd (a dirty worktree breaks the ff-merge and the
+# launcher's clean-tree guard on relaunch).
 cd "$PROJECT_ROOT" || { write_status aborted_cd; exit 6; }
-rm -f src/integrations/unlanedet_vat.py \
-      configs/unlanedet/clrnet_r50_hardlane_vat.py \
-      scripts/autodl/smoke_vat_training.py
+for f in src/integrations/unlanedet_vat.py \
+         configs/unlanedet/clrnet_r50_hardlane_vat.py \
+         scripts/autodl/smoke_vat_training.py; do
+    if [ -e "$f" ] && ! git cat-file -e "HEAD:$f" 2>/dev/null; then
+        rm -f "$f"
+        log "removed untracked $f"
+    fi
+done
 git fetch "$BUNDLE" HEAD || { write_status aborted_fetch; exit 6; }
 git merge --ff-only FETCH_HEAD || { write_status aborted_merge; exit 6; }
 head=$(git rev-parse HEAD)
