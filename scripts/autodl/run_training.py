@@ -28,8 +28,12 @@ from validate_run import (
 ITERATIONS_PER_EPOCH = 525
 CONFIGS = {
     "clrnet_r50": "clrnet_r50_hardlane.py",
+    "clrnet_r50_vat": "clrnet_r50_hardlane_vat.py",
     "adnet_r34": "adnet_r34_hardlane.py",
 }
+# Models that reuse the plain baseline's adapted pretrained checkpoint and
+# smoke evidence (their state_dict layout is identical to the base model).
+WEIGHT_BASE_MODEL = {"clrnet_r50_vat": "clrnet_r50"}
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
 EXPERIMENT_OVERRIDE_KEYS = frozenset(
@@ -40,6 +44,10 @@ EXPERIMENT_OVERRIDE_KEYS = frozenset(
         "model.head.cfg.seg_loss_weight",
         "optimizer.lr",
         "optimizer.weight_decay",
+        "model.vat_weight",
+        "model.vat_eps",
+        "model.vat_xi",
+        "model.vat_power_iters",
     }
 )
 CONTROLLED_OVERRIDE_KEYS = frozenset(
@@ -235,8 +243,9 @@ def validate_training_prerequisites(
             raise SystemExit(f"{label} evidence is stale or invalid for project {project_head}")
         if value.get("pinned_unlanedet_commit") != PINNED_UNLANEDET_COMMIT:
             raise SystemExit(f"{label} evidence uses a different UnLanedet commit")
-    expected_checkpoint = weights_root / f"adapted_{model}_hardlane.pth"
-    adapted = weight.get("adapted_checkpoints", {}).get(model, {})
+    weight_model = WEIGHT_BASE_MODEL.get(model, model)
+    expected_checkpoint = weights_root / f"adapted_{weight_model}_hardlane.pth"
+    adapted = weight.get("adapted_checkpoints", {}).get(weight_model, {})
     if Path(adapted.get("path", "")).resolve() != expected_checkpoint.resolve():
         raise SystemExit(f"weight probe points to an unexpected {model} checkpoint")
     if not expected_checkpoint.is_file():
@@ -244,7 +253,7 @@ def validate_training_prerequisites(
     checkpoint_sha = sha256_file(expected_checkpoint)
     if adapted.get("sha256") != checkpoint_sha:
         raise SystemExit(f"adapted {model} checkpoint SHA differs from weight probe")
-    smoke_model = smoke.get("models", {}).get(model, {})
+    smoke_model = smoke.get("models", {}).get(weight_model, {})
     if smoke_model.get("checkpoint_sha256") != checkpoint_sha:
         raise SystemExit(f"{model} smoke evidence does not match the adapted checkpoint")
     return {

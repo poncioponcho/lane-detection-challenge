@@ -236,9 +236,17 @@ def _safe_relative_path(raw: str, expected_prefix: str) -> PurePosixPath:
 
 
 def read_manifest_rows(path: str | Path, expected_split: str) -> list[dict]:
-    """Read the frozen JSONL order and recheck identities used by training."""
+    """Read the frozen JSONL order and recheck identities used by training.
+
+    Verbatim whole-row repetition is tolerated so a hard-clip oversampled
+    training manifest (each repeated row keeps its original ``order``) loads
+    as independent extra samples.  A repeated image_id with any content
+    difference stays a hard error, and a fresh row's ``order`` must still
+    equal the number of distinct rows before it, so the frozen single-copy
+    manifests keep their exact strict semantics.
+    """
     rows: list[dict] = []
-    seen: set[str] = set()
+    first_by_id: dict[str, dict] = {}
     with Path(path).open("r", encoding="utf-8") as handle:
         for line_number, raw in enumerate(handle, 1):
             if not raw.strip():
@@ -254,15 +262,22 @@ def read_manifest_rows(path: str | Path, expected_split: str) -> list[dict]:
             missing = required.difference(row)
             if missing:
                 raise ValueError(f"manifest line {line_number} missing {sorted(missing)}")
-            if row["order"] != len(rows):
-                raise ValueError(f"manifest order mismatch at line {line_number}")
             if row["split"] != expected_split:
                 raise ValueError(
                     f"manifest split mismatch at line {line_number}: {row['split']!r}"
                 )
             expected_id = f"{row['clip_id']}/{row['frame_id']}"
-            if row["image_id"] != expected_id or expected_id in seen:
-                raise ValueError(f"duplicate/inconsistent image_id at line {line_number}")
+            if row["image_id"] != expected_id:
+                raise ValueError(f"inconsistent image_id at line {line_number}")
+            first = first_by_id.get(expected_id)
+            if first is None:
+                if row["order"] != len(first_by_id):
+                    raise ValueError(f"manifest order mismatch at line {line_number}")
+            elif row != first:
+                raise ValueError(
+                    f"oversampled duplicate of {expected_id} differs from its first "
+                    f"occurrence at line {line_number}"
+                )
             image_path = _safe_relative_path(row["image_path"], "JPEGImages")
             if image_path.parts[1] != row["clip_id"] or image_path.stem != row["frame_id"]:
                 raise ValueError(f"inconsistent image_path at line {line_number}")
@@ -278,7 +293,8 @@ def read_manifest_rows(path: str | Path, expected_split: str) -> list[dict]:
                 # Leaking GT into a prediction-only split would silently turn a
                 # submission rehearsal into a self-scoring run.
                 raise ValueError(f"unlabeled split {expected_split!r} carries gt_path at line {line_number}")
-            seen.add(expected_id)
+            if first is None:
+                first_by_id[expected_id] = row
             rows.append(row)
     if not rows:
         raise ValueError(f"manifest is empty: {path}")
