@@ -139,6 +139,8 @@ class LVORunner:
         self.input_height = args.input_height
         self.cut_height = args.cut_height
         self.eval_workers = args.eval_workers
+        self.checkpoint_max_to_keep = args.checkpoint_max_to_keep
+        self.iterations_per_epoch_override = args.iterations_per_epoch
         self.train_net = self.unlanedet_root / "tools/train_net.py"
         self.adapted_checkpoint = self.weights_root / "adapted_clrnet_r50_hardlane.pth"
         self.events_path = self.experiment_root / "runner_events.jsonl"
@@ -179,8 +181,9 @@ class LVORunner:
         if not source.is_file():
             raise SystemExit(f"source manifest missing: {source}")
         source_records = self.read_manifest(source)
-        if len(source_records) != 7100:
-            raise SystemExit(f"source manifest has {len(source_records)} rows, expected 7100")
+        source_rows = len(source_records)
+        if source_rows <= 0:
+            raise SystemExit("source manifest is empty")
         source_ids = {record.image_id for record in source_records}
         all_holdout_ids: list[str] = []
         fold_evidence = []
@@ -217,8 +220,9 @@ class LVORunner:
                 "train_videos": sorted(train_videos),
                 "holdout_videos": sorted(holdout_videos),
             })
-        if len(all_holdout_ids) != 7100 or len(set(all_holdout_ids)) != 7100:
-            raise SystemExit("LVO holdout union is not 7100 unique rows")
+        if (len(all_holdout_ids) != source_rows
+                or len(set(all_holdout_ids)) != source_rows):
+            raise SystemExit("LVO holdout union is not a unique cover of the source rows")
         if set(all_holdout_ids) != source_ids:
             raise SystemExit("LVO holdout union differs from source manifest")
         self.experiment_root.mkdir(parents=True, exist_ok=True)
@@ -257,7 +261,7 @@ class LVORunner:
             },
             "folds": fold_evidence,
             "coverage": {
-                "source_rows": len(source_records),
+                "source_rows": source_rows,
                 "holdout_rows": len(all_holdout_ids),
                 "unique_holdout_rows": len(set(all_holdout_ids)),
                 "each_image_held_out_once": True,
@@ -363,7 +367,7 @@ class LVORunner:
             self.override("train.max_iter", target_iter),
             self.override("train.eval_period", 0),
             self.override("train.checkpointer.period", iter_per_epoch),
-            self.override("train.checkpointer.max_to_keep", 40),
+            self.override("train.checkpointer.max_to_keep", self.checkpoint_max_to_keep),
             self.override("train.output_dir", run_dir),
             self.override("dataloader.evaluator.output_basedir", run_dir / "train_eval"),
             self.override("dataloader.train.dataset.manifest_path", fold["train_manifest"]),
@@ -397,7 +401,11 @@ class LVORunner:
     def run_fold(self, fold: dict, *, smoke: bool = False) -> dict:
         train_records, holdout_records = self.load_fold_records(fold)
         batch_size = 12
-        iter_per_epoch = len(train_records) // batch_size
+        iter_per_epoch = (
+            self.iterations_per_epoch_override
+            if self.iterations_per_epoch_override is not None
+            else len(train_records) // batch_size
+        )
         if iter_per_epoch <= 0:
             raise ValueError(f"{fold['name']}: no complete training batch")
         target_iter = 2 if smoke else iter_per_epoch * 15
@@ -455,6 +463,7 @@ class LVORunner:
             "eval_workers": self.eval_workers,
             "conf_threshold": 0.4,
             "checkpoint_policy": "fixed model_final; no holdout selection",
+            "checkpoint_max_to_keep": self.checkpoint_max_to_keep,
             "project_git_head": self.project_head,
             "unlanedet_git_head": self.unlanedet_head,
             "started_utc": utc_now(),
@@ -598,8 +607,12 @@ class LVORunner:
         for fold in folds:
             self.run_fold(fold, smoke=False)
         self.aggregate_oof(folds)
+        source_records = self.read_manifest(
+            self.manifests_root / "source_manifest_train.jsonl"
+        )
         write_json(self.experiment_root / "lvo_training_complete.json", {
-            "status": "pass", "folds": len(folds), "prediction_count": 7100,
+            "status": "pass", "folds": len(folds),
+            "prediction_count": len(source_records),
             "project_git_head": self.project_head, "completed_utc": utc_now(),
         })
 
@@ -639,6 +652,18 @@ def main() -> None:
         help="validation DataLoader workers; 0 disables multiprocessing",
     )
     parser.add_argument(
+        "--checkpoint-max-to-keep",
+        type=int,
+        default=40,
+        help="periodic checkpoints retained per fold; model_final is retained separately",
+    )
+    parser.add_argument(
+        "--iterations-per-epoch",
+        type=int,
+        default=None,
+        help="optional fixed training budget per epoch, independent of manifest row count",
+    )
+    parser.add_argument(
         "--override",
         dest="overrides",
         action="append",
@@ -653,6 +678,10 @@ def main() -> None:
         raise SystemExit("input dimensions must be positive and cut-height non-negative")
     if args.eval_workers < 0:
         raise SystemExit("--eval-workers must be non-negative")
+    if args.checkpoint_max_to_keep <= 0:
+        raise SystemExit("--checkpoint-max-to-keep must be positive")
+    if args.iterations_per_epoch is not None and args.iterations_per_epoch <= 0:
+        raise SystemExit("--iterations-per-epoch must be positive")
     runner = LVORunner(args)
     if args.mode == "smoke":
         runner.run_smoke()
