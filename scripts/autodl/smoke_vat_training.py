@@ -114,25 +114,41 @@ def vat_only_backward(torch, model, batch, label: str) -> dict:
 
 
 def vat_scaled_amp_backward(torch, model, batch, label: str) -> dict:
-    """Reproduce the real AMPTrainer path: GradScaler-scaled summed-loss backward."""
+    """Reproduce the real AMPTrainer path: dynamic GradScaler.
+
+    A fixed loss scale can legitimately overflow fp16 at init (task losses
+    ~O(10) there), so this mirrors the trainer exactly: try the current
+    scale, and whenever unscaling reveals inf/nan, let GradScaler halve the
+    scale (scaler.update) and retry on fresh gradients.
+    """
     model.train()
-    model.zero_grad(set_to_none=True)
-    scaler = torch.cuda.amp.GradScaler(init_scale=2.0 ** 16, growth_interval=10 ** 9)
-    with torch.autocast("cuda"):
-        losses = model(batch)
-    total = sum(losses.values())
-    scaler.scale(total).backward()
+    scaler = torch.cuda.amp.GradScaler(enabled=True)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.0)
-    scaler.unscale_(optimizer)
-    report = {"scaled_loss_vat_share": float(
-        losses["loss_vat"].detach() / total.detach())}
+    attempts = 0
+    while True:
+        attempts += 1
+        if attempts > 20:
+            raise AssertionError(f"{label}: no loss scale in 2^16..2^-3 produced finite grads")
+        model.zero_grad(set_to_none=True)
+        with torch.autocast("cuda"):
+            losses = model(batch)
+        total = sum(losses.values())
+        scaler.scale(total).backward()
+        scaler.unscale_(optimizer)
+        all_grads = [p.grad for p in model.parameters() if p.grad is not None]
+        if all_grads and all(bool(torch.isfinite(g).all().item()) for g in all_grads):
+            break
+        scaler.update()
+    report = {
+        "attempts": attempts,
+        "final_scale": float(scaler.get_scale()),
+        "scaled_loss_vat_share": float(losses["loss_vat"].detach() / total.detach()),
+    }
     modules = [("backbone", model.backbone), ("neck", model.neck), ("head", model.head)]
     for group_name, module in modules:
         grads = [p.grad for p in module.parameters() if p.grad is not None]
         if not grads:
             raise AssertionError(f"{label}: scaled backward reached no {group_name} parameters")
-        if not all(bool(torch.isfinite(g).all().item()) for g in grads):
-            raise FloatingPointError(f"{label}: non-finite {group_name} gradients after unscale")
         nonzero = sum(1 for g in grads if g.abs().sum().item() > 0.0)
         if nonzero == 0:
             raise AssertionError(
