@@ -48,8 +48,16 @@ def video_id(clip_id: str) -> str:
 
 def write_rows(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    # A derived manifest is its own ordered task list.  The source ``order``
+    # is not valid after filtering, and repeated training rows need distinct
+    # positions even though they intentionally share image_id.
+    normalized = []
+    for order, row in enumerate(rows):
+        value = dict(row)
+        value["order"] = order
+        normalized.append(value)
     path.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in normalized),
         encoding="utf-8",
     )
 
