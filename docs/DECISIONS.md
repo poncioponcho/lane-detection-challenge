@@ -1234,3 +1234,24 @@ incumbent 至少 `+0.5pp` 才考虑第二笔额度。`t06`、`conf=0.35` 以及�
   实例 bundle 原子替换为 292d559→f60e1fa（含该修复），phase-2 与 T3
   共用同一 bundle 文件，merge 幂等。
 - 当前实例 HEAD 仍为 292d559（链训练中不动 HEAD 纪律）；本地 HEAD f60e1fa。
+
+### 36.6 D6/Q6 solution.zip 体积裁决与官方规则落盘（2026-09-08 15:15 北京）
+
+- 抓取官方赛事规则页（challenge.xfyun.cn，option=ssgy）核对；规则全文落盘
+  `docs/official_rules.md`（版本 v1），含数据集/指标/提交格式/赛程/奖项。
+- **D6/Q6 结论**：官方**未对 solution.zip 设显式 MB 上限**。页内"文件大小：<200MB"
+  位于预测格式条款（四.1–四.3）之后、solution.zip 条款（四.5）之前，**字面归属
+  submit.zip（预测包）**。solution.zip 仅受"完整代码+权重+配置+依赖说明 + 64 位
+  SHA-256 字节一致"约束；且**权重必须内嵌**（规则要求含"权重"，不允许代码+链接）。
+- PRD P1-C21 的"<200MB 集成包体"与 R13"超 200MB"为**团队自设工程纪律**，非官方规则；
+  继续按 FP16 权重执行该纪律，但不构成对官方体积的硬约束。
+- **对 T2 含义**：原"体积决定 Soup 单模型 vs 多权重集成"前提不成立 → T2 可走
+  多权重 ensemble（期望更高），Soup 兜底；二者均以 FP16 满足自设纪律。
+- 伪标签/域适配（D5）维持 §35.1 禁令，且与官方"测试集严禁参与训练"双一致。
+- **6dfa937 独立复核确认**：commit `6dfa937` 真实存在于当前分支
+  `risk-on-res960x384-screen`（HEAD=dfcbe21），`scripts/autodl/smoke_vat_training.py`
+  的 `vat_scaled_amp_backward`（116–158 行）含动态 GradScaler 重试（125 行建 scaler，
+  127–141 行重试循环：梯度非有限则 `scaler.update()` 减半再试，>20 次报错），
+  替代旧固定 2^16 scale；phase-2 abort 隐患在源码层已闭合。
+- 决策状态汇总（以 §36.1 为准）：D1 采纳✓ / D2 不租第二台 GPU✓ / D3 T4 启动✓ /
+  D4 A 榜每次人工确认（不变） / D5 伪标签禁✓ / D6 本节解✓。无悬空决策。
