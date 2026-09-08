@@ -390,6 +390,10 @@ class LVORunner:
 
     def train_command(self, run_dir: Path, fold: dict, target_iter: int,
                       iter_per_epoch: int, resume: bool) -> list[str]:
+        # Keep command construction usable for lightweight callers that build
+        # a runner with ``object.__new__`` (the production constructor always
+        # supplies this field).
+        checkpoint_max_to_keep = getattr(self, "checkpoint_max_to_keep", 40)
         command = [
             self.python_bin, str(self.train_net),
             "--config-file", str(self.base_config),
@@ -402,7 +406,7 @@ class LVORunner:
             self.override("train.max_iter", target_iter),
             self.override("train.eval_period", 0),
             self.override("train.checkpointer.period", iter_per_epoch),
-            self.override("train.checkpointer.max_to_keep", self.checkpoint_max_to_keep),
+            self.override("train.checkpointer.max_to_keep", checkpoint_max_to_keep),
             self.override("train.output_dir", run_dir),
             self.override("dataloader.evaluator.output_basedir", run_dir / "train_eval"),
             self.override("dataloader.train.dataset.manifest_path", fold["train_manifest"]),

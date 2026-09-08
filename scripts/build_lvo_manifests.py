@@ -49,12 +49,35 @@ def video_id(clip_id: str) -> str:
 def write_rows(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # A derived manifest is its own ordered task list.  The source ``order``
-    # is not valid after filtering, and repeated training rows need distinct
-    # positions even though they intentionally share image_id.
+    # is not valid after filtering.  Repeated training rows intentionally
+    # share an image_id and must also share the same canonical order: the
+    # dataset loader treats a duplicate as valid only when the whole row is
+    # identical to its first occurrence.
     normalized = []
-    for order, row in enumerate(rows):
+    canonical_by_id: dict[str, dict] = {}
+    order_by_id: dict[str, int] = {}
+    for row in rows:
         value = dict(row)
-        value["order"] = order
+        image_id = value["image_id"]
+        first = canonical_by_id.get(image_id)
+        if first is None:
+            order = len(canonical_by_id)
+            value["order"] = order
+            canonical_by_id[image_id] = dict(value)
+            order_by_id[image_id] = order
+        else:
+            # ``order`` is the only field that may differ in the weighted
+            # input.  Rejecting any other difference prevents a malformed
+            # oversampling list from being silently normalized.
+            comparable = dict(value)
+            comparable.pop("order", None)
+            expected = dict(first)
+            expected.pop("order", None)
+            if comparable != expected:
+                raise SystemExit(
+                    f"duplicate image_id has inconsistent manifest fields: {image_id}"
+                )
+            value["order"] = order_by_id[image_id]
         normalized.append(value)
     path.write_text(
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in normalized),
