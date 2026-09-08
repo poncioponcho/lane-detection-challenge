@@ -29,7 +29,9 @@ WEIGHTS_ROOT=/hy-tmp/weights
 OUTPUT_ROOT=/hy-tmp/lane-outputs
 PYTHON_BIN=/usr/local/miniconda3/envs/py39/bin/python
 BUNDLE=/hy-tmp/bundles/hardlane_292d559_to_HEAD.bundle
-EXPECTED_HEAD=0b02619966e6e108d5f2731b13ed7616d0dfe978
+# The merge must bring these paths in as tracked files (a pinned commit hash
+# cannot live inside its own commit, so file presence is the check).
+MERGE_REQUIRED_PATHS="src/integrations/unlanedet_vat.py configs/unlanedet/clrnet_r50_hardlane_vat.py scripts/autodl/smoke_vat_training.py scripts/autodl/run_training.py"
 OS_MANIFEST="$OUTPUT_ROOT/experiments_manifest_train_os_v1_seed42_hard25_x3.jsonl"
 CHAIN_STATUS="$OUTPUT_ROOT/top3_chain_20260908.status"
 CHAIN_TIMEOUT_SECONDS=$((26 * 3600))
@@ -84,11 +86,13 @@ rm -f src/integrations/unlanedet_vat.py \
 git fetch "$BUNDLE" HEAD || { write_status aborted_fetch; exit 6; }
 git merge --ff-only FETCH_HEAD || { write_status aborted_merge; exit 6; }
 head=$(git rev-parse HEAD)
-if [ "$head" != "$EXPECTED_HEAD" ]; then
-    write_status aborted_head_mismatch
-    log "merged HEAD $head != expected $EXPECTED_HEAD"
-    exit 6
-fi
+for required in $MERGE_REQUIRED_PATHS; do
+    if ! git cat-file -e "HEAD:$required" 2>/dev/null; then
+        write_status aborted_merge_incomplete
+        log "post-merge HEAD is missing tracked $required"
+        exit 6
+    fi
+done
 log "merged to $head"
 
 # Prerequisite evidence must be regenerated at the new HEAD or the launcher
