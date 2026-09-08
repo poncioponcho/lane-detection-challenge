@@ -70,19 +70,24 @@ while true; do
 done
 log "t3 left running state (status: $t3)"
 
-# GPU drain guard — never launch onto an occupied GPU.
-gpu_deadline=$(( $(date +%s) + 2 * 3600 ))
+# GPU drain guard — never launch onto an occupied GPU or while another
+# agent's chain (LVO video-disjoint screens etc.) is mid-flight: GPU idle
+# gaps between chained screens would otherwise cause collisions.
+gpu_deadline=$(( $(date +%s) + 24 * 3600 ))
 while true; do
     procs=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | wc -l)
-    [ "$procs" -eq 0 ] && break
+    chain=$(pgrep -fc 'lvo_video_runner|tools/train_net.py' 2>/dev/null || printf 0)
+    if [ "$procs" -eq 0 ] && [ "$chain" -eq 0 ]; then
+        break
+    fi
     if [ "$(date +%s)" -gt "$gpu_deadline" ]; then
-        alert "GPU still busy after 2h drain wait; optimizer standing down"
+        alert "GPU/chain still busy after 24h drain wait; optimizer standing down"
         write_status aborted_gpu_busy
         exit 5
     fi
     sleep 120
 done
-log "GPU idle; entering iteration loop"
+log "GPU idle and no foreign chain processes; entering iteration loop"
 
 # --- 2. iteration loop -----------------------------------------------------
 iter=0
