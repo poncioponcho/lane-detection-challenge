@@ -85,7 +85,10 @@ def fuse_image(
             score = float(scores[li]) if li < len(scores) else 0.0
             nodes.append((s, li, lane, score))
     if not nodes:
-        return [], []
+        # Keep the return shape identical to the normal path.  Empty
+        # prediction files are valid in HardLane and must remain empty in the
+        # fused output rather than aborting the whole 900/1000-image export.
+        return [], [], 0
 
     # union-find over nodes
     parent = list(range(len(nodes)))
