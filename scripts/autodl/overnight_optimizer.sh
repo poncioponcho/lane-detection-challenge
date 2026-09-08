@@ -100,6 +100,11 @@ while [ "$iter" -lt "$MAX_ITERATIONS" ]; do
     log "iter $iter plan: $spec"
 
     case "$itype" in
+        wait)
+            log "iter $iter: waiting for screens ($spec)"
+            iter=$((iter - 1))
+            sleep 600
+            continue ;;
         stop)
             log "planner says stop: $spec"
             break ;;

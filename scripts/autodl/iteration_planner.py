@@ -69,7 +69,20 @@ def load_history_best(history: Path) -> tuple[float | None, set]:
 
 def screen_f1(runs_root: Path, name: str) -> float | None:
     parsed = parse_metrics(runs_root / name / "metrics.json")
-    return parsed["best"] if parsed else None
+    if parsed is None:
+        return None
+    if parsed["final_iter"] < 7875:  # 15 epochs x 525 iters — screen incomplete
+        return None
+    return parsed["best"]
+
+
+def screens_pending(runs_root: Path) -> bool:
+    """True while any phase-2/T3 screen is still mid-training."""
+    for name in CANDIDATES + [INCUMBENT_NAME]:
+        parsed = parse_metrics(runs_root / name / "metrics.json")
+        if parsed is not None and parsed["final_iter"] < 7875:
+            return True
+    return False
 
 
 def projected_seconds(epochs: int, iters_per_epoch: int) -> float:
@@ -99,6 +112,10 @@ def main() -> None:
     inputs = args.state_root / "consensus_inputs.json"
     if inputs.is_file() and not done("consensus"):
         return _emit({"type": "consensus", "inputs": str(inputs), "slug": "consensus_t2"})
+
+    # 0. never decide on half-finished screens.
+    if screens_pending(args.runs_root):
+        return _emit({"type": "wait", "reason": "phase-2/T3 screens still training"})
 
     # 2. pick the best 15ep screen variant vs the incumbent baseline.
     baseline = screen_f1(args.runs_root, INCUMBENT_NAME) or 0.7840
