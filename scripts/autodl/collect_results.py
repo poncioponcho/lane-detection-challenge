@@ -14,6 +14,15 @@ from select_screen_winner import choose_winner
 from validate_run import sha256_file
 
 
+# The gate/screen/baseline collect stages describe the ORIGINAL two-model duel
+# (DECISIONS §12 baseline selection / §25 pipeline entry).  CONFIGS later grew
+# dispatch-only members (clrnet_r50_vat, clrernet_r50) that are launched by
+# dedicated phase scripts with their own evidence chains; they must NOT
+# inflate the historical pipeline modes' run requirements.
+PIPELINE_MODELS = ("clrnet_r50", "adnet_r34")
+assert all(model in CONFIGS for model in PIPELINE_MODELS)
+
+
 RUN_FILES = (
     "config.yaml",
     "metrics.json",
@@ -113,7 +122,7 @@ def collect_paths(
         raise ValueError("smoke evidence belongs to another project commit")
     add_required_tree(files, output_root / "smoke")
 
-    for model in CONFIGS:
+    for model in PIPELINE_MODELS:
         add_run(
             files, output_root / f"runs/gate_{model}_1ep", model,
             expected_project_head, 526,
@@ -122,7 +131,7 @@ def collect_paths(
     decision = None
     if through in {"screen", "baseline"}:
         screen_evidence = {}
-        for model in CONFIGS:
+        for model in PIPELINE_MODELS:
             run_dir = output_root / f"runs/screen_{model}_15ep"
             screen_evidence[model] = add_run(
                 files, run_dir, model, expected_project_head, 15 * 525
