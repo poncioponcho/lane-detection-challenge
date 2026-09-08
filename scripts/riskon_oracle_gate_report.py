@@ -2,10 +2,12 @@
 """Build the final risk-on gate report from frozen Oracle evaluations.
 
 The diagnostic trainer counts are intentionally not used here.  Both input
-files must be the 7100-image, video-disjoint evaluations produced by
-``evaluate_lvo_video_oof.py``.  The global score is computed from the single
-full-OOF Oracle result; video rows are used only for paired bootstrap and
-leave-one-video-out diagnostics.
+files must be passing, video-disjoint evaluations produced by
+``evaluate_lvo_video_oof.py``.  The image count is read from and cross-checked
+against each evaluation artifact rather than hard-coded, so reduced screen
+protocols such as a 6300-image run are audited correctly.  The global score
+is computed from the single full-OOF Oracle result; video rows are used only
+for paired bootstrap and leave-one-video-out diagnostics.
 """
 from __future__ import annotations
 
@@ -32,14 +34,26 @@ def load_eval(path: Path) -> dict:
     value = json.loads(path.read_text(encoding="utf-8"))
     if value.get("status") != "pass":
         raise SystemExit(f"evaluation is not passing: {path}")
-    if int(value.get("prediction_count", -1)) != 7100:
-        raise SystemExit(f"expected 7100 OOF predictions: {path}")
+    try:
+        prediction_count = int(value["prediction_count"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(f"evaluation has no valid prediction count: {path}") from exc
+    if prediction_count <= 0:
+        raise SystemExit(f"evaluation has an invalid prediction count: {path}")
     rows = value.get("videos")
     if not isinstance(rows, list) or len(rows) != 8:
         raise SystemExit(f"expected 8 video rows: {path}")
     by_video = {row["video"]: row for row in rows}
     if len(by_video) != 8:
         raise SystemExit(f"duplicate video rows: {path}")
+    try:
+        image_count = sum(int(row["images"]) for row in rows)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(f"video rows have no valid image counts: {path}") from exc
+    if image_count != prediction_count:
+        raise SystemExit(
+            f"prediction/video image count mismatch: {prediction_count} != {image_count}: {path}"
+        )
     global_counts = value["global_oracle"]["global"]
     summed = {
         key: sum(int(row[key]) for row in rows)
@@ -47,7 +61,7 @@ def load_eval(path: Path) -> dict:
     }
     if summed != {key: int(global_counts[key]) for key in ("tp", "fp", "fn")}:
         raise SystemExit(f"global/video count mismatch: {path}")
-    return value | {"by_video": by_video}
+    return value | {"by_video": by_video, "prediction_count": prediction_count}
 
 
 def load_fold_names(path: Path) -> dict[str, str]:
@@ -123,6 +137,11 @@ def main() -> None:
 
     cand = load_eval(args.candidate.resolve())
     base = load_eval(args.baseline.resolve())
+    if cand["prediction_count"] != base["prediction_count"]:
+        raise SystemExit(
+            "candidate and baseline prediction counts differ: "
+            f"{cand['prediction_count']} != {base['prediction_count']}"
+        )
     if set(cand["by_video"]) != set(base["by_video"]):
         raise SystemExit("candidate and baseline video sets differ")
     fold_names = load_fold_names(args.folds_candidate.resolve())
@@ -164,8 +183,8 @@ def main() -> None:
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "protocol": {
             "metric": "frozen official Oracle",
-            "records": 7100,
-            "videos": 8,
+            "records": cand["prediction_count"],
+            "videos": len(cand["by_video"]),
             "global_score": "one full-OOF Oracle call per experiment",
             "bootstrap": "paired video-cluster resampling",
         },
@@ -199,10 +218,10 @@ def main() -> None:
     lines = [
         f"> AutoDL：{args.autodl_status}",
         "",
-        "# risk-on 960×384 + cut_height=180：8 折冻结 Oracle 终审",
+        "# risk-on 960×384 + cut_height=180：冻结 Oracle 终审",
         "",
         f"- 生成时间（UTC）：{payload['created_utc']}",
-        "- 评估协议：7100 张 OOF 图像、8 个 held-out video；全局 F1 来自一次完整 OOF 官方 Oracle 调用；禁止用 per-video F1 平均代替全局分数。",
+        f"- 评估协议：{cand['prediction_count']} 张 OOF 图像、{len(cand['by_video'])} 个 held-out video；全局 F1 来自一次完整 OOF 官方 Oracle 调用；禁止用 per-video F1 平均代替全局分数。",
         "- 候选：CLRNet-R50，960×384，`cut_height=180`，15ep；基线：CLRNet-R50，800×320，15ep。",
         "",
         f"## 最终裁决：**{verdict}**",
@@ -231,7 +250,7 @@ def main() -> None:
         "",
         "## Paired video bootstrap",
         "",
-        f"- 单位：8 个 held-out video；重采样 {boot['n_bootstrap']} 次；seed={boot['seed']}。",
+        f"- 单位：{len(cand['by_video'])} 个 held-out video；重采样 {boot['n_bootstrap']} 次；seed={boot['seed']}。",
         f"- ΔF1 95% CI：`[{boot['ci95_delta_pp'][0]:+.3f}, {boot['ci95_delta_pp'][1]:+.3f}]pp`；均值 `{boot['mean_delta_pp']:+.3f}pp`；P(Δ>0) `{boot['p_delta_gt_0']:.3f}`。",
         "",
         "## LOCO（逐一留出 video）",
@@ -250,7 +269,7 @@ def main() -> None:
         "|---|---|---:|:--:|",
         f"| 效应量 | 全局 ΔF1 ≥ +{MIN_GLOBAL_DELTA_PP:.1f}pp | {delta_pp:+.3f}pp | {result(gates['global_dF1_ge_1pp'])} |",
         f"| 稳定性 | paired bootstrap CI 下界 > 0 | {boot['ci95_delta_pp'][0]:+.3f}pp | {result(gates['bootstrap_ci_lower_gt_0'])} |",
-        f"| 一致性 | ≥{MIN_POSITIVE_VIDEOS}/8 个 video 为正 | {positive}/8 | {result(gates['positive_videos_ge_5'])} |",
+        f"| 一致性 | ≥{MIN_POSITIVE_VIDEOS}/{len(cand['by_video'])} 个 video 为正 | {positive}/{len(cand['by_video'])} | {result(gates['positive_videos_ge_5'])} |",
         "",
         "## 处置",
         "",

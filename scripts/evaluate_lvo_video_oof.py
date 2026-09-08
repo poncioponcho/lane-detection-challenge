@@ -132,7 +132,9 @@ def main() -> None:
         )
     oof_evidence = json.loads(args.oof_evidence.read_text(encoding="utf-8"))
     if oof_evidence.get("status") != "pass" or int(oof_evidence.get("prediction_count", -1)) != len(records):
-        raise SystemExit("OOF evidence is not a passing 7100-row artifact")
+        raise SystemExit(
+            f"OOF evidence is not a passing {len(records)}-row artifact"
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     global_path = output_dir / "oracle_global_per_clip.json"
