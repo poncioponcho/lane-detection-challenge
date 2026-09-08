@@ -29,11 +29,12 @@ ITERATIONS_PER_EPOCH = 525
 CONFIGS = {
     "clrnet_r50": "clrnet_r50_hardlane.py",
     "clrnet_r50_vat": "clrnet_r50_hardlane_vat.py",
+    "clrernet_r50": "clrernet_r50_hardlane.py",
     "adnet_r34": "adnet_r34_hardlane.py",
 }
 # Models that reuse the plain baseline's adapted pretrained checkpoint and
 # smoke evidence (their state_dict layout is identical to the base model).
-WEIGHT_BASE_MODEL = {"clrnet_r50_vat": "clrnet_r50"}
+WEIGHT_BASE_MODEL = {"clrnet_r50_vat": "clrnet_r50", "clrernet_r50": "clrnet_r50"}
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
 EXPERIMENT_OVERRIDE_KEYS = frozenset(

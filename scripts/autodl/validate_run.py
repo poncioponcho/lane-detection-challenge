@@ -13,7 +13,7 @@ from pathlib import Path, PurePath
 
 EXPECTED_VAL_IMAGES = 800
 EXPECTED_VAL_LANES = 2655
-KNOWN_MODELS = {"clrnet_r50", "clrnet_r50_vat", "adnet_r34"}
+KNOWN_MODELS = {"clrnet_r50", "clrnet_r50_vat", "clrernet_r50", "adnet_r34"}
 
 
 def sha256_file(path: Path) -> str:
