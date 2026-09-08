@@ -46,7 +46,7 @@ def video_id(clip_id: str) -> str:
     return value
 
 
-def write_rows(path: Path, rows: list[dict]) -> None:
+def write_rows(path: Path, rows: list[dict], *, split: str | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # A derived manifest is its own ordered task list.  The source ``order``
     # is not valid after filtering.  Repeated training rows intentionally
@@ -58,6 +58,8 @@ def write_rows(path: Path, rows: list[dict]) -> None:
     order_by_id: dict[str, int] = {}
     for row in rows:
         value = dict(row)
+        if split is not None:
+            value["split"] = split
         image_id = value["image_id"]
         first = canonical_by_id.get(image_id)
         if first is None:
@@ -120,7 +122,7 @@ def main() -> None:
 
     args.output_root.mkdir(parents=True)
     manifests = args.output_root / "manifests"
-    write_rows(manifests / "source_manifest_train.jsonl", source)
+    write_rows(manifests / "source_manifest_train.jsonl", source, split="train")
     folds = []
     for index, heldout in enumerate(videos):
         fold = manifests / f"fold_{index:02d}_{heldout}"
@@ -130,8 +132,8 @@ def main() -> None:
         actual_train = {row["image_id"] for row in train}
         if actual_train != expected_train:
             raise SystemExit(f"{heldout}: weighted train image universe mismatch")
-        write_rows(fold / "manifest_train.jsonl", train)
-        write_rows(fold / "manifest_holdout.jsonl", holdout)
+        write_rows(fold / "manifest_train.jsonl", train, split="train")
+        write_rows(fold / "manifest_holdout.jsonl", holdout, split="val")
         folds.append({
             "index": index,
             "video": heldout,
