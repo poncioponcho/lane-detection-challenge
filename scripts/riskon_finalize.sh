@@ -10,7 +10,7 @@
 #   frozen-Oracle global call. Failure here must never block Stage A.
 set +e
 
-PROJECT="/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛"
+PROJECT="/Users/seyonmacbook/Workbuddy/恶劣场景下的车道线检测挑战赛"
 KEY="/Users/seyonmacbook/.ssh/lane_id"
 REMOTE="root@i-1.gpushare.com"
 PORT=34529
@@ -91,7 +91,7 @@ if [ -x "$ORACLE_PY" ]; then
     PYTHONPATH=src "$LANE_PY" scripts/evaluate_lvo_video_oof.py \
       --manifest data/processed/manifest_train.jsonl \
       --pred-dir "$LOCAL/oof/predictions" \
-      --gt-dir data/raw/dataset/_extract/train_full/Lane \
+      --gt-dir data/raw/dataset/_extract/train_full/Lane/anno_txt \
       --official-python "$ORACLE_PY" \
       --oof-evidence "$LOCAL/oof/oof_evidence.json" \
       --output-dir "$LOCAL/evaluation" \

@@ -63,9 +63,9 @@ def write_markdown(path: Path, value: dict) -> None:
         "",
         f"- 模型：`{value['protocol']['model']}`；输入 `{value['protocol']['input']}`；"
         f"`cut_height={value['protocol']['cut_height']}`；15ep。",
-        "- 8-fold leave-one-video-out；每折固定使用 `model_final.pth`，不使用留出 video 选点。",
-        "- OOF 预测覆盖全量 7100 张图，每张恰好一次。",
-        "- CI 重采样单位为 8 个 video cluster，不能解释为 7100 个独立样本。",
+        f"- {len(value['videos'])}-fold leave-one-video-out；每折固定使用 `model_final.pth`，不使用留出 video 选点。",
+        f"- OOF 预测覆盖 {value['prediction_count']} 张图，每张恰好一次。",
+        f"- CI 重采样单位为 {len(value['videos'])} 个 video cluster，不能解释为图像独立样本。",
         "",
         "## 全局 Oracle 结果",
         "",
@@ -108,6 +108,14 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--bootstrap", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--model", default="clrnet_r50")
+    parser.add_argument("--input", default="800x320")
+    parser.add_argument("--cut-height", type=int, default=180)
+    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument(
+        "--expected-videos", type=int, default=8,
+        help="expected held-out video count (default: 8)",
+    )
     args = parser.parse_args()
 
     manifest = args.manifest.resolve()
@@ -136,8 +144,10 @@ def main() -> None:
     grouped: dict[str, list] = {}
     for record in records:
         grouped.setdefault(video_id(record.clip_id), []).append(record)
-    if len(grouped) != 8:
-        raise SystemExit(f"expected 8 videos, got {len(grouped)}")
+    if len(grouped) != args.expected_videos:
+        raise SystemExit(
+            f"expected {args.expected_videos} videos, got {len(grouped)}"
+        )
 
     video_rows = []
     video_oracle_paths = {}
@@ -182,10 +192,10 @@ def main() -> None:
         "status": "pass",
         "protocol": {
             "name": "leave-one-video-out",
-            "model": "clrnet_r50",
-            "input": "800x320",
-            "cut_height": 180,
-            "epochs": 15,
+            "model": args.model,
+            "input": args.input,
+            "cut_height": args.cut_height,
+            "epochs": args.epochs,
             "checkpoint_policy": "fixed model_final; no holdout selection",
             "bootstrap_unit": "video",
         },
