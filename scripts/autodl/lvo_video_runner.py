@@ -79,7 +79,7 @@ def video_id(clip_id: str) -> str:
 def import_project_modules(project_root: Path):
     sys.path.insert(0, str(project_root / "scripts/autodl"))
     sys.path.insert(0, str(project_root / "src"))
-    from data.manifest import read_manifest
+    from data.manifest import ManifestRecord, read_manifest
     from run_training import (
         PINNED_UNLANEDET_COMMIT,
         assert_tracked_worktree_clean,
@@ -93,6 +93,7 @@ def import_project_modules(project_root: Path):
     from validate_run import checkpoint_payload, manifest_prediction_paths
     return {
         "read_manifest": read_manifest,
+        "manifest_record": ManifestRecord,
         "PINNED_UNLANEDET_COMMIT": PINNED_UNLANEDET_COMMIT,
         "assert_tracked_worktree_clean": assert_tracked_worktree_clean,
         "git_head": git_head,
@@ -120,6 +121,7 @@ class LVORunner:
         self.skip_complete = args.skip_complete
         self.mods = import_project_modules(self.project_root)
         self.read_manifest = self.mods["read_manifest"]
+        self.ManifestRecord = self.mods["manifest_record"]
         self.override = self.mods["override"]
         self.experiment_overrides = self.mods["parse_experiment_overrides"](
             args.overrides
@@ -188,7 +190,7 @@ class LVORunner:
         all_holdout_ids: list[str] = []
         fold_evidence = []
         for fold in folds:
-            train_records = self.read_manifest(fold["train_manifest"])
+            train_records = self.read_weighted_manifest(fold["train_manifest"])
             holdout_records = self.read_manifest(fold["holdout_manifest"])
             train_ids = {record.image_id for record in train_records}
             holdout_ids = {record.image_id for record in holdout_records}
@@ -308,9 +310,42 @@ class LVORunner:
         return parent / fold["name"]
 
     def load_fold_records(self, fold: dict):
-        train_records = self.read_manifest(fold["train_manifest"])
+        train_records = self.read_weighted_manifest(fold["train_manifest"])
         holdout_records = self.read_manifest(fold["holdout_manifest"])
         return train_records, holdout_records
+
+    def read_weighted_manifest(self, path: Path):
+        """Read a training manifest where repeated image rows are deliberate.
+
+        The normal manifest contract rejects duplicate image IDs because
+        source/holdout lists represent unique evaluation tasks.  Oversampling
+        is different: the same labeled example may occur multiple times in a
+        training epoch.  Keep the strict reader for source and holdout files,
+        and perform the minimal row-level safety checks here instead.
+        """
+        records = []
+        with path.open("r", encoding="utf-8") as handle:
+            for line_no, raw in enumerate(handle, start=1):
+                if not raw.strip():
+                    continue
+                try:
+                    record = self.ManifestRecord.from_dict(json.loads(raw))
+                except (TypeError, json.JSONDecodeError) as exc:
+                    raise ValueError(
+                        f"invalid weighted manifest JSON at line {line_no}: {path}"
+                    ) from exc
+                if record.split != "train":
+                    raise ValueError(
+                        f"weighted training manifest contains split {record.split!r}: {path}"
+                    )
+                if record.image_id != f"{record.clip_id}/{record.frame_id}":
+                    raise ValueError(f"inconsistent image_id at line {line_no}: {path}")
+                if record.pred_rel_path != f"{record.clip_id}/{record.frame_id}.lines.txt":
+                    raise ValueError(f"inconsistent prediction path at line {line_no}: {path}")
+                records.append(record)
+        if not records:
+            raise ValueError(f"weighted manifest is empty: {path}")
+        return records
 
     def checkpoint_info(self, checkpoint: Path, target_iter: int) -> dict:
         if not checkpoint.is_file():
