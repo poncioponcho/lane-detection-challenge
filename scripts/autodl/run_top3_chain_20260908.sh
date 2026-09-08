@@ -19,6 +19,7 @@ ALL71_MANIFEST="$OUTPUT_ROOT/experiments_manifest_train_all71.jsonl"
 
 export HARDLANE_PROJECT_ROOT="$PROJECT_ROOT"
 export HARDLANE_DATA_ROOT="$DATA_ROOT"
+export UNLANEDET_ROOT="$UNLANEDET_ROOT"
 export HARDLANE_WEIGHTS_ROOT="$WEIGHTS_ROOT"
 export HARDLANE_OUTPUT_ROOT="$OUTPUT_ROOT"
 export HARDLANE_PYTHON="$PYTHON_BIN"
@@ -69,5 +70,9 @@ run_one all71_seed43_clrnet_r50_36ep 43 \
     --train-manifest "$ALL71_MANIFEST" --iters-per-epoch 592 --eval-every-epochs 6
 run_one all71_seed44_clrnet_r50_36ep 44 \
     --train-manifest "$ALL71_MANIFEST" --iters-per-epoch 592 --eval-every-epochs 6
-write_status complete
+if grep -q failed "$RUNS" 2>/dev/null; then
+    write_status complete_with_failures
+else
+    write_status complete
+fi
 log "chain complete"
