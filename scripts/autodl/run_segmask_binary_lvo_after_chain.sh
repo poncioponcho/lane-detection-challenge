@@ -12,7 +12,7 @@ UNLANEDET_ROOT="${UNLANEDET_ROOT:-/hy-tmp/UnLanedet}"
 WEIGHTS_ROOT="${HARDLANE_WEIGHTS_ROOT:-/hy-tmp/weights}"
 OUTPUT_ROOT="${HARDLANE_OUTPUT_ROOT:-/hy-tmp/lane-outputs}"
 MANIFESTS_ROOT="${MANIFESTS_ROOT:-$OUTPUT_ROOT/lvo_plain_v1_15ep_20260909/manifests}"
-EXPERIMENT_ROOT="${EXPERIMENT_ROOT:-$OUTPUT_ROOT/lvo_maskbinary_15ep_20260909}"
+EXPERIMENT_ROOT="${EXPERIMENT_ROOT:-$OUTPUT_ROOT/lvo_maskbinary_15ep_20260909/experiment}"
 PYTHON_BIN="${HARDLANE_PYTHON:-/usr/local/miniconda3/envs/py39/bin/python}"
 STATUS="${STATUS:-$OUTPUT_ROOT/lvo_maskbinary_15ep_20260909.launch.status}"
 LOG="${LOG:-$OUTPUT_ROOT/lvo_maskbinary_15ep_20260909.launch.log}"
@@ -28,13 +28,15 @@ on_error() {
 }
 trap on_error ERR
 
-for path in "$MASK_PROJECT_ROOT" "$DATA_ROOT" "$UNLANEDET_ROOT" "$WEIGHTS_ROOT" "$OUTPUT_ROOT" "$MANIFESTS_ROOT"; do
-    [ -e "$path" ] || { echo "missing required path: $path" >&2; exit 2; }
-done
-[ ! -e "$EXPERIMENT_ROOT" ] || {
+if [ -e "$EXPERIMENT_ROOT" ]; then
     echo "refusing to overwrite existing experiment: $EXPERIMENT_ROOT" >&2
     exit 3
-}
+fi
+mkdir -p "$EXPERIMENT_ROOT"
+
+for path in "$MASK_PROJECT_ROOT" "$DATA_ROOT" "$UNLANEDET_ROOT" "$WEIGHTS_ROOT" "$OUTPUT_ROOT" "$MANIFESTS_ROOT" "$EXPERIMENT_ROOT"; do
+    [ -e "$path" ] || { echo "missing required path: $path" >&2; exit 2; }
+done
 
 mkdir -p "$OUTPUT_ROOT"
 write_status waiting
