@@ -6,7 +6,7 @@
 set -uo pipefail
 PORT="${1:?usage: fresh_instance_setup.sh <ssh_port>}"
 SSH="ssh -i $HOME/.ssh/lane_id -p $PORT -o BatchMode=yes -o ConnectTimeout=20 root@i-1.gpushare.com"
-SCP="scp -i $HOME/.ssh/lane_id -P $PORT -o BatchMode=yes -o ConnectTimeout=20 root@i-1.gpushare.com"
+SCP="scp -i $HOME/.ssh/lane_id -P $PORT -o BatchMode=yes -o ConnectTimeout=20"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PY39="/usr/local/miniconda3/envs/py39/bin/python"
 SRC_CKPT=/tmp/clrnet_r50_culane_model_best.pth
