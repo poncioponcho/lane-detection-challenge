@@ -25,25 +25,50 @@ $SSH 'if [ ! -x /usr/local/miniconda3/envs/py39/bin/python ]; then /usr/local/mi
 
 step "3/7 数据集上传（tar 文件→md5 双端核对→解包）"
 $SSH "mkdir -p /hy-tmp/datasets/HardLane /hy-tmp/datasets/_staging /hy-tmp/weights /hy-tmp/lane-outputs"
-# split_upload <local> <remote> — 200m 分块，逐块 md5+重试（抗抖动链路），远端重组后整文件终验
+# split_upload <local> <remote> — 200m 分块、3 路并行、逐块 md5+重试、已传块跳过（断点续传）、远端重组后整文件终验
 split_upload() {
     local src=$1 dst=$2
     local base lmd5=$(md5 -q "$src")
     echo "  split_upload $(basename "$src") ($(du -h "$src" | cut -f1)) md5=$lmd5"
+    local staging=/hy-tmp/datasets/_staging
     rm -f /tmp/schunk_*
     split -b 200m "$src" /tmp/schunk_
+    local chunks=(/tmp/schunk_*)
+    echo "  ${#chunks[@]} chunks; resume-check remote existing..."
+    # 断点续传：远端已有且 md5 一致的块直接跳过
+    local todo=()
     local c bn l md5r attempt
-    for c in /tmp/schunk_*; do
+    for c in "${chunks[@]}"; do
         bn=$(basename "$c")
-        for attempt in 1 2 3 4 5 6; do
-            $SCP -q "$c" "root@i-1.gpushare.com:/hy-tmp/datasets/_staging/$bn" && break
-            echo "    chunk $bn attempt $attempt failed; retry in 20s"; sleep 20
-        done
-        l=$(md5 -q "$c"); md5r=$($SSH "md5sum /hy-tmp/datasets/_staging/$bn" | awk '{print $1}')
-        [ "$l" = "$md5r" ] || { echo "    chunk $bn md5 mismatch"; return 1; }
-        echo "    chunk $bn OK"
+        md5r=$($SSH "md5sum $staging/$bn 2>/dev/null" | awk '{print $1}')
+        l=$(md5 -q "$c")
+        if [ "$l" = "$md5r" ]; then
+            echo "    chunk $bn already on remote (skip)"
+        else
+            todo+=("$c")
+        fi
     done
-    $SSH "cat /hy-tmp/datasets/_staging/schunk_* > $dst && rm -f /hy-tmp/datasets/_staging/schunk_*"
+    echo "  to upload: ${#todo[@]} chunks"
+    # 3 路并行 worker
+    upload_worker() {
+        local w=$1 i=0
+        for c in "${todo[@]}"; do
+            i=$((i+1)); [ $((i % 3)) -eq $((w % 3)) ] || continue
+            local bn=$(basename "$c") l md5r attempt
+            for attempt in 1 2 3 4 5 6; do
+                $SCP -q "$c" "root@i-1.gpushare.com:$staging/$bn" && break
+                echo "    chunk $bn attempt $attempt failed; retry in 20s"; sleep 20
+            done
+            l=$(md5 -q "$c"); md5r=$($SSH "md5sum $staging/$bn" | awk '{print $1}')
+            [ "$l" = "$md5r" ] || { echo "    chunk $bn md5 mismatch"; return 1; }
+            echo "    chunk $bn OK (worker $w)"
+        done
+    }
+    upload_worker 0 & local p1=$!
+    upload_worker 1 & local p2=$!
+    upload_worker 2 & local p3=$!
+    wait $p1 $p2 $p3 || { echo "  a worker failed"; return 1; }
+    $SSH "cat $staging/schunk_* > $dst && rm -f $staging/schunk_*"
     md5r=$($SSH "md5sum $dst" | awk '{print $1}')
     [ "$lmd5" = "$md5r" ] || { echo "  whole-file md5 mismatch"; return 1; }
     echo "  split_upload $(basename "$src") DONE"
