@@ -20,8 +20,8 @@ step() { echo "== [$(date -u +%H:%M:%S)] $* =="; }
 step "1/7 体检"
 $SSH "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader; df -h /hy-tmp | tail -1" || { echo "SSH 不通，核对端口"; exit 2; }
 
-step "2/7 py39 环境 + torch 2.1.2+cu118"
-$SSH 'if [ ! -x /usr/local/miniconda3/envs/py39/bin/python ]; then conda create -n py39 python=3.9 -y; fi; /usr/local/miniconda3/envs/py39/bin/python -m pip install --no-cache-dir torch==2.1.2 --index-url https://download.pytorch.org/whl/cu118' || exit 2
+step "2/7 py39 环境 + torch 2.1.2+cu118（镜像无 conda PATH，一律绝对路径）"
+$SSH 'if [ ! -x /usr/local/miniconda3/envs/py39/bin/python ]; then /usr/local/miniconda3/bin/conda create -n py39 python=3.9 -y; fi; /usr/local/miniconda3/envs/py39/bin/python -m pip install --no-cache-dir torch==2.1.2 --index-url https://download.pytorch.org/whl/cu118' || exit 2
 
 step "3/7 数据集上传（tar 文件→md5 双端核对→解包）"
 $SSH "mkdir -p /hy-tmp/datasets/HardLane /hy-tmp/datasets/_staging /hy-tmp/weights /hy-tmp/lane-outputs"
@@ -56,7 +56,7 @@ $SCP "$REPO/data/processed/manifest_train.jsonl" "$REPO/data/processed/manifest_
 $SSH "wc -l /hy-tmp/lane-outputs/experiments_manifest_train_all71.jsonl /hy-tmp/lane-detection-challenge/data/processed/manifest_testA.jsonl"
 
 step "6/7 UnLanedet pinned 环境 + adapted 权重构建"
-$SSH "cd /hy-tmp/lane-detection-challenge && export HARDLANE_PROJECT_ROOT=/hy-tmp/lane-detection-challenge HARDLANE_DATA_ROOT=/hy-tmp/datasets/HardLane/Lane UNLANEDET_ROOT=/hy-tmp/UnLanedet HARDLANE_WEIGHTS_ROOT=/hy-tmp/weights HARDLANE_OUTPUT_ROOT=/hy-tmp/lane-outputs HARDLANE_PYTHON=$PY39 PYTHON_BIN=$PY39 && bash scripts/autodl/setup_unlanedet.sh && $PY39 scripts/autodl/probe_weights.py --no-download --output /hy-tmp/lane-outputs/weight_probe.json" || exit 2
+$SSH "export PATH=/usr/local/cuda/bin:\$PATH; cd /hy-tmp/lane-detection-challenge && export HARDLANE_PROJECT_ROOT=/hy-tmp/lane-detection-challenge HARDLANE_DATA_ROOT=/hy-tmp/datasets/HardLane/Lane UNLANEDET_ROOT=/hy-tmp/UnLanedet HARDLANE_WEIGHTS_ROOT=/hy-tmp/weights HARDLANE_OUTPUT_ROOT=/hy-tmp/lane-outputs HARDLANE_PYTHON=$PY39 PYTHON_BIN=$PY39 && bash scripts/autodl/setup_unlanedet.sh && $PY39 scripts/autodl/probe_weights.py --no-download --output /hy-tmp/lane-outputs/weight_probe.json" || exit 2
 $SSH "ls -la /hy-tmp/weights/adapted_clrnet_r50_hardlane.pth 2>/dev/null || ls /hy-tmp/weights/"
 
 step "7/7 A2 发车（外链守卫自动等待）"
