@@ -30,6 +30,12 @@ split_upload() {
     local src=$1 dst=$2
     local base lmd5=$(md5 -q "$src")
     echo "  split_upload $(basename "$src") ($(du -h "$src" | cut -f1)) md5=$lmd5"
+    # 整文件已在远端且 md5 一致 → 直接跳过（重组后重跑场景）
+    local whole=$($SSH "md5sum $dst 2>/dev/null" | awk '{print $1}')
+    if [ "$whole" = "$lmd5" ]; then
+        echo "  $dst already verified on remote (whole-file skip)"
+        return 0
+    fi
     local staging=/hy-tmp/datasets/_staging
     rm -f /tmp/schunk_*
     split -b 200m "$src" /tmp/schunk_
