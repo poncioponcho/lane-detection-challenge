@@ -25,24 +25,45 @@ $SSH 'if [ ! -x /usr/local/miniconda3/envs/py39/bin/python ]; then /usr/local/mi
 
 step "3/7 数据集上传（tar 文件→md5 双端核对→解包）"
 $SSH "mkdir -p /hy-tmp/datasets/HardLane /hy-tmp/datasets/_staging /hy-tmp/weights /hy-tmp/lane-outputs"
-cd "$REPO/data/raw/dataset/_extract"
-echo "  3a. train_full/Lane 本地打包"
-tar -czf /tmp/train_lane.tar.gz -C train_full Lane
-T_MD5=$(md5 -q /tmp/train_lane.tar.gz); echo "  local md5: $T_MD5"
-echo "  3b. 上传（4.7G，取决于上行带宽）"
-$SCP /tmp/train_lane.tar.gz root@i-1.gpushare.com:/hy-tmp/datasets/_staging/train_lane.tar.gz
-R_MD5=$($SSH "md5sum /hy-tmp/datasets/_staging/train_lane.tar.gz" | awk '{print $1}')
-echo "  remote md5: $R_MD5"
-[ "$T_MD5" = "$R_MD5" ] || { echo "MD5 不一致，中止"; exit 3; }
-echo "  3c. testA JPEGImages 打包上传"
-tar -czf /tmp/testa_jpg.tar.gz -C testA_full/Lane JPEGImages
-$SCP /tmp/testa_jpg.tar.gz root@i-1.gpushare.com:/hy-tmp/datasets/_staging/testa_jpg.tar.gz
-echo "  3d. 实例侧解包合并"
-$SSH 'cd /hy-tmp/datasets/_staging && tar -xzf train_lane.tar.gz -C /hy-tmp/datasets/HardLane/ && tar -xzf testa_jpg.tar.gz -C /hy-tmp/datasets/HardLane/Lane/ && rm -f train_lane.tar.gz testa_jpg.tar.gz && find /hy-tmp/datasets/HardLane/Lane/JPEGImages -name "*.jpg" | wc -l && ls /hy-tmp/datasets/HardLane/Lane'
+# split_upload <local> <remote> — 200m 分块，逐块 md5+重试（抗抖动链路），远端重组后整文件终验
+split_upload() {
+    local src=$1 dst=$2
+    local base lmd5=$(md5 -q "$src")
+    echo "  split_upload $(basename "$src") ($(du -h "$src" | cut -f1)) md5=$lmd5"
+    rm -f /tmp/schunk_*
+    split -b 200m "$src" /tmp/schunk_
+    local c bn l md5r attempt
+    for c in /tmp/schunk_*; do
+        bn=$(basename "$c")
+        for attempt in 1 2 3 4 5 6; do
+            $SCP -q "$c" "root@i-1.gpushare.com:/hy-tmp/datasets/_staging/$bn" && break
+            echo "    chunk $bn attempt $attempt failed; retry in 20s"; sleep 20
+        done
+        l=$(md5 -q "$c"); md5r=$($SSH "md5sum /hy-tmp/datasets/_staging/$bn" | awk '{print $1}')
+        [ "$l" = "$md5r" ] || { echo "    chunk $bn md5 mismatch"; return 1; }
+        echo "    chunk $bn OK"
+    done
+    $SSH "cat /hy-tmp/datasets/_staging/schunk_* > $dst && rm -f /hy-tmp/datasets/_staging/schunk_*"
+    md5r=$($SSH "md5sum $dst" | awk '{print $1}')
+    [ "$lmd5" = "$md5r" ] || { echo "  whole-file md5 mismatch"; return 1; }
+    echo "  split_upload $(basename "$src") DONE"
+    rm -f /tmp/schunk_*
+}
 
-step "4/7 源权重上传（CULane R50，292,961,772B）"
-$SCP "$SRC_CKPT" root@i-1.gpushare.com:/hy-tmp/weights/clrnet_r50_culane_model_best.pth
-$SSH "md5sum /hy-tmp/weights/clrnet_r50_culane_model_best.pth; stat -c%s /hy-tmp/weights/clrnet_r50_culane_model_best.pth"
+cd "$REPO/data/raw/dataset/_extract"
+echo "  3a. train_full/Lane 本地打包（不压缩，JPEG/PNG 零收益）"
+tar -cf /tmp/train_lane.tar -C train_full Lane
+step "3b/7 上传 train（2.1G，分块续传）"
+split_upload /tmp/train_lane.tar /hy-tmp/datasets/_staging/train_lane.tar || { echo "train 上传失败"; exit 3; }
+echo "  3c. testA JPEGImages 打包上传"
+tar -cf /tmp/testa_jpg.tar -C testA_full/Lane JPEGImages
+split_upload /tmp/testa_jpg.tar /hy-tmp/datasets/_staging/testa_jpg.tar || { echo "testA 上传失败"; exit 3; }
+echo "  3d. 实例侧解包合并"
+$SSH 'cd /hy-tmp/datasets/_staging && tar -xf train_lane.tar -C /hy-tmp/datasets/HardLane/ && tar -xf testa_jpg.tar -C /hy-tmp/datasets/HardLane/Lane/ && rm -f train_lane.tar testa_jpg.tar && find /hy-tmp/datasets/HardLane/Lane/JPEGImages -name "*.jpg" | wc -l && ls /hy-tmp/datasets/HardLane/Lane'
+
+step "4/7 源权重上传（CULane R50，292,961,772B，分块）"
+split_upload "$SRC_CKPT" /hy-tmp/weights/clrnet_r50_culane_model_best.pth || exit 3
+$SSH "stat -c%s /hy-tmp/weights/clrnet_r50_culane_model_best.pth"
 echo "  local sha256: $LOCAL_SHA bytes: $LOCAL_BYTES"
 
 step "5/7 repo bundle + manifests"
