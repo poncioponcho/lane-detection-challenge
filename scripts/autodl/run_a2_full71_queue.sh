@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# §37 A2: full-71 production-recipe 36ep queue — seeds 101/202/303.
+# §37 A2: full-71 production-recipe 36ep queue — seeds 42/101/202/303.
 #
-# seed42 already exists from the T1 chain (all71_seed42_clrnet_r50_36ep);
-# this launcher adds the three missing seeds so the A2 pool is
-# {42,101,202,303} x 36ep on the full 71-clip manifest.
+# ALL FOUR seeds retrain here: the 09-09 instance expiry destroyed the T1
+# all71 weights (only their testA/val predictions survive locally).  Names
+# follow the T1 convention all71_seed<NN>_clrnet_r50_36ep so downstream
+# inventory/selection globs stay uniform.
 #
 # Recovery contract (instance was down 09-09 22:4x .. TBD):
 #   1. wait until NO codex-chain processes remain (lvo_video_runner /
@@ -69,12 +70,11 @@ for path in "$ALL71_MANIFEST" "$PROJECT_ROOT/scripts/autodl/run_training.py" \
     [ -e "$path" ] || { write_status aborted_prereq; log "missing: $path"; exit 4; }
 done
 
-# --- 3. three runs -----------------------------------------------------------
+# --- 3. four runs (≈9h total on the 3090 at ~0.44s/it) ----------------------
 write_status running
 run_one() {
-    seed=$1
-    name="a2_full71_seed${seed}_clrnet_r50_36ep"
-    log "start $name"
+    name=$1; seed=$2
+    log "start $name seed=$seed"
     if "$PYTHON_BIN" "$PROJECT_ROOT/scripts/autodl/run_training.py" \
         --model clrnet_r50 --run-name "$name" --epochs 36 \
         --seed "$seed" --max-to-keep 6 \
@@ -89,9 +89,10 @@ run_one() {
         printf '%s:failed:%s\n' "$name" "$code" >> "$RUNS"
     fi
 }
-run_one 101
-run_one 202
-run_one 303
+run_one all71_seed42_clrnet_r50_36ep 42
+run_one all71_seed101_clrnet_r50_36ep 101
+run_one all71_seed202_clrnet_r50_36ep 202
+run_one all71_seed303_clrnet_r50_36ep 303
 
 # --- 4. inventory for the B-package selection -------------------------------
 if grep -q failed "$RUNS" 2>/dev/null; then
@@ -101,9 +102,9 @@ else
 fi
 log "=== A2 pool inventory (B-package candidates) ==="
 for d in "$OUTPUT_ROOT/runs"/all71_seed42_clrnet_r50_36ep \
-         "$OUTPUT_ROOT/runs"/a2_full71_seed101_clrnet_r50_36ep \
-         "$OUTPUT_ROOT/runs"/a2_full71_seed202_clrnet_r50_36ep \
-         "$OUTPUT_ROOT/runs"/a2_full71_seed303_clrnet_r50_36ep; do
+         "$OUTPUT_ROOT/runs"/all71_seed101_clrnet_r50_36ep \
+         "$OUTPUT_ROOT/runs"/all71_seed202_clrnet_r50_36ep \
+         "$OUTPUT_ROOT/runs"/all71_seed303_clrnet_r50_36ep; do
     if [ -e "$d/last_checkpoint" ]; then
         log "READY  $d  ckpt=$(cat "$d/last_checkpoint")"
     else
