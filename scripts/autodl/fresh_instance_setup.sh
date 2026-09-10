@@ -62,4 +62,4 @@ $SSH "ls -la /hy-tmp/weights/adapted_clrnet_r50_hardlane.pth 2>/dev/null || ls /
 step "7/7 A2 发车（外链守卫自动等待）"
 $SCP "$REPO/scripts/autodl/run_a2_full71_queue.sh" root@i-1.gpushare.com:/hy-tmp/lane-outputs/run_a2_full71_queue.sh
 $SSH "chmod +x /hy-tmp/lane-outputs/run_a2_full71_queue.sh && cd /hy-tmp/lane-outputs && nohup bash run_a2_full71_queue.sh > a2_full71_queue.nohup.log 2>&1 & sleep 6; cat a2_full71_queue.status; pgrep -fc run_a2_full71_queue"
-echo "== 完成。A2 3×36ep ≈7h；监控: tail -f /hy-tmp/lane-outputs/a2_full71_queue.log =="
+echo "== 完成。A2 4×36ep ≈9h；监控: tail -f /hy-tmp/lane-outputs/a2_full71_queue.log =="
