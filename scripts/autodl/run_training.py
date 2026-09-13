@@ -28,6 +28,9 @@ from validate_run import (
 ITERATIONS_PER_EPOCH = 525
 CONFIGS = {
     "clrnet_r50": "clrnet_r50_hardlane.py",
+    # Native-resolution variant (1366x540 over cut_height=180, isotropic 1:1).
+    # Added 2026-09-13 for the recall-side night run; see the config docstring.
+    "clrnet_r50_hires": "clrnet_r50_hardlane_hires.py",
     "clrnet_r50_vat": "clrnet_r50_hardlane_vat.py",
     "clrernet_r50": "clrernet_r50_hardlane.py",
     "adnet_r34": "adnet_r34_hardlane.py",
