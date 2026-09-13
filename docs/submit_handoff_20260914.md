@@ -9,14 +9,17 @@
 
 | 顺序 | 包（绝对路径，直接粘到文件选择框） | 备注文案（≤50 字符，直接复制） | 线数 |
 |---|---|---|---|
-| **1** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k2_trim0.zip` | `54ep + consensus-avg union k2 trim0` | 2882 |
-| **2** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_hires_c35_trim0.zip` | `hires 1366x540 conf0.35 trim0` | 2673 |
-| **3** | 见下方自适应 | 见下方 | — |
+**三发可以直接连着交，不用等彼此出分**（都是独立候选，取 max）：
 
-**第 3 发自适应**（等前两发出分后定）：
-- 第 1 发 > 0.73574 → 告诉我，我**现造一包**「共识并集 + hi-res 支撑加固版」再给你（约 10 分钟）；来不及就交 `/…/outputs/submit_testA_consensus_k3_trim0.zip`，备注 `54ep + consensus union k3 trim0`（2839 线）
-- 第 1 发 < 0.73574 且第 2 发 > 0.73574 → 交 `/…/outputs/submit_testA_hires_c40_trim0.zip`，备注 `hires 1366x540 conf0.40 trim0`（2593 线）
-- 两发都 < 0.73574 → 第 3 发**留空**，不浪费；B 榜主注退回 54ep+trim0
+| 顺序 | 包（绝对路径，直接粘到文件选择框） | 备注文案（≤50 字符，直接复制） | 线数 |
+|---|---|---|---|
+| **1** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k2_trim0.zip` | `54ep + consensus-avg union k2 trim0` | 2882 |
+| **2** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k3_trim0.zip` | `54ep + consensus-avg union k3 trim0` | 2831 |
+| **3** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_hires_c35_trim0.zip` | `hires 1366x540 conf0.35 trim0` | 2673 |
+
+**为什么发 1 和发 2 是同一构造的两档**：本地只测得到"2 棵支撑树全同意"（真线率 0.5688）。testA 上用了 10 棵树，**"≥2/10"比"2/2"弱**，真线率会往下掉；**"≥3/10"更严**，真线率往上但条数变少（218 → 167）。两档谁更优取决于下降幅度，**离线判不了 → 两档都交，实测取 max**。
+
+（若三发都已交完且发 1 明显赢，可告诉我，我现造「共识 + hi-res 支撑加固版」备用，供 9/16 B 榜用。）
 
 ## 每发在测什么（出分后怎么读）
 
