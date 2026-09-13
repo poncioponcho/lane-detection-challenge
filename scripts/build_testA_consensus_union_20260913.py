@@ -66,6 +66,40 @@ def iou(a, b) -> float:
     return int(np.logical_and(ma, mb).sum()) / union
 
 
+def x_at(lane, y: float) -> float:
+    pts = sorted(lane, key=lambda p: p[1])
+    if y <= pts[0][1]:
+        return pts[0][0]
+    if y >= pts[-1][1]:
+        return pts[-1][0]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if y0 <= y <= y1:
+            if y1 == y0:
+                return x0
+            return x0 + (x1 - x0) * (y - y0) / (y1 - y0)
+    return pts[-1][0]
+
+
+def mean_lane(lanes: list, samples: int = 20) -> list | None:
+    """Pointwise mean of agreeing lanes over their common y range.
+
+    `exp_consensus_avg_20260913.py` measured this on the honest 63-clip OOF:
+    taking one representative gives a 0.5507 marginal true-rate, averaging the
+    agreeing lanes gives 0.5688 (+0.234pp vs +0.210pp). The gain is small but
+    consistent, and it should grow with more diverse support trees because the
+    per-tree lateral errors are less correlated.
+    """
+    lo = max(min(p[1] for p in lane) for lane in lanes)
+    hi = min(max(p[1] for p in lane) for lane in lanes)
+    if hi - lo < 10.0:
+        return None
+    out = []
+    for k in range(samples):
+        y = lo + (hi - lo) * k / (samples - 1)
+        out.append((sum(x_at(lane, y) for lane in lanes) / len(lanes), y))
+    return out
+
+
 def read_lanes(path: Path) -> list:
     if not path.is_file():
         return []
@@ -96,6 +130,9 @@ def main() -> None:
     ap.add_argument("--min-support", type=int, default=2,
                     help="how many OTHER support trees must confirm a novel lane")
     ap.add_argument("--trim-margin", type=float, default=0.0)
+    ap.add_argument("--average", action="store_true",
+                    help="add the pointwise mean of all agreeing support lanes "
+                         "instead of the first tree's geometry")
     args = ap.parse_args()
 
     base_root = args.base.resolve()
@@ -129,19 +166,25 @@ def main() -> None:
         kept = list(base_lanes)
         for ti, novel in enumerate(novel_by_tree):
             for cand in novel:
-                # count the OTHER trees that also propose this lane
-                support = 1  # itself
+                # collect the OTHER trees that also propose this lane
+                agreeing = [cand]
                 for tj, other in enumerate(novel_by_tree):
                     if tj == ti:
                         continue
-                    if any(iou(cand, o) > IOU_THRESHOLD for o in other):
-                        support += 1
-                if support < args.min_support:
+                    hit = next((o for o in other if iou(cand, o) > IOU_THRESHOLD), None)
+                    if hit is not None:
+                        agreeing.append(hit)
+                if len(agreeing) < args.min_support:
                     continue
+                lane = cand
+                if args.average:
+                    lane = mean_lane(agreeing)
+                    if lane is None:
+                        lane = cand
                 # already added from an earlier tree?
-                if any(iou(cand, k) > IOU_THRESHOLD for k in kept[len(base_lanes):]):
+                if any(iou(lane, k) > IOU_THRESHOLD for k in kept[len(base_lanes):]):
                     continue
-                kept.append(cand)
+                kept.append(lane)
                 added_total += 1
         per_image.append(len(kept) - len(base_lanes))
 
