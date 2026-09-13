@@ -41,15 +41,25 @@ def x_at(lane, y: float) -> float:
     return pts[-1][0]
 
 
-def matches_base(lane, base_lanes, keep_dist: float) -> bool:
+def matches_base(lane, base_lanes, keep_dist: float,
+                 min_overlap: float = 5.0) -> bool:
+    """Does `lane` correspond to one of the incumbent's lanes?
+
+    `min_overlap` must stay small. The incumbent tree is untrimmed (lanes run to
+    y=719) while the union tree has already been trimmed, and the base tree does
+    contain very short lanes (a 694->719 lane trims to 694->713, a 19px common
+    range). With the earlier 20px guard those lanes failed to match, were
+    reclassified as "added", and were then dropped by the span filter -- the
+    audit caught 5 incumbent lanes silently disappearing from the main shot.
+    """
     lo, hi = min(p[1] for p in lane), max(p[1] for p in lane)
     for b in base_lanes:
         blo, bhi = min(p[1] for p in b), max(p[1] for p in b)
         o, u = max(lo, blo), min(hi, bhi)
-        if u - o < 20:
+        if u - o < min_overlap:
             continue
         xs = [abs(x_at(lane, o + (u - o) * i / 8) - x_at(b, o + (u - o) * i / 8))
-              for i in range(9)]
+              for i in range(9)] if u > o else [abs(x_at(lane, o) - x_at(b, o))]
         if statistics.median(xs) < keep_dist:
             return True
     return False
