@@ -13,13 +13,20 @@
 
 | 顺序 | 包（绝对路径，直接粘到文件选择框） | 备注文案（≤50 字符，直接复制） | 线数 |
 |---|---|---|---|
-| **1** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k2_trim0.zip` | `54ep + consensus-avg union k2 trim0` | 2882 |
-| **2** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k3_trim0.zip` | `54ep + consensus-avg union k3 trim0` | 2831 |
-| **3** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_hires_c35_trim0.zip` | `hires 1366x540 conf0.35 trim0` | 2673 |
+| **1** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k2_f80_trim0.zip` | `54ep + consensus-avg k2 span80 trim0` | 2822 |
+| **2** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_hires_c35_trim0.zip` | `hires 1366x540 conf0.35 trim0` | 2673 |
+| **3** | `/Users/seyonmacbook/WorkBuddy/恶劣场景下的车道线检测挑战赛/outputs/submit_testA_consensus_avg_k2_trim0.zip` | `54ep + consensus-avg k2 trim0 (no filter)` | 2882 |
 
-**为什么发 1 和发 2 是同一构造的两档**：本地只测得到"2 棵支撑树全同意"（真线率 0.5688）。testA 上用了 10 棵树，**"≥2/10"比"2/2"弱**，真线率会往下掉；**"≥3/10"更严**，真线率往上但条数变少（218 → 167）。两档谁更优取决于下降幅度，**离线判不了 → 两档都交，实测取 max**。
+**三发分别在测什么（这是设计，不是随便选的）**
 
-（若三发都已交完且发 1 明显赢，可告诉我，我现造「共识 + hi-res 支撑加固版」备用，供 9/16 B 榜用。）
+- **发 1（主注）** = 共识并集 + 几何平均 + 短残线过滤。本地每一层都验过：
+  - 共识门控：真线率 0.3956/0.3741（单支撑）→ **0.5688**（两支撑），盈亏线 0.3921；
+  - 几何平均：0.5507 → 0.5688；
+  - 短残线过滤：并集新增的 204 条里 **29.4% 的纵向跨度 < 80px**（基线只有 2.5%），span 中位 110 vs 基线 155 —— 残线对长 GT 的 IoU 天然过不了 0.5，按 F1/2 规则（被删集合中 ≥63.2% 是伪线才该删）滤掉 60 条。
+- **发 2** = 新配方（1366×540 原生分辨率，横向 1.71x）。选 conf 0.35 是因为它给出 2673 线，与 54ep@0.50 的 2664 线几乎精确对齐 —— 病根是召回，必须对齐预算才只隔离"分辨率"这一个变量。
+- **发 3** = 发 1 的**对照**（同一构造，只去掉短残线过滤）。用来验证"过滤"这一层到底有没有正贡献 —— 本项目"本地正增益 → testA 全败"已经发生 4 次，一条没上过榜的后处理规则不该直接带进 B 榜。
+
+**判读线统一 0.73574。** 另外 `k3` 两档（`submit_testA_consensus_avg_k3_trim0.zip` 2831 线 / `submit_testA_consensus_avg_k3_f80_trim0.zip` 2784 线）已备好，是"门槛 ≥3/10"的更严版本 —— 发 1 若赢面很大，它可能更优，可留 B 榜用。
 
 ## 每发在测什么（出分后怎么读）
 
