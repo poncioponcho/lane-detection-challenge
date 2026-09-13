@@ -13,7 +13,15 @@ from pathlib import Path, PurePath
 
 EXPECTED_VAL_IMAGES = 800
 EXPECTED_VAL_LANES = 2655
-KNOWN_MODELS = {"clrnet_r50", "clrnet_r50_vat", "clrernet_r50", "adnet_r34"}
+KNOWN_MODELS = {
+    "clrnet_r50",
+    # 1366x540 over cut_height=180: same topology as clrnet_r50, native
+    # resolution. Registered 2026-09-13 alongside run_training.CONFIGS.
+    "clrnet_r50_hires",
+    "clrnet_r50_vat",
+    "clrernet_r50",
+    "adnet_r34",
+}
 
 
 def sha256_file(path: Path) -> str:
