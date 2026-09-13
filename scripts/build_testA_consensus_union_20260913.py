@@ -133,13 +133,22 @@ def main() -> None:
     ap.add_argument("--average", action="store_true",
                     help="add the pointwise mean of all agreeing support lanes "
                          "instead of the first tree's geometry")
+    ap.add_argument("--supports-json", type=Path, default=None,
+                    help="JSON list of {name, path} support trees; defaults to "
+                         "the frozen testA list. B board must pass its own, "
+                         "since the run-dirs differ.")
     args = ap.parse_args()
 
     base_root = args.base.resolve()
     dst = args.dst.resolve()
     if dst.exists():
         raise SystemExit(f"destination exists: {dst}")
-    supports = [(n, (PROJECT_ROOT / p).resolve()) for n, p in SUPPORTS]
+    if args.supports_json is not None:
+        spec = json.loads(args.supports_json.read_text(encoding="utf-8"))
+        pairs = [(entry["name"], Path(entry["path"]).resolve()) for entry in spec]
+    else:
+        pairs = [(n, (PROJECT_ROOT / p).resolve()) for n, p in SUPPORTS]
+    supports = pairs
     missing = [n for n, p in supports if not p.is_dir()]
     if missing:
         raise SystemExit(f"missing support trees: {missing}")
