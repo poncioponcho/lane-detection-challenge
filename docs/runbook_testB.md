@@ -34,7 +34,22 @@ ssh -p <PORT> root@<HOST> "cd /hy-tmp/lane-detection-challenge && \
   git fetch /hy-tmp/bundles/hl.bundle HEAD && git merge --ff-only FETCH_HEAD && git rev-parse HEAD"
 ```
 
-## 2. 拿到 testB 数据后，第一件事：建 manifest
+## 2. testB 数据：先确认它在实例上（2026-09-15 实测：现在不在）
+
+**🔴 实例 `/hy-tmp/datasets/HardLane/Lane/JPEGImages` 目前只有 97 项 = 71 训练 clip + 9 个 testA clip + 17 个 `_hflip` 增强目录。testB 的 10 个 clip 尚未上传。** 开榜第一步不是建 manifest，是把图弄上去。
+
+```bash
+# 0) 核对 testB 是否已到位（到位应出现 10 个新 clip，JPEGImages 总数 > 97）
+ssh -p <PORT> root@<HOST> "ls /hy-tmp/datasets/HardLane/Lane/JPEGImages | wc -l; \
+  ls /hy-tmp/datasets/HardLane/Lane/JPEGImages | grep -v _hflip | wc -l"
+```
+
+取数路径（**必须由用户手动下载**——本执行环境的浏览器自动化已证实不可靠，
+见 MEMORY §2）：用户在赛事平台下载 testB → 本地 `scp -P <PORT> testB.zip root@<HOST>:/hy-tmp/` →
+实例 `unzip` 到 `/hy-tmp/datasets/HardLane/Lane/JPEGImages/`，保持
+`JPEGImages/<clip_id>/<frame>.jpg` 的层级。
+
+## 2b. 拿到 testB 数据后，第一件事：建 manifest
 
 ```bash
 # 实例上（或本地，manifest 只依赖 JPEGImages 目录）
