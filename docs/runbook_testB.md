@@ -114,7 +114,8 @@ cat > /hy-tmp/testB_supports.json <<'JSON'
  {"name": "seed42_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed42/testB/predictions"},
  {"name": "seed43_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed43/testB/predictions"},
  {"name": "seed44_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed44/testB/predictions"},
- {"name": "clrernet_15ep","path": "/hy-tmp/lane-outputs/testB_clrernet15/testB/predictions"}
+ {"name": "clrernet_15ep","path": "/hy-tmp/lane-outputs/testB_clrernet15/testB/predictions"},
+ {"name": "cut400_36ep",  "path": "/hy-tmp/lane-outputs/testB_cut400/testB/predictions"}
 ]
 JSON
 
@@ -150,8 +151,13 @@ python src/eval/official_oracle/check_submission.py \
 | 2 | **t05 36ep**（63 段血统）+ trim | 唯一异质数据血统，实测 0.73444（次优） |
 | 3 | **CLRerNet 36ep** + trim | 唯一异质检测头，实测 0.72994 |
 | 4 | **共识并集，门槛 = 同意率 50~60%（10 棵 → ≥5~6 票）** + span80 过滤 + trim | `docs/consensus_gate_calibration_20260914.md`：同意率 20%→真线率 0.0055、40%→0.0506、60%→0.342、80%→0.431、100%→0.581（盈亏线 0.3921）。**testA 实测 20% 那发的目标是 0.3414 < 0.3675**。50~60% 是插值出的过线区 |
-| 5 | 共识并集 ≥7~8/10 + trim（沿 4 的方向再走一格） | 若第 4 注向上则加码；否则改交 seed202/303 |
+| 5 | **cut400 新配方 conf0.35 + trim + span80**（`clrnet_r50_cut400`，2026-09-14 训完） | 唯一"裁剪面匹配目标域地平线"的配方（val best 0.89351 vs 36ep 基线 ≈0.8817）；testA 上 conf0.35 给 2690 线，与基线 2664 几乎对齐 |
 | 6 | 自适应：视前 5 注 | 取 max |
+
+**§4.5 预测几何剖面自检（B 榜当天必做，不花额度）**：把 testB 的 base 预测与已知基线剖面对比 ——
+基线 testA 剖面为 `线数 2664 / 空图 9 / top p5-p50-p95 = 549-564-624 / span = 95-155-170 / bottom=719 占 95.8%`。
+若某模型的 top 中位数偏离 564 很多（例如 <450），说明它学到的是 train 型几何 → **§4 的 trim 判据要按它的分布重算**，不能照搬。
+（2026-09-14 实测：cut400 的 top 中位数仍是 564，**"裁剪面框住地平线"这个假设不成立** —— 模型是从图像内容自己找地平线的。分辨率/cut_height 轴到此可以正式关掉。）
 
 **门槛按"同意率"设，不是按"票数"设**。tick 分布是**双峰**的（本地 5 棵支撑：1 票 69679 / 2 票 15501 / 3 票 769 / 4 票 320 / 5 票 136），加支撑树的**数量**只会让"≥k 票"更松。
 
