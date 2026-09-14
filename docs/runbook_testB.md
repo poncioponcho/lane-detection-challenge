@@ -153,7 +153,6 @@ python scripts/build_testA_consensus_union_20260913.py \
   --base /hy-tmp/lane-outputs/testB_base54/testB/predictions \
   --dst  /hy-tmp/testB_consensus_g4 \
   --min-support 4 --average --supports-json /hy-tmp/testB_supports.json
-# 只滤"新增的"短残线（--base 必给，否则会砍掉 base 自带的短线）
 python scripts/filter_short_lanes.py \
   --src /hy-tmp/testB_consensus_g4 \
   --base /hy-tmp/lane-outputs/testB_base54/testB/predictions \
@@ -178,6 +177,21 @@ python src/eval/official_oracle/check_submission.py \
 （2730 → 2594，比 incumbent 的 2664 还少 70 条）。
 脚本现已加硬守卫：`base_missing > 0` 或 `base_kept == 0` 都会 **拒绝运行**并提示去查多出的目录层级。
 B 榜跑完过滤后**务必看一眼 `base_kept` 是否 ≈ base 的线数**，不是就直接停手。
+
+**门槛标定（2026-09-15 实测，testA）**：
+
+| 配置 | 新增条数 | 受益图数 |
+|---|---|---|
+| 10 树，`--min-support 6`（60%） | **66** | 63 |
+| 7 树，`--min-support 4`（57%） | 65 | 60 |
+| 7 树，`--min-support 5`（71%） | 33 | 33 |
+
+→ 三种配置量级一致（±0.15pp 内），**B 榜用 7 树 + `--min-support 4`** 即可；
+想更严就 5（条数减半，约 −0.07pp 的期望差）。**不要再降到 2/3**（≤43% 同意，实测为负）。
+
+⚠️ 本地 `outputs/testA_support_trees/clrernet_36ep` **只有 158/900 个文件（残缺）**，
+上表的 7 树结果是在它残缺的情况下跑的。**别拿本地这棵树当基线或做几何统计**；
+实例上 `all71_seed42_clrernet_r50_36ep` 是完整的（A 榜 0.72994 那发就是它）。
 
 **参考值（testA gate6 实测）**：`base_kept=2669 added_kept=48 added_dropped=13`
 → 过滤后 2717 线 → 打包 2717 线。gate6 = 10 棵支撑树 + `--min-support 6`（60% 同意）。
