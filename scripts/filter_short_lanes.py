@@ -84,9 +84,12 @@ def main() -> None:
     if dst.exists():
         shutil.rmtree(dst)
     kept = dropped = base_kept = files = 0
+    base_missing = 0
     for f in sorted(src.rglob("*.lines.txt")):
         rel = f.relative_to(src)
         bfile = base / rel
+        if not bfile.is_file():
+            base_missing += 1
         base_lanes = [parse_line(t) for t in bfile.read_text(encoding="utf-8").splitlines()
                       if t.strip()] if bfile.is_file() else []
         out = dst / rel
@@ -108,6 +111,23 @@ def main() -> None:
                 dropped += 1
         out.write_text(("\n".join(rows) + "\n") if rows else "", encoding="utf-8")
         files += 1
+    # Fail loudly instead of silently downgrading to "every lane is added".
+    # When --base does not line up with --src (a very easy mistake: the raw
+    # trees under outputs/ carry an extra `testA/predictions/` level while the
+    # built consensus trees do not) every lane becomes "added", and the span
+    # filter then deletes the incumbent's own short lanes. That cost 136 lanes
+    # on the 2026-09-15 gate6 build before this guard existed.
+    if base_missing:
+        raise SystemExit(
+            f"--base {base} has no prediction for {base_missing}/{files} images; "
+            "rel paths must match --src exactly (check for an extra "
+            "'testA/predictions' level). Refusing to run."
+        )
+    if base_kept == 0 and (kept or dropped):
+        raise SystemExit(
+            f"no lane matched --base {base} at all (keep_dist={args.keep_dist}); "
+            "the base tree is almost certainly wrong. Refusing to run."
+        )
     print(f"{src.name} -> {dst.name}: files={files} base_kept={base_kept} "
           f"added_kept={kept} added_dropped={dropped} (min_span={args.min_span})")
 

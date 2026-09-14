@@ -58,25 +58,30 @@ export HARDLANE_OUTPUT_ROOT=/hy-tmp/lane-outputs
 export HARDLANE_PYTHON=/usr/local/miniconda3/envs/py39/bin/python
 cd "$HARDLANE_PROJECT_ROOT"
 # 每棵树的 run-dir + 输出名 + conf（testA 实测选点，testB 先照搬）
+# ⚠️ 2026-09-15 校正：下面这份名单才是实例上真实存在的 run-dir。
+#    旧版写的 seed43 / seed44 / clrernet_15ep 在实例上**没有** run-dir，照抄会直接失败。
+#    可用的独立支撑树 = 7 棵（hires / cut400 / 36ep_s42 / s101 / s202 / s303 / clrernet36）。
 while read -r run conf tag; do
   "$HARDLANE_PYTHON" scripts/autodl/infer_testA.py \
     --run-dir "/hy-tmp/lane-outputs/runs/$run" --split testB --conf-threshold "$conf" \
     --output-dir "/hy-tmp/lane-outputs/testB_$tag" --skip-if-complete
 done <<'LIST'
 all71_seed42_clrnet_r50_54ep            0.50 base54
-all71_seed42_clrnet_r50_hires_36ep      0.35 hires
 all71_seed42_clrnet_r50_36ep            0.50 seed42
-all71_seed43_clrnet_r50_36ep            0.50 seed43
-all71_seed44_clrnet_r50_36ep            0.50 seed44
-all71_seed42_clrnet_r50_36ep            0.55 seed101
-all71_seed42_clrnet_r50_36ep            0.55 seed202
-all71_seed42_clrnet_r50_36ep            0.55 seed303
-clrernet_r50_36ep                       0.50 clrernet36
+all71_seed101_clrnet_r50_36ep           0.50 seed101
+all71_seed202_clrnet_r50_36ep           0.50 seed202
+all71_seed303_clrnet_r50_36ep           0.50 seed303
+all71_seed42_clrernet_r50_36ep          0.50 clrernet36
+all71_seed42_clrnet_r50_cut400_36ep     0.35 cut400
+all71_seed42_clrnet_r50_hires_36ep      0.40 hires
+swa4_54ep_stage                         0.50 swa4
 LIST
-# t05 血统（63 段）与 clrernet_15ep 若在实例上，同样加进来
-EOS
 ```
-⚠️ 上面 seed101/202/303 的 run-dir 需按实例实际情况填（本地 `outputs/testA_support_trees/` 里有它们的 testA 产物可反查来源）。
+
+- `swa4_54ep_stage` 是**派生**自 base 的（同轨迹平均），**不要**把它算进共识的"独立票"
+  —— 否则同意率是虚高的。它只作为第 2 注的独立候选模型用。
+- 因此**独立支撑树 n = 7**。门槛按同意率定：50% → ≥4/7；60% → ≥5/7（`--min-support` 传 4 或 5）。
+- t05（63 段血统，A 榜 0.73444）的 run-dir 在实例上未定位到 → **不进名单**，别临时去猜路径。
 
 ## 4. trim 决策（**无需 GT，纯几何**）
 
@@ -119,29 +124,25 @@ spread 25.81pp 和 0.00pp 的 clip 上。`f<450` 是唯一能把"spread 必为 0
 ```bash
 cat > /hy-tmp/testB_supports.json <<'JSON'
 [
- {"name": "hires",        "path": "/hy-tmp/lane-outputs/testB_hires/testB/predictions"},
- {"name": "t05_36ep",     "path": "/hy-tmp/lane-outputs/testB_t05/testB/predictions"},
- {"name": "clrernet_36ep","path": "/hy-tmp/lane-outputs/testB_clrernet36/testB/predictions"},
+ {"name": "seed42_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed42/testB/predictions"},
+ {"name": "seed101_36ep", "path": "/hy-tmp/lane-outputs/testB_seed101/testB/predictions"},
  {"name": "seed202_36ep", "path": "/hy-tmp/lane-outputs/testB_seed202/testB/predictions"},
  {"name": "seed303_36ep", "path": "/hy-tmp/lane-outputs/testB_seed303/testB/predictions"},
- {"name": "seed101_36ep", "path": "/hy-tmp/lane-outputs/testB_seed101/testB/predictions"},
- {"name": "seed42_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed42/testB/predictions"},
- {"name": "seed43_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed43/testB/predictions"},
- {"name": "seed44_36ep",  "path": "/hy-tmp/lane-outputs/testB_seed44/testB/predictions"},
- {"name": "clrernet_15ep","path": "/hy-tmp/lane-outputs/testB_clrernet15/testB/predictions"},
- {"name": "cut400_36ep",  "path": "/hy-tmp/lane-outputs/testB_cut400/testB/predictions"}
+ {"name": "clrernet_36ep","path": "/hy-tmp/lane-outputs/testB_clrernet36/testB/predictions"},
+ {"name": "cut400_36ep",  "path": "/hy-tmp/lane-outputs/testB_cut400/testB/predictions"},
+ {"name": "hires_36ep",   "path": "/hy-tmp/lane-outputs/testB_hires/testB/predictions"}
 ]
 JSON
 
 python scripts/build_testA_consensus_union_20260913.py \
   --base /hy-tmp/lane-outputs/testB_base54/testB/predictions \
-  --dst  /hy-tmp/testB_consensus_avg_k2 \
-  --min-support 2 --average --supports-json /hy-tmp/testB_supports.json
+  --dst  /hy-tmp/testB_consensus_g4 \
+  --min-support 4 --average --supports-json /hy-tmp/testB_supports.json
 # 只滤"新增的"短残线（--base 必给，否则会砍掉 base 自带的短线）
 python scripts/filter_short_lanes.py \
-  --src /hy-tmp/testB_consensus_avg_k2 \
+  --src /hy-tmp/testB_consensus_g4 \
   --base /hy-tmp/lane-outputs/testB_base54/testB/predictions \
-  --dst /hy-tmp/testB_consensus_avg_k2_f80 --min-span 80
+  --dst /hy-tmp/testB_consensus_g4_f80 --min-span 80
 # canonicalize + pack + verify + 官方预检
 python src/submit/prepare_submit.py \
   --raw-pred-dir /hy-tmp/testB_consensus_avg_k2_f80 --canonical-dir /tmp/canonB \
@@ -154,6 +155,17 @@ python src/eval/official_oracle/check_submission.py \
 （`/tmp/testB_list.txt` 由 manifest 生成：`'/'+image_path` 每行一条。）
 支撑树缺失时脚本会直接报 `missing support trees: [...]` 并退出，不会静默跑错。
 `--supports-json` 通路已于 2026-09-13 实测（传不存在的路径会正确报缺失）。
+
+**🔴 `--base` 路径必须与 `--src` 的 rel 结构逐层对齐**（2026-09-15 真事故）：
+把 `outputs/testA_54ep_raw`（多一层 `testA/predictions/`）传给
+`filter_short_lanes.py --base` 时，`base / rel` 全部落空 → 打印 `base_kept=0`，
+于是**每一条线都被当成"新增"**，短残线过滤把 incumbent 自己的 136 条线也删了
+（2730 → 2594，比 incumbent 的 2664 还少 70 条）。
+脚本现已加硬守卫：`base_missing > 0` 或 `base_kept == 0` 都会 **拒绝运行**并提示去查多出的目录层级。
+B 榜跑完过滤后**务必看一眼 `base_kept` 是否 ≈ base 的线数**，不是就直接停手。
+
+**参考值（testA gate6 实测）**：`base_kept=2669 added_kept=48 added_dropped=13`
+→ 过滤后 2717 线 → 打包 2717 线。gate6 = 10 棵支撑树 + `--min-support 6`（60% 同意）。
 
 ## 6. 六注怎么排（v2，2026-09-15 夜班重写）
 
