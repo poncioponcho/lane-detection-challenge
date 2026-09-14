@@ -114,4 +114,10 @@
 - **实例上真实可用的独立支撑树只有 7 棵**：36ep_s42、s101、s202、s303、clrernet36、cut400、hires。
   runbook 旧版写的 **seed43/seed44/clrernet_15ep 在实例上没有 run-dir**（照抄会失败）；
   t05 的 run-dir 未定位到 → 不进名单。**swa*/soup* 是 base 的派生模型，不能算独立共识票**（同意率会虚高）。
+- **共识门槛标定（testA 实测）**：10 树 `--min-support 6`(60%) → 66 条/63 图；7 树 k=4(57%) → 65 条/60 图；
+  7 树 k=5(71%) → 33 条/33 图 → **B 榜用 7 树 + k=4**。⚠️ 本地 `outputs/testA_support_trees/clrernet_36ep`
+  **只有 158/900 文件（残缺）**，别拿它当基线/做几何统计（实例上那棵完整）。
+- **9/16 执行 = 两条命令**：实例 `scripts/autodl/run_testB_infer.sh`（核对图在不在 → 建 manifest →
+  base54(0.50/0.55)+7 支撑+swa4 共 10 次推理 → 打印 `f<450` → 打 tgz）；
+  本地 `scripts/build_testB_candidates.sh <tgz>`（定 margin → 建 5 注 → 逐个官方预检 → 打印路径+备注）。
 - **所有新候选都无法离线打分**（testA 无 GT、A 榜已关）→ 排序依据是机制强度 + 方差，不是实测。
