@@ -99,14 +99,18 @@
 ## 8. B 榜作战（2026-09-15 v2，`docs/runbook_testB.md`）
 
 发车前先算 testB 的 `f<450` 定 margin M∈{0,40}。六注：
-1. `54ep model_best conf0.50 + trim(M)`（地板）｜2. **SWA + trim(M)**（见下）｜3. train 型 → margin 对冲注；testA 型 → `conf0.55 + trim0`｜4. 共识 ≥50% 同意 + span80 + trim｜5. `cut400 conf0.35 + trim + span80`｜6. 自适应。
+1. `54ep model_best conf0.50 + trim(M)`（地板）｜2. **`uni_swa4_g6`**（swa4 几何 ∪ gate6 增量；`scripts/build_union_pair_20260915.py`；**严格支配 swa4，不再单发 swa4**）｜3. `cons_gate6`（≥60% 同意，纯增量 52 条）｜4. train 型 → margin 对冲注；testA 型 → `conf0.55 + trim0`｜5. `cut400 conf0.35 + trim + span80`｜6. 自适应。
 - **不交 hires**（−1.54pp）；**不降共识门槛到 ≥2/10**。
 - **⭐ SWA 依据**：54ep 的 val 早越过峰值（iter 24863 → 0.89565；final 31968 → 0.89429），incumbent 用的就是 model_best(24863)。沿**同一轨迹**平均 {24863,29007,…,31967} → 保证同 basin，风险极低；输出 2650–2663 线 ≈ incumbent 原始 2688（对比跨种子 soup 2795–2828，多 5%）。已建 `swa3/swa4/swa7_54ep` 并跑完 testA 推理。
 - **已验证可打包**（全部过 `prepare_submit` + 官方 `check_submission`）：`outputs/submit_testA_night_{conf55,conf60,soupA,soupB,soupC,swa3,swa4,swa7}_m0.zip`。
 - **无 GT 的候选台账**（`scripts/profile_night_candidates_20260915.py`）：conf55 = 保留 2595/删 69/新增 0（**纯删除赌注**，需被删 69 条真线率 <36.75%，估 r≈0.30 → 约 +0.16pp）；conf60 = 删 129（更大赌注，倾向更差）；soupA = 删 39/新增 170；soupB = 删 51/新增 215。
 - **候选形态速查（相对 incumbent 2664 条线，2026-09-15 台账）**：
-  `cons_gate6_v2` = kept 2664 / **dropped 0** / novel **52**（**纯增量，下行风险为零**）；
-  `conf55` = 纯删除 69；`swa4` = 删 29 / 加 27（footprint 最小）；`soupA/B/C` = 删 39~51 / 加 170~215（最大赌注）。
+  `uni_swa4_g6` = kept **2664** / **dropped 0** / novel **69**（⭐ 最优：严格支配 swa4）；
+  `cons_gate6` = kept 2664 / dropped 0 / novel 52（纯增量，下行零）；
+  `conf55` = 纯删除 69；`swa4` = 删 29 / 加 27；`soupA/B/C` = 删 39~51 / 加 170~215（最大赌注，不投）。
+- **⭐ union 优于单发 swa4 的原因**：union 原样保留 A 侧（继承 SWA 的轻微位移 —— 这类收益
+  containment 台账看不见，因为线身份没变只是位置变了），B 侧叠加增量；因 gate6 含全部 incumbent 线，
+  swa4 丢的 29 条被自动补回 → dropped=0。**凡"新模型略优于/略异于 incumbent"的情形都可照此合成。**
 - **实例上真实可用的独立支撑树只有 7 棵**：36ep_s42、s101、s202、s303、clrernet36、cut400、hires。
   runbook 旧版写的 **seed43/seed44/clrernet_15ep 在实例上没有 run-dir**（照抄会失败）；
   t05 的 run-dir 未定位到 → 不进名单。**swa*/soup* 是 base 的派生模型，不能算独立共识票**（同意率会虚高）。
