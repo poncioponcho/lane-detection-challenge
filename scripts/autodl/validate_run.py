@@ -18,6 +18,7 @@ KNOWN_MODELS = {
     # 1366x540 over cut_height=180: same topology as clrnet_r50, native
     # resolution. Registered 2026-09-13 alongside run_training.CONFIGS.
     "clrnet_r50_hires",
+    "clrnet_r50_cut400",
     "clrnet_r50_vat",
     "clrernet_r50",
     "adnet_r34",

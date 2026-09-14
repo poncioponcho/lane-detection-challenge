@@ -31,6 +31,9 @@ CONFIGS = {
     # Native-resolution variant (1366x540 over cut_height=180, isotropic 1:1).
     # Added 2026-09-13 for the recall-side night run; see the config docstring.
     "clrnet_r50_hires": "clrnet_r50_hardlane_hires.py",
+    # Road-band variant (cut_height=400 over img_h=320): spends the whole
+    # 320-row budget on the road band instead of reserving it for sky.
+    "clrnet_r50_cut400": "clrnet_r50_hardlane_cut400.py",
     "clrnet_r50_vat": "clrnet_r50_hardlane_vat.py",
     "clrernet_r50": "clrernet_r50_hardlane.py",
     "adnet_r34": "adnet_r34_hardlane.py",
@@ -43,6 +46,7 @@ WEIGHT_BASE_MODEL = {
     # 1366x540 is the same topology at a different input size, so it reuses the
     # baseline adapted checkpoint and its smoke evidence unchanged.
     "clrnet_r50_hires": "clrnet_r50",
+    "clrnet_r50_cut400": "clrnet_r50",
 }
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
