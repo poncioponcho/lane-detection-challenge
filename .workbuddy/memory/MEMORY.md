@@ -127,4 +127,12 @@
   （前两次：09-13「2664 条中 86.6% 被全部 4 模型支持」、「共识删 FP 死」。）
   可读的只有**相对印证率**（对共识派生的线仍属循环论证/上界）：gate6 0.558 > uni 0.406 >
   swa3/4/7 0.25 > **soup 0.18~0.22**（体量还最大）→ "不投 soup"因此升级为有证据支持。
+- **🔴 `build_testB_manifest.py` 严禁 glob 全量 JPEGImages**（2026-09-15 事故，已修）：实例 JPEGImages 含
+  71 训练 clip + 9 testA clip + 17 `_hflip` 目录 → 原 `derive_list` 会产出 **~9700 行"testB"清单**
+  （训练集全被当成 testB）且**不报错**。现行为 = **补集**（减去 train/testA 已知 clip、排除 `_hflip`），
+  且未见 clip 数 ≠ `--expect-clips`（默认 10）就拒绝运行并列出 clip 名。已合成测试（11 未见 → 拒绝并点名；10 → 1000 行；`_hflip` 从不入选）。
+- **bundle 必须带 manifest 回传**：`manifest_testB.jsonl` 在实例上生成，但**本地建包脚本也要读它**；
+  `testB_bundle.tgz` 现含 `data_processed/manifest_testB.jsonl` + `.list.txt`，本地脚本自动安装并校验 ≥1000 行。
+- **span80 只对"共识平均产生的残线桩"有效**，**不要对独立模型自己的短线套用**（cut400 的短线是自己的输出，
+  不是合并伪影）→ shot5 已改为 `cut400 + trim` 纯 recipe。
 - **所有新候选都无法离线打分**（testA 无 GT、A 榜已关）→ 排序依据是机制强度 + 方差 + 相对印证率，不是实测。

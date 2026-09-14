@@ -93,8 +93,22 @@ else:
     print("=> testA-shaped geometry: use TRIM MARGIN 0   (40 would be a no-op)")
 PY
 
-echo "=== [5/5] pack the trees for transfer ==="
-cd $HARDLANE_OUTPUT_ROOT || exit 1
-tar czf /hy-tmp/testB_trees.tgz testB_*/testB/predictions
-ls -la /hy-tmp/testB_trees.tgz
-echo "scp -i ~/.ssh/lane_id -P <PORT> root@<HOST>:/hy-tmp/testB_trees.tgz <local>/outputs/"
+echo "=== [5/5] stage + pack for transfer ==="
+# The LOCAL packaging script (build_testB_candidates.sh) also reads
+# manifest_testB.jsonl, so it must travel with the trees -- otherwise it would
+# silently fall back to a stale/absent manifest. The list file goes too so the
+# official precheck can run locally without rebuilding it.
+STAGE=/hy-tmp/testB_stage
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+cp -r $HARDLANE_OUTPUT_ROOT/testB_* "$STAGE"/ 2>/dev/null
+mkdir -p "$STAGE/data_processed"
+cp data/processed/manifest_testB.jsonl "$STAGE/data_processed/"
+[ -f data/processed/manifest_testB.list.txt ] && \
+  cp data/processed/manifest_testB.list.txt "$STAGE/data_processed/"
+cd "$STAGE" || exit 1
+tar czf /hy-tmp/testB_bundle.tgz .
+ls -la /hy-tmp/testB_bundle.tgz
+echo
+echo "scp -i ~/.ssh/lane_id -P <PORT> root@<HOST>:/hy-tmp/testB_bundle.tgz <local>/"
+echo "then: tar xzf testB_bundle.tgz -C outputs/testB_$(date +%Y%m%d)   # trees"
+echo "      cp outputs/testB_$(date +%Y%m%d)/data_processed/manifest_testB* data/processed/"

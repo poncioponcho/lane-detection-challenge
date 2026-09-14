@@ -60,6 +60,16 @@ python scripts/build_testB_manifest.py \
 # 内置校验：100 帧/clip（10 clip × 100 = 1000 图）、路径安全、重复 id、文件存在
 ```
 
+**🔴 2026-09-15 修掉一个会酿成大错的缺陷**：`derive_list()` 原本 glob **整个** `JPEGImages`，
+而实例上那里有 71 训练 clip + 9 个 testA clip + 17 个 `_hflip` 目录 → 平台若不提供官方列表，
+会产出 **约 9700 行的"testB"清单**（训练集+testA 全被当成 testB），推理跑几小时且**不报错**。
+
+现在的行为：**testB = JPEGImages 减去 train/testA manifest 已知 clip、再排除 `_hflip` 的补集**；
+且未见 clip 数 ≠ `--expect-clips`（默认 10）就**拒绝运行并列出 clip 名**。
+额外旋钮：`--exclude <manifest...>`（默认 train + testA）、`--expect-clips 0`（手工核对后才可放宽）。
+
+**首次真跑时若被拒绝，那是设计行为，不是 bug**——按它打印的实际 clip 名核对即可。
+
 ## 3. 推理：base + 10 棵支撑树（每棵 ≈1.5 min，共 ≈20 min）
 
 ```bash

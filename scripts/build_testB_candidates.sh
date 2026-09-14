@@ -16,23 +16,37 @@ OUT=outputs/testB_${DAY}
 BUILD=$OUT/build
 MANIFEST=data/processed/manifest_testB.jsonl
 
-[ -f "$TREES" ] || { echo "usage: $0 <testB_trees.tgz>"; exit 1; }
-[ -f "$MANIFEST" ] || { echo "missing $MANIFEST -- generate it on the instance"; exit 1; }
+[ -f "$TREES" ] || { echo "usage: $0 <testB_bundle.tgz>"; exit 1; }
 
 mkdir -p "$BUILD"
 tar xzf "$TREES" -C "$OUT"
+# the bundle also carries the manifest + list produced on the instance
+if [ -f "$OUT/data_processed/manifest_testB.jsonl" ]; then
+  cp "$OUT/data_processed/manifest_testB.jsonl" "$MANIFEST"
+  echo "manifest installed from bundle: $MANIFEST"
+fi
+[ -f "$OUT/data_processed/manifest_testB.list.txt" ] && \
+  cp "$OUT/data_processed/manifest_testB.list.txt" "/tmp/testB_list_$DAY.txt"
 ls -d "$OUT"/testB_*
 
 B=$OUT/testB_base54/testB/predictions
 [ -d "$B" ] || { echo "base tree missing at $B"; exit 1; }
+[ -f "$MANIFEST" ] || { echo "missing $MANIFEST -- transfer it with the bundle"; exit 1; }
+NLINES=$(wc -l < "$MANIFEST")
+echo "manifest present: $MANIFEST ($NLINES rows)"
+[ "$NLINES" -ge 1000 ] || echo "!! only $NLINES rows -- expected >=1000 for testB"
 
 echo "=== official pre-check list ==="
-$PY - "$MANIFEST" /tmp/testB_list_$DAY.txt <<'PY'
+if [ -f "/tmp/testB_list_$DAY.txt" ]; then
+  echo "using list from bundle: /tmp/testB_list_$DAY.txt ($(wc -l < /tmp/testB_list_$DAY.txt) rows)"
+else
+  $PY - "$MANIFEST" /tmp/testB_list_$DAY.txt <<'PY'
 import json, sys
 recs = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 open(sys.argv[2], "w").write("".join("/" + r["image_path"] + "\n" for r in recs))
 print("list rows:", len(recs))
 PY
+fi
 
 echo "=== margin decision (f<450, runbook section 4) ==="
 M=$($PY - "$B" <<'PY'
@@ -108,11 +122,14 @@ else
     || echo "  shot4_margin0: PRECHECK FAILED"
 fi
 
-echo "=== shot 5: cut400 conf0.35 + span80 ==="
-$PY scripts/filter_short_lanes.py \
-  --src "$OUT/testB_cut400/testB/predictions" \
-  --base "$B" --dst "$BUILD/cut400_f80" --min-span 80
-pack shot5_cut400 "$BUILD/cut400_f80"
+echo "=== shot 5: cut400 conf0.35 + trim (no span80) ==="
+# Deliberately NO span filter here. The span80 rule was validated on the
+# *consensus-averaged* union, where 29.4% of added lanes were averaging stubs
+# (2026-09-13 audit). cut400 is a standalone model, so its short lanes are its
+# own output, not a merge artefact -- filtering them would be an unmeasured
+# deletion bet layered on top of a recipe that has never been scored. Keep it a
+# pure recipe: identical to what the A-board calibration actually measured.
+pack shot5_cut400 "$OUT/testB_cut400/testB/predictions"
 
 echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
