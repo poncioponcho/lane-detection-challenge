@@ -174,18 +174,31 @@ B 榜跑完过滤后**务必看一眼 `base_kept` 是否 ≈ base 的线数**，
 
 **发车前先跑 §4 的 `f<450` 判据定 margin（M ∈ {0, 40}）。**
 
+**最终台账（2026-09-15，`scripts/profile_night_candidates_20260915.py`，相对 incumbent 2664 条线）**：
+
+| 候选 | 线数 | kept | dropped | novel | 说明 |
+|---|---|---|---|---|---|
+| incumbent | 2664 | — | — | — | 地板 |
+| **uni_swa4_g6** | **2733** | **2664** | **0** | **69** | ⭐ **严格支配 swa4**（几何取 swa4，再叠 gate6 增量） |
+| cons_gate6 | 2717 | 2664 | 0 | 52 | 纯增量，下行零 |
+| swa4 / swa7 / swa3 | 2662 / 2656 / 2649 | 2635 / 2628 / 2629 | 29 / 36 / 35 | 27 / 28 / 20 | SWA 几何（台账看不见"线被轻移"的收益） |
+| conf55 | 2595 | 2595 | 69 | 0 | 纯删除 |
+| soupA / B / C | 2795 / 2828 / 2816 | 2625 / 2613 / 2616 | 39 / 51 / 48 | 170 / 215 / 200 | ⛔ 不投 |
+
 | 注 | 构造 | 依据 | 风险 |
 |---|---|---|---|
 | **1（主注）** | `54ep(model_best) conf0.50 + trim(M)` | 现役配方，地板 | 极低 |
-| **2** | **SWA（swa4_54ep 或 swa7_54ep）+ trim(M)** | ⭐ 见下 §6.1；同 basin，线数 2650–2663 ≈ incumbent 原始 2688 | 低 |
-| **3** | 若 train 型（`f<450>10%`）→ **margin 对冲注**（0 与 40 取另一个）；若 testA 型 → `conf0.55 + trim0` | §4 的不对称性（下界 −0.069pp / 上界 +2.25pp）；conf0.55 是 A 榜从未测过的档位 | 中 |
-| **4** | 共识并集，同意率 **≥50%**（10 棵 → ≥5 票）+ span80 + trim(M) | 标定 +0.28pp；**≥2/10 已实测为负，不要降门槛** | 中 |
-| **5** | `cut400 conf0.35` + trim(M) + span80 | 唯一未上过 A 榜的配方，2690 线≈基线 2664 | 中 |
+| **2** | **`uni_swa4_g6` + trim(M)** | ⭐ 见 §6.2；拥有 swa4 全部几何 + 42 条经 60% 同意率筛选的线 | 低 |
+| **3** | `cons_gate6`（≥60% 同意）+ span80 + trim(M) | 纯增量 52 条，下行零；估 +0.06~+0.15pp | 低 |
+| **4** | 若 train 型 → **margin 对冲注**（0 与 40 取另一个）；若 testA 型 → `conf0.55 + trim0` | §4 不对称（下界 −0.069pp / 上界 +2.25pp）；conf0.55 纯删除 69 条、估 +0.16pp | 中 |
+| **5** | `cut400 conf0.35` + trim(M) + span80 | 唯一未上过 A 榜的配方 | 中 |
 | **6** | 自适应：前 5 注最优者叠一个新变量 | 取 max | — |
 
 **已验证可打包（2026-09-15 全部通过 `prepare_submit` + 官方 `check_submission`）**：
-`outputs/submit_testA_night_{conf55,conf60,soupA,soupB,soupC,swa3,swa4,swa7}_m0.zip`。
+`outputs/submit_testA_night_{conf55,conf60,cons_gate6_v2,dryrun_g6,uni_swa4_g6,soupA,soupB,soupC,swa3,swa4,swa7}_m0.zip`。
 B 榜同构造只需把 `--src` 换成 testB 预测树重跑同一条命令。
+`dryrun_g6` 与 `cons_gate6_v2` 字节级同构（同为 2717 线 / 80235 点），
+证明 **§5 的 `--supports-json` 通路已被实际执行验证过**（不只是文字描述）。
 
 ### 6.1 ⭐ 为什么第 2 注给 SWA（同轨迹权重平均）
 
@@ -197,6 +210,19 @@ B 榜同构造只需把 `--src` 换成 testB 预测树重跑同一条命令。
 沿**同一条轨迹**平均 `{24863, 29007, 29599, 30191, 30783, 31375, 31967}`（脚本 `scripts/autodl/make_soup.py`）
 与跨种子 soup 的关键区别：**保证在同一 basin 内**，崩掉风险极低（跨种子 soup 输出 2795–2828 线，多 5%，方差明显更大）。
 实例上已构建 `swa3_54ep / swa4_54ep / swa7_54ep` 三个权重并跑完 testA 推理（2650 / 2663 / 2657 线）。
+
+### 6.2 ⭐ 为什么第 2 注是 union 而不是 swa4 本身
+
+`scripts/build_union_pair_20260915.py --a <swa4_trim> --b <gate6_trim> --dst ...`
+
+- A 侧把 swa4 的 2662 条线**原样保留**（含 SWA 带来的轻微位置移动 —— 这部分收益
+  containment 台账看不见，因为线的身份没变，只是位置变了）。
+- B 侧再叠 gate6 相对 swa4 新增的 71 条。
+- 由于 gate6 含**全部** incumbent 线，swa4 丢掉的那 29 条会被自动补回 → 最终 `dropped=0`。
+- 结果 `kept=2664 / dropped=0 / novel=69`：**拥有 swa4 的全部几何，还多 42 条经 60% 同意率筛选的线**
+  → **严格支配 swa4**，所以不该再单发 swa4。
+
+testA 实测：`union: a_lanes=2662 added_from_b=71 b_lanes_already_in_a=2646 total=2733`。
 
 **§4.5 预测几何剖面自检（B 榜当天必做，不花额度）**：把 testB 的 base 预测与已知基线剖面对比 ——
 基线 testA 剖面为 `线数 2664 / 空图 9 / top p5-p50-p95 = 549-564-624 / span = 95-155-170 / bottom=719 占 95.8%`。
