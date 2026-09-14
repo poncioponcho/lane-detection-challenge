@@ -62,6 +62,12 @@
 - 其它已封死：降 conf（低置信带真线率 23%）、单支撑 union（38.5% ≈ 盈亏）、去重（互 IoU>0.5 全 0 条）、融合/投票换线、flip-TTA（−0.49pp）、端点上外推（−2.43pp）、OS 过采样（testA −1.07pp）、VAT、ConvNeXt-T（与 R50 持平）、雾雨增强。
 - **共识删 FP 死**：2664 条中 86.6% 被全部 4 模型支持 → FP 是**系统性偏差**，不是个体怪癖。
 - **短残线过滤（span80）有效**：删 54 条、其中伪线 70.4% > 删线盈亏线 63.2% → **+0.127pp**。B 榜保留 `--min-span 80`。
+- **🔴 `filter_short_lanes.py --base` 必须与 `--src` 的 rel 路径逐层对齐**（2026-09-15 事故，已加守卫）：
+  传 `outputs/testA_54ep_raw`（多一层 `testA/predictions/`）→ `base/rel` 全落空 → 打印 `base_kept=0`
+  → 每条线都被当"新增" → 过滤把 incumbent 自己的 **136 条**线删掉（gate6 2730 → 2594，比 incumbent 的 2664 还少 70 条）。
+  脚本现已拒绝运行（base 缺文件 或 base_kept==0）。**B 榜跑完必看 `base_kept` 是否 ≈ base 线数。**
+- **`testA_54ep_raw` = 2688 线 ≠ 已交包 2664 线**（不是同一阈值），**不可当基线**；探针/基线一律以「已交 zip 本身」为源。
+- **`--average` 共识对已有线零收益**：9/14 分解显示 ΔTP 全部来自新增线，被保留线净变化 = 0。
 - **测试集无 score sidecar** → 改阈值必须重跑推理。
 
 ## 6. trim（唯一正迁移轴）—— 2026-09-15 定稿
@@ -98,4 +104,10 @@
 - **⭐ SWA 依据**：54ep 的 val 早越过峰值（iter 24863 → 0.89565；final 31968 → 0.89429），incumbent 用的就是 model_best(24863)。沿**同一轨迹**平均 {24863,29007,…,31967} → 保证同 basin，风险极低；输出 2650–2663 线 ≈ incumbent 原始 2688（对比跨种子 soup 2795–2828，多 5%）。已建 `swa3/swa4/swa7_54ep` 并跑完 testA 推理。
 - **已验证可打包**（全部过 `prepare_submit` + 官方 `check_submission`）：`outputs/submit_testA_night_{conf55,conf60,soupA,soupB,soupC,swa3,swa4,swa7}_m0.zip`。
 - **无 GT 的候选台账**（`scripts/profile_night_candidates_20260915.py`）：conf55 = 保留 2595/删 69/新增 0（**纯删除赌注**，需被删 69 条真线率 <36.75%，估 r≈0.30 → 约 +0.16pp）；conf60 = 删 129（更大赌注，倾向更差）；soupA = 删 39/新增 170；soupB = 删 51/新增 215。
+- **候选形态速查（相对 incumbent 2664 条线，2026-09-15 台账）**：
+  `cons_gate6_v2` = kept 2664 / **dropped 0** / novel **52**（**纯增量，下行风险为零**）；
+  `conf55` = 纯删除 69；`swa4` = 删 29 / 加 27（footprint 最小）；`soupA/B/C` = 删 39~51 / 加 170~215（最大赌注）。
+- **实例上真实可用的独立支撑树只有 7 棵**：36ep_s42、s101、s202、s303、clrernet36、cut400、hires。
+  runbook 旧版写的 **seed43/seed44/clrernet_15ep 在实例上没有 run-dir**（照抄会失败）；
+  t05 的 run-dir 未定位到 → 不进名单。**swa*/soup* 是 base 的派生模型，不能算独立共识票**（同意率会虚高）。
 - **所有新候选都无法离线打分**（testA 无 GT、A 榜已关）→ 排序依据是机制强度 + 方差，不是实测。
