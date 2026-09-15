@@ -122,14 +122,25 @@ else
     || echo "  shot4_margin0: PRECHECK FAILED"
 fi
 
-echo "=== shot 5: cut400 conf0.35 + trim (no span80) ==="
-# Deliberately NO span filter here. The span80 rule was validated on the
-# *consensus-averaged* union, where 29.4% of added lanes were averaging stubs
-# (2026-09-13 audit). cut400 is a standalone model, so its short lanes are its
-# own output, not a merge artefact -- filtering them would be an unmeasured
-# deletion bet layered on top of a recipe that has never been scored. Keep it a
-# pure recipe: identical to what the A-board calibration actually measured.
-pack shot5_cut400 "$OUT/testB_cut400/testB/predictions"
+echo "=== shot 5: union(incumbent, independent model) -- pure addition, dropped=0 ==="
+# 2026-09-15 夜间改注：原为 cut400 conf0.35，但它在 A 榜**实测 -0.772pp**；
+# B 榜取 max，已知负数不该占名额。改为 dropped=0 的纯加注。
+# 优先级：seed101_54ep（同排期，novel 线质量最高）> occlude_36ep > cut400 兜底。
+SHOT5_SRC=""
+for cand in "$OUT/testB_s101_54ep/testB/predictions" \
+            "$OUT/testB_occlude/testB/predictions" \
+            "$OUT/testB_cut400/testB/predictions"; do
+  [ -d "$cand" ] && { SHOT5_SRC="$cand"; break; }
+done
+if [ -n "$SHOT5_SRC" ]; then
+  $PY scripts/apply_bottom_trim_testA.py --src "$SHOT5_SRC" \
+    --dst "$BUILD/shot5_src_trim" --margin "$M" >/dev/null
+  $PY scripts/build_union_pair_20260915.py \
+    --a "$BUILD/shot1_base54_trim" --b "$BUILD/shot5_src_trim" --dst "$BUILD/shot5_uni"
+  pack shot5_union "$BUILD/shot5_uni"
+else
+  echo "  shot5: no source tree found -- SKIPPED"
+fi
 
 echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
