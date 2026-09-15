@@ -62,6 +62,10 @@ echo "chosen trim margin M = $M"
 
 pack () {  # pack <name> <srcdir>
   n=$1; s=$2
+  if [ ! -d "$s" ] || [ -z "$(find "$s" -name '*.lines.txt' -print -quit 2>/dev/null)" ]; then
+    echo "  $n: SKIPPED (source tree empty or missing: $s)"
+    return 1
+  fi
   $PY scripts/apply_bottom_trim_testA.py --src "$s" --dst "$BUILD/${n}_trim" --margin "$M" >/dev/null
   $PY src/submit/prepare_submit.py --raw-pred-dir "$BUILD/${n}_trim" \
     --canonical-dir "$BUILD/${n}_canon" \
@@ -74,29 +78,91 @@ pack () {  # pack <name> <srcdir>
     && echo "  $n: OK" || echo "  $n: PRECHECK FAILED"
 }
 
+count_lanes () {  # count_lanes <tree>
+  find "$1" -name '*.lines.txt' -print0 2>/dev/null \
+    | xargs -0 cat 2>/dev/null | grep -cve '^[[:space:]]*$'
+}
+
+# A consensus shot that adds ~nothing is just the floor resubmitted; say so
+# loudly instead of burning a slot. (2026-09-16 dry run: 6 supports at k=4 is a
+# 67% gate, not 57%, and it added exactly 0 lanes.)
+warn_if_no_addition () {  # warn_if_no_addition <name> <tree> <base_lanes>
+  n=$(count_lanes "$2")
+  added=$(( n - $3 ))
+  echo "  $1: lanes=$n (added vs floor: $added)"
+  if [ "$added" -le 0 ]; then
+    echo "  !! $1 adds NO lanes -- identical to the floor. Do NOT spend a slot on it."
+  fi
+}
+
 echo "=== shot 1: base54 + trim($M) ==="
 pack shot1_base54 "$B"
+BASE_LANES=$(find "$BUILD/shot1_base54_trim" -name '*.lines.txt' -print0 2>/dev/null \
+  | xargs -0 cat 2>/dev/null | grep -cve '^[[:space:]]*$')
+echo "  base lanes after trim: $BASE_LANES"
 
-echo "=== shot 3/2 inputs: consensus at >=60% agreement ==="
-cat > /tmp/testB_supports_$DAY.json <<JSON
-[
- {"name": "seed42_36ep",  "path": "$(pwd)/$OUT/testB_seed42/testB/predictions"},
- {"name": "seed101_36ep", "path": "$(pwd)/$OUT/testB_seed101/testB/predictions"},
- {"name": "seed202_36ep", "path": "$(pwd)/$OUT/testB_seed202/testB/predictions"},
- {"name": "seed303_36ep", "path": "$(pwd)/$OUT/testB_seed303/testB/predictions"},
- {"name": "clrernet_36ep","path": "$(pwd)/$OUT/testB_clrernet36/testB/predictions"},
- {"name": "cut400_36ep",  "path": "$(pwd)/$OUT/testB_cut400/testB/predictions"},
- {"name": "hires_36ep",   "path": "$(pwd)/$OUT/testB_hires/testB/predictions"}
-]
-JSON
-# 7 independent supports; the gate is an AGREEMENT FRACTION, not a vote count.
-# 60% of 7 -> --min-support 4 (57%) is the practical choice; 5 (71%) is stricter.
-$PY scripts/build_testA_consensus_union_20260913.py \
-  --base "$B" --dst "$BUILD/cons" --min-support 4 --average \
-  --supports-json /tmp/testB_supports_$DAY.json | tail -4
-$PY scripts/filter_short_lanes.py --src "$BUILD/cons" --base "$B" \
-  --dst "$BUILD/cons_f80" --min-span 80
-pack shot3_consensus "$BUILD/cons_f80"
+echo "=== support trees: which ones actually made it through inference? ==="
+# 2026-09-16 修：支撑树写死 7 棵，但只要有 1 棵推理失败，
+# build_testA_consensus_union_20260913.py 会**静默产出空树**（files=0），
+# 后面 filter → pack 全失败却不中断 → 白扔 3 发额度。演练实测到这个行为。
+# 现在：只把真实存在的树写进 json，并按**同意率**（不是票数）重算门槛。
+$PY - "$OUT" "$DAY" <<'PY'
+import json, sys, pathlib
+out, day = pathlib.Path(sys.argv[1]), sys.argv[2]
+spec = [("seed42_36ep", "testB_seed42"), ("seed101_36ep", "testB_seed101"),
+        ("seed202_36ep", "testB_seed202"), ("seed303_36ep", "testB_seed303"),
+        ("clrernet_36ep", "testB_clrernet36"), ("cut400_36ep", "testB_cut400"),
+        ("hires_36ep", "testB_hires")]
+present, missing = [], []
+for name, d in spec:
+    p = out / d / "testB/predictions"
+    if p.is_dir() and any(p.rglob("*.lines.txt")):
+        present.append({"name": name, "path": str(p.resolve())})
+    else:
+        missing.append(name)
+json.dump(present, open(f"/tmp/testB_supports_{day}.json", "w"), indent=1)
+print(f"  support trees: present={len(present)} missing={missing}")
+if missing:
+    print("  !! WARNING: agreement fractions recomputed on the available set")
+print(len(present))
+PY
+M_SUP=$($PY - "$OUT" <<'PY'
+import sys, pathlib
+out = pathlib.Path(sys.argv[1])
+print(sum(1 for d in ("testB_seed42", "testB_seed101", "testB_seed202", "testB_seed303",
+                     "testB_clrernet36", "testB_cut400", "testB_hires")
+          if (out / d / "testB/predictions").is_dir()
+          and any((out / d / "testB/predictions").rglob("*.lines.txt"))))
+PY
+)
+# round(frac * m), not ceil -- ceil is too strict when a tree is missing and the
+# consensus then adds nothing at all (dry run: 6 supports at k=4 is a 67% gate
+# and produced added_kept=0, i.e. the floor resubmitted under another name).
+# 0.571/0.714/0.857 of 7 -> 4/5/6; of 6 -> 3/4/5 (50%/67%/83%).
+K4=$(( (M_SUP * 571 + 500) / 1000 ))
+K5=$(( (M_SUP * 714 + 500) / 1000 ))
+K6=$(( (M_SUP * 857 + 500) / 1000 ))
+[ "$K4" -lt 2 ] && K4=2
+[ "$K5" -lt 3 ] && K5=3
+[ "$K6" -lt 3 ] && K6=3
+echo "  available supports=$M_SUP -> min-support k: 57%=$K4  71%=$K5  86%=$K6"
+
+build_cons () {  # build_cons <dst> <k>
+  $PY scripts/build_testA_consensus_union_20260913.py \
+    --base "$B" --dst "$1" --min-support "$2" --average \
+    --supports-json /tmp/testB_supports_$DAY.json | tail -2
+}
+
+echo "=== shot 3: consensus at >=57% agreement + span80 ==="
+if [ "$M_SUP" -ge 4 ]; then
+  build_cons "$BUILD/cons" "$K4"
+  $PY scripts/filter_short_lanes.py --src "$BUILD/cons" --base "$B" \
+    --dst "$BUILD/cons_f80" --min-span 80
+  pack shot3_consensus "$BUILD/cons_f80"
+  warn_if_no_addition shot3_consensus "$BUILD/cons_f80" "$BASE_LANES"
+else
+  echo "  shot3: SKIPPED (only $M_SUP support trees -- gate is meaningless)"
+fi
 
 echo "=== shot 2: union(swa4, consensus) -- strictly dominates swa4 ==="
 $PY scripts/apply_bottom_trim_testA.py \
@@ -110,12 +176,15 @@ echo "=== shot 4: consensus at >=71% agreement (testA-shaped) or margin hedge (t
 # conf55 删掉的 69 条线 corr=0.333 → r_est=0.384 > 盈亏线 0.3675 → **估计 -0.039pp**（此前按 r≈0.30
 # 估成 +0.16pp 是错的）。已知/疑似为负的不该占 max 名额，换成同曲线上更纯的一点：7 树 k=5(71%)。
 if [ "$M" = "0" ]; then
-  $PY scripts/build_testA_consensus_union_20260913.py \
-    --base "$B" --dst "$BUILD/cons_k5" --min-support 5 --average \
-    --supports-json /tmp/testB_supports_$DAY.json | tail -4
-  $PY scripts/filter_short_lanes.py --src "$BUILD/cons_k5" --base "$B" \
-    --dst "$BUILD/cons_k5_f80" --min-span 80
-  pack shot4_cons_k5 "$BUILD/cons_k5_f80"
+  if [ "$M_SUP" -ge 4 ]; then
+    build_cons "$BUILD/cons_k5" "$K5"
+    $PY scripts/filter_short_lanes.py --src "$BUILD/cons_k5" --base "$B" \
+      --dst "$BUILD/cons_k5_f80" --min-span 80
+    pack shot4_cons_k5 "$BUILD/cons_k5_f80"
+  warn_if_no_addition shot4_cons_k5 "$BUILD/cons_k5_f80" "$BASE_LANES"
+  else
+    echo "  shot4: SKIPPED (only $M_SUP support trees)"
+  fi
 else
   $PY scripts/apply_bottom_trim_testA.py --src "$B" --dst "$BUILD/base_m0" --margin 0 >/dev/null
   $PY src/submit/prepare_submit.py --raw-pred-dir "$BUILD/base_m0" \
@@ -135,12 +204,15 @@ echo "=== shot 5: consensus at >=86% agreement -- the purest point on the ladder
 # occlude 增量的 119 条 corr=0.227 → r_est=0.352 < 盈亏线 0.3675 → **-0.067pp**（负）。
 # 单支撑 union 的增量线印证率普遍低（swa4 0.222 / occlude 0.227 / soupB 0.177），
 # 只有**共识门控**的增量线印证率高（gate6 0.519）。所以第 5 注改成同意率阶梯的最纯一端。
-$PY scripts/build_testA_consensus_union_20260913.py \
-  --base "$B" --dst "$BUILD/cons_k6" --min-support 6 --average \
-  --supports-json /tmp/testB_supports_$DAY.json | tail -4
-$PY scripts/filter_short_lanes.py --src "$BUILD/cons_k6" --base "$B" \
-  --dst "$BUILD/cons_k6_f80" --min-span 80
-pack shot5_cons_k6 "$BUILD/cons_k6_f80"
+if [ "$M_SUP" -ge 4 ]; then
+  build_cons "$BUILD/cons_k6" "$K6"
+  $PY scripts/filter_short_lanes.py --src "$BUILD/cons_k6" --base "$B" \
+    --dst "$BUILD/cons_k6_f80" --min-span 80
+  pack shot5_cons_k6 "$BUILD/cons_k6_f80"
+  warn_if_no_addition shot5_cons_k6 "$BUILD/cons_k6_f80" "$BASE_LANES"
+else
+  echo "  shot5: SKIPPED (only $M_SUP support trees)"
+fi
 
 echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
@@ -156,10 +228,12 @@ print(n)")
   echo "  $(pwd)/$z   lanes=$l"
 done
 echo
-echo "Shot order: 1 base54 -> 2 union -> 3 consensus -> 4 hedge -> 5 cut400 -> 6 adaptive"
+echo "Shot order: 1 base54 -> 2 union(swa4,consensus) -> 3 consensus 57% -> 4 cons 71%/hedge -> 5 cons 86% -> 6 adaptive"
 echo "Suggested notes (<=50 chars):"
 echo "  1: 54ep conf0.50 trim$M"
 echo "  2: swa4 union consensus trim$M"
-echo "  3: consensus 60pct span80 trim$M"
-echo "  4: $([ "$M" = "0" ] && echo '54ep conf0.55 trim0' || echo '54ep conf0.50 trim0 hedge')"
-echo "  5: cut400 conf0.35 span80 trim$M"
+echo "  3: consensus 57pct span80 trim$M"
+echo "  4: $([ "$M" = "0" ] && echo "consensus 71pct span80 trim0" || echo '54ep conf0.50 trim0 hedge')"
+echo "  5: consensus 86pct span80 trim$M"
+echo
+echo "REMINDER: if any shot printed SKIPPED, do not submit a placeholder -- fix or drop the slot."
