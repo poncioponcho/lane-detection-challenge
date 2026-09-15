@@ -20,6 +20,7 @@ KNOWN_MODELS = {
     "clrnet_r50_hires",
     "clrnet_r50_cut400",
     "clrnet_r50_segmask_binary",
+    "clrnet_r50_occlude",
     "clrnet_r50_vat",
     "clrernet_r50",
     "adnet_r34",

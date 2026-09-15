@@ -37,6 +37,7 @@ CONFIGS = {
     # Single-variable aux-segmentation experiment (2026-09-15): identical to the
     # baseline except seg_mask_mode binary_union. See the config docstring.
     "clrnet_r50_segmask_binary": "clrnet_r50_hardlane_segmask_binary.py",
+    "clrnet_r50_occlude": "clrnet_r50_hardlane_occlude.py",
     "clrnet_r50_vat": "clrnet_r50_hardlane_vat.py",
     "clrernet_r50": "clrernet_r50_hardlane.py",
     "adnet_r34": "adnet_r34_hardlane.py",
@@ -53,6 +54,7 @@ WEIGHT_BASE_MODEL = {
     # Same topology and input size as the baseline, so it reuses the adapted
     # checkpoint and the baseline smoke evidence unchanged.
     "clrnet_r50_segmask_binary": "clrnet_r50",
+    "clrnet_r50_occlude": "clrnet_r50",
 }
 PINNED_UNLANEDET_COMMIT = "03921844220adb2e65c840de2d9759478d5c3d4c"
 SAFE_RUN_NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,79}$")
