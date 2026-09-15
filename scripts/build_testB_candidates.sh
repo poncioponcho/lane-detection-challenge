@@ -55,7 +55,16 @@ root = pathlib.Path(sys.argv[1])
 tops = [min(float(t) for t in [float(x) for x in line.split()][1::2])
         for f in root.rglob("*.lines.txt") for line in f.read_text().splitlines() if line.strip()]
 far = sum(1 for t in tops if t < 450) / max(1, len(tops))
-print(40 if far > 0.10 else 0)
+# 2026-09-16: the threshold was a hard-coded 10%. The two branches are wildly
+# asymmetric, so the break-even point is far lower than that:
+#   train-shaped lanes  -> margin 40 beats margin 0 by +2.25pp (measured on OOF)
+#   testA-shaped lanes  -> margin 0 beats margin 40 by only +0.069pp (A board)
+# break-even fraction p:  p*2.25 == (1-p)*0.069  ->  p = 2.98%
+# So switch at 3%, not 10%: it can only ever cost 0.07pp and can gain 2.25pp.
+import sys as _s
+print("f<450 = %.4f (%d/%d)" % (far, sum(1 for t in tops if t < 450), len(tops)),
+      file=_s.stderr)
+print(40 if far > 0.03 else 0)
 PY
 )
 echo "chosen trim margin M = $M"
