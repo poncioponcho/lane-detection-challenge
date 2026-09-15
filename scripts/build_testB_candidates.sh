@@ -112,7 +112,10 @@ out, day = pathlib.Path(sys.argv[1]), sys.argv[2]
 spec = [("seed42_36ep", "testB_seed42"), ("seed101_36ep", "testB_seed101"),
         ("seed202_36ep", "testB_seed202"), ("seed303_36ep", "testB_seed303"),
         ("clrernet_36ep", "testB_clrernet36"), ("cut400_36ep", "testB_cut400"),
-        ("hires_36ep", "testB_hires")]
+        ("hires_36ep", "testB_hires"),
+        # 2026-09-16: measured on testA that 9 supports beat 7 at the same
+        # agreement fraction (56% -> 24 added lanes vs 14). Both run-dirs exist.
+        ("occlude_36ep", "testB_occlude"), ("s101_54ep", "testB_s101_54ep")]
 present, missing = [], []
 for name, d in spec:
     p = out / d / "testB/predictions"
@@ -130,7 +133,8 @@ M_SUP=$($PY - "$OUT" <<'PY'
 import sys, pathlib
 out = pathlib.Path(sys.argv[1])
 print(sum(1 for d in ("testB_seed42", "testB_seed101", "testB_seed202", "testB_seed303",
-                     "testB_clrernet36", "testB_cut400", "testB_hires")
+                     "testB_clrernet36", "testB_cut400", "testB_hires",
+                     "testB_occlude", "testB_s101_54ep")
           if (out / d / "testB/predictions").is_dir()
           and any((out / d / "testB/predictions").rglob("*.lines.txt"))))
 PY
@@ -139,13 +143,16 @@ PY
 # consensus then adds nothing at all (dry run: 6 supports at k=4 is a 67% gate
 # and produced added_kept=0, i.e. the floor resubmitted under another name).
 # 0.571/0.714/0.857 of 7 -> 4/5/6; of 6 -> 3/4/5 (50%/67%/83%).
-K4=$(( (M_SUP * 571 + 500) / 1000 ))
-K5=$(( (M_SUP * 714 + 500) / 1000 ))
-K6=$(( (M_SUP * 857 + 500) / 1000 ))
+# 2026-09-16: the ladder is re-pinned to the points actually measured on testA
+# with the production support set. 44/56/67% of 9 -> 4/5/6, of 7 -> 3/4/5.
+# Above ~70% the consensus adds nothing at all (measured 0).
+K4=$(( (M_SUP * 440 + 500) / 1000 ))
+K5=$(( (M_SUP * 560 + 500) / 1000 ))
+K6=$(( (M_SUP * 670 + 500) / 1000 ))
 [ "$K4" -lt 2 ] && K4=2
 [ "$K5" -lt 3 ] && K5=3
 [ "$K6" -lt 3 ] && K6=3
-echo "  available supports=$M_SUP -> min-support k: 57%=$K4  71%=$K5  86%=$K6"
+echo "  available supports=$M_SUP -> min-support k: 44%=$K4  56%=$K5  67%=$K6"
 
 build_cons () {  # build_cons <dst> <k>
   $PY scripts/build_testA_consensus_union_20260913.py \

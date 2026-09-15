@@ -60,10 +60,11 @@ all71_seed42_clrnet_r50_cut400_36ep     0.35 cut400
 all71_seed42_clrnet_r50_hires_36ep      0.40 hires
 swa4_54ep_stage                         0.50 swa4
 all71_seed42_clrnet_r50_occlude_36ep    0.50 occlude
+all71_seed101_clrnet_r50_54ep           0.50 s101_54ep
 LIST
 
 echo "=== [3/4] line counts per tree ==="
-for t in base54 base54_c55 seed42 seed101 seed202 seed303 clrernet36 cut400 hires swa4 occlude; do
+for t in base54 base54_c55 seed42 seed101 seed202 seed303 clrernet36 cut400 hires swa4 occlude s101_54ep; do
   p=$HARDLANE_OUTPUT_ROOT/testB_$t/testB/predictions
   n=$(find $p -name '*.lines.txt' 2>/dev/null | wc -l)
   l=$(find $p -name '*.lines.txt' -exec cat {} + 2>/dev/null | grep -c .)
