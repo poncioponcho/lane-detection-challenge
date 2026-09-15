@@ -44,20 +44,38 @@ bash scripts/build_testB_candidates.sh <下载回来的 testB_bundle.tgz>
 
 ---
 
-## 2. 六注怎么排（9/15 夜间修订版）
+## 2. 六注怎么排（9/16 凌晨再修订：**只有共识类加线是正的**）
 
-| 注 | 配方 | 形态 | 依据 |
+用「印证率 → 真线率」拟合给每个候选定了价（脚本 `scripts/calibrate_corroboration_20260915.py`，
+拟合式 `r = 0.2816 + 0.3083 × corroboration`，两点锚定均来自 A 榜实测反解）：
+
+| 注 | 配方 | 形态 | 定价 |
 |---|---|---|---|
-| 1 | `54ep model_best conf0.50 + trim(M)` | 地板 | incumbent，**0.73574**（A 榜实测） |
-| 2 | **`uni_swa4_g6`** | kept 2664 / **dropped 0** / novel 69 | 严格支配 swa4；相对印证率 0.406（全场第二） |
-| 3 | `cons_gate6`（7 树 ≥4 票 + span80） | kept 2664 / dropped 0 / novel 52 | 纯增量，印证率 0.558（全场第一） |
-| 4 | testA 型 → `conf0.55 + trim0`；train 型 → margin 对冲 | 纯删除 69 条 | 估 +0.16pp |
-| 5 | **`uni_occlude` / `uni_s101_54ep`** | kept 2664 / dropped 0 / novel 119 | **替换原 cut400** |
-| 6 | 自适应 | — | 看前 5 注结果再定 |
+| 1 | `54ep model_best conf0.50 + trim(M)` | 地板 | **0.73574**（A 榜实测） |
+| 2 | **`cons_gate6`**（7 树 ≥4 = 57% + span80） | +52 线 | **+0.132pp** ⭐ 最高 |
+| 3 | **`uni_swa4_g6`** | +69 线 | **+0.071pp** |
+| 4 | M=0 → `cons_k5`（≥5/7 = 71%）；M=40 → margin0 对冲 | 更纯更少 | 估 ~+0.11pp |
+| 5 | M=0 → `cons_k6`（≥6/7 = 86%） | 最纯最少 | 估 ~+0.09pp |
+| 6 | 自适应 | — | 看前 5 注结果 |
 
-**修订 1（重要）**：第 5 注原为 `cut400 conf0.35`，但它在 A 榜**实测 −0.772pp**。
-B 榜是取 max，已知负数不该占名额 → 改成 dropped=0 的纯加注。
-`build_testB_candidates.sh` 已内置优先级：`testB_s101_54ep` > `testB_occlude` > `cut400` 兜底。
+注 2/4/5 是**同意率阶梯**（57% / 71% / 86%）， deliberately 用三次提交去实测 testB 上的
+「同意率→真线率」曲线，取 max。
+
+### 已否决（都有定价或实测依据，别再捡回来）
+
+| 候选 | 理由 |
+|---|---|
+| `cut400 conf0.35` | A 榜**实测 −0.772pp** |
+| `conf0.55`（删 69 条） | corr 0.333 → r_est **0.384 > 盈亏线 0.3675** → **−0.039pp**（此前按 r≈0.30 估成 +0.16pp，**是错的**） |
+| `uni_occlude`（加 119 条） | corr 0.227 → r_est 0.352 → **−0.067pp** |
+| `soupB` | corr 0.177 → **−0.235pp** |
+| `swa4` 单发 | −0.016pp，被 `uni_swa4_g6` 严格支配 |
+
+**核心结论**：单支撑 union 的增量线印证率普遍很低（swa4 0.222 / occlude 0.227 / soupB 0.177），
+**只有共识门控的增量线印证率高**（gate6 0.519）。加线的质量来自"多少棵树同意"，不是来自"哪个模型"。
+
+⚠️ 拟合对高 corr 系统性**低估**（incumbent corr 0.930 → r_est 0.568，而真实精确率 0.803），
+所以注 2/3 的估计值应视为**下界**；conf55 / uni_occlude 落在锚点区间内，更可信。
 
 **修订 2**：`run_testB_infer.sh` 的推理名单加了 `all71_seed42_clrnet_r50_occlude_36ep`（+1 次推理，+1.5 min）。
 

@@ -75,6 +75,8 @@ PACKAGES = {
     "gate6 novel": "outputs/submit_testA_night_cons_gate6_v2_m0.zip",
     "swa4 novel": "outputs/submit_testA_night_swa4_54ep_m0.zip",
     "uni novel": "outputs/submit_testA_night_uni_swa4_g6_m0.zip",
+    # added 2026-09-16: price the occlude union before spending a B-board slot
+    "uni_occlude novel": "outputs/submit_testA_night_uni_occlude_m0.zip",
 }
 
 # true rates recovered from today's scores (probe_g4 is a pure addition; soupB's

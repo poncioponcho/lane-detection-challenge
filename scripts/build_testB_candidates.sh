@@ -105,9 +105,17 @@ $PY scripts/build_union_pair_20260915.py \
   --a "$BUILD/swa4_trim" --b "$BUILD/shot3_consensus_trim" --dst "$BUILD/uni"
 pack shot2_uni_swa4_cons "$BUILD/uni"
 
-echo "=== shot 4: conf0.55 (testA-shaped) or margin hedge (train-shaped) ==="
+echo "=== shot 4: consensus at >=71% agreement (testA-shaped) or margin hedge (train-shaped) ==="
+# 2026-09-16 改注：原为 conf0.55。夜间用校准后的印证率→真线率拟合给它定了价：
+# conf55 删掉的 69 条线 corr=0.333 → r_est=0.384 > 盈亏线 0.3675 → **估计 -0.039pp**（此前按 r≈0.30
+# 估成 +0.16pp 是错的）。已知/疑似为负的不该占 max 名额，换成同曲线上更纯的一点：7 树 k=5(71%)。
 if [ "$M" = "0" ]; then
-  pack shot4_conf55 "$OUT/testB_base54_c55/testB/predictions"
+  $PY scripts/build_testA_consensus_union_20260913.py \
+    --base "$B" --dst "$BUILD/cons_k5" --min-support 5 --average \
+    --supports-json /tmp/testB_supports_$DAY.json | tail -4
+  $PY scripts/filter_short_lanes.py --src "$BUILD/cons_k5" --base "$B" \
+    --dst "$BUILD/cons_k5_f80" --min-span 80
+  pack shot4_cons_k5 "$BUILD/cons_k5_f80"
 else
   $PY scripts/apply_bottom_trim_testA.py --src "$B" --dst "$BUILD/base_m0" --margin 0 >/dev/null
   $PY src/submit/prepare_submit.py --raw-pred-dir "$BUILD/base_m0" \
@@ -122,25 +130,17 @@ else
     || echo "  shot4_margin0: PRECHECK FAILED"
 fi
 
-echo "=== shot 5: union(incumbent, independent model) -- pure addition, dropped=0 ==="
-# 2026-09-15 夜间改注：原为 cut400 conf0.35，但它在 A 榜**实测 -0.772pp**；
-# B 榜取 max，已知负数不该占名额。改为 dropped=0 的纯加注。
-# 优先级：seed101_54ep（同排期，novel 线质量最高）> occlude_36ep > cut400 兜底。
-SHOT5_SRC=""
-for cand in "$OUT/testB_s101_54ep/testB/predictions" \
-            "$OUT/testB_occlude/testB/predictions" \
-            "$OUT/testB_cut400/testB/predictions"; do
-  [ -d "$cand" ] && { SHOT5_SRC="$cand"; break; }
-done
-if [ -n "$SHOT5_SRC" ]; then
-  $PY scripts/apply_bottom_trim_testA.py --src "$SHOT5_SRC" \
-    --dst "$BUILD/shot5_src_trim" --margin "$M" >/dev/null
-  $PY scripts/build_union_pair_20260915.py \
-    --a "$BUILD/shot1_base54_trim" --b "$BUILD/shot5_src_trim" --dst "$BUILD/shot5_uni"
-  pack shot5_union "$BUILD/shot5_uni"
-else
-  echo "  shot5: no source tree found -- SKIPPED"
-fi
+echo "=== shot 5: consensus at >=86% agreement -- the purest point on the ladder ==="
+# 2026-09-16 改注：原为 union(incumbent, occlude)。夜间定价：
+# occlude 增量的 119 条 corr=0.227 → r_est=0.352 < 盈亏线 0.3675 → **-0.067pp**（负）。
+# 单支撑 union 的增量线印证率普遍低（swa4 0.222 / occlude 0.227 / soupB 0.177），
+# 只有**共识门控**的增量线印证率高（gate6 0.519）。所以第 5 注改成同意率阶梯的最纯一端。
+$PY scripts/build_testA_consensus_union_20260913.py \
+  --base "$B" --dst "$BUILD/cons_k6" --min-support 6 --average \
+  --supports-json /tmp/testB_supports_$DAY.json | tail -4
+$PY scripts/filter_short_lanes.py --src "$BUILD/cons_k6" --base "$B" \
+  --dst "$BUILD/cons_k6_f80" --min-span 80
+pack shot5_cons_k6 "$BUILD/cons_k6_f80"
 
 echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
