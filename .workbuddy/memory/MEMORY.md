@@ -106,11 +106,26 @@ testA ≈ θ 0.3675，P+G = 5819.8，u = 2/(P+G) = 3.4365e-4：
 
 ## 9. B 榜作战（`docs/runbook_testB.md` / `docs/action_testB_20260916.md`）
 
-- 发车前先算 testB 的 `f<450` 定 M∈{0,40}。六注 = 地板 / `cons_gate6` / `uni_swa4_g6` / 同意率阶梯 k5 / k6 / 自适应。
+- 发车前先算 testB 的 `f<450` 定 M∈{0,40}，**阈值 3%**（不是旧的 10%）：两条分支极不对称——
+  train 型线 margin 40 比 0 好 **+2.25pp**，testA 型线 margin 0 只比 40 好 **+0.069pp**，
+  盈亏平衡 `p×2.25=(1−p)×0.069` → **p=2.98%**。最坏只亏 0.07pp，最好赚 2.25pp。
+- **🔴 六注终版（9/16 04:00，阶梯已按生产支撑树实测重锚）**：
+  地板 / **cons 9 树 56%**（+24 线，+0.036pp ⭐）/ uni(swa4, cons56%) / cons 9 树 44%（+42 线）/ cons 9 树 67%（+5 线）/ 自适应。
+- **🔴 旧的"cons_gate6 +0.132pp"是错的**：它的 52 条增量线用本地支撑树（t05/seed43/44/clrernet_15ep）建的，
+  **这些 run-dir 在实例上不存在** → testB 上复现不出来。**定价前先确认候选依赖的每棵树在实例上都有 run-dir。**
+  本地 testA 预测树 ≠ 实例可复现 run-dir，是两个不同的集合。
+- **生产支撑树实测阶梯**（9 棵、base=54ep raw、span80 后）：44%→42 线｜**56%→24 线 ⭐**｜67%→5 线｜
+  （7 棵时）43%→44｜57%→14｜**71%/86%→0/0**。
+  → **同意率 >~70% 共识一条线都不加**（会变成"地板改名重交"）；**同同意率下树越多线越多** → 支撑树 7→9 棵（加 occlude_36ep + s101_54ep）。
+- 阶梯分数 44/56/67%，按可用树数四舍五入（m=9→4/5/6；m=8→4/4/5；m=7→3/4/5；m=6→3/3/4）。
+- **共识加线这个杠杆总共就值 +0.03~0.04pp**（交叉验证：A 榜实测 probe_g4 40% 档 94 线 = +0.035pp）。
 - **9/16 执行 = 两条命令**：实例 `scripts/autodl/run_testB_infer.sh`；本地 `scripts/build_testB_candidates.sh <tgz>`。
 - **bundle 必须是 `tar czf x.tgz .`（无外层目录）**，否则本地脚本找不到 `testB_*`。bundle 含 `manifest_testB.jsonl` + list。
 - **🔴 `build_testB_manifest.py` 严禁 glob 全量 JPEGImages**（已修 = 补集 + `--expect-clips 10` 校验）。
-- **实例上真实可用的独立支撑树只有 7 棵**：s42/s101/s202/s303 36ep、clrernet36、cut400、hires。swa*/soup* 是 base 派生，**不能算独立票**。本地 `clrernet_36ep` 只有 158/900（残缺），别当基线。
+- **实例上真实可用的独立支撑树原来只有 7 棵**：s42/s101/s202/s303 36ep、clrernet36、cut400、hires。
+  **9/16 扩到 9 棵**（+ `all71_seed42_clrnet_r50_occlude_36ep` + `all71_seed101_clrnet_r50_54ep`，两者都有 run-dir）。
+  swa*/soup* 是 base 派生，**不能算独立票**。本地 `clrernet_36ep` 只有 158/900（残缺），别当基线
+  （9/16 已重跑 `testA_clrernet36_c50` 900/900 补齐）。
 - **⭐ union 优于单发**：A 侧原样保留（继承位移收益），B 侧叠增量 → dropped=0。
 - **⭐ SWA 依据**：54ep s42 val 峰值 iter 24863 → 0.89565（final 0.89429），incumbent 用的就是 model_best(24863)；沿同轨迹平均 → 同 basin。
 - **solution.zip 已冻结**：`/hy-tmp/solution_freeze_20260916.tgz`，2,495,124,936 bytes，sha256 `b97cffd20fc765de589f617d43a9611359dd9032cb6bacea1e4dfd2042165bbf`。
@@ -127,3 +142,14 @@ testA ≈ θ 0.3675，P+G = 5819.8，u = 2/(P+G) = 3.4365e-4：
 | 旁路 | `EXPERIMENT_OVERRIDE_KEYS` 已含 `seg_mask_mode` → 单变量配方实验走 `--experiment-override`。`candidate_topk` 不在白名单。 |
 
 **判据先写死的规矩**：新实验先算台账（2 分钟 CPU，不用 GPU）——dropped 落在 [104,175] = 零效应；形状健康才发 1 发（≥+0.30pp 为有戏）。**污染 val 不能当筛子。**
+
+## 10. 端到端演练（防"临门一脚才发现炸"）
+
+- `build_testB_candidates.sh` 在 9/16 之前**从未真跑过**。演练抓到两类静默失败：
+  ① 支撑树缺失 → 共识构建输出 `files=0`，后续 filter→pack 全失败**却不中断**，白扔 3 发；
+  ② 门槛取整用 ceil → 少一棵树时 4/6=67%（而非 57%）→ 共识**一条线不加**。
+  现已全部加守卫（动态支撑树、按同意率重算、空树跳过、加线=0 响亮告警）。
+- **演练方法**：`scripts/build_dryrun_bundle_20260916.py` 用 testA 树拼一个假 testB bundle
+  → 复制一份 `build_testB_candidates.sh` 到 /tmp 并把 OUT / zip / manifest 全部重定向到
+  `/tmp/_DRYRUN_OUT_*` → 跑。**这样 outputs/ 里不会留下任何名字像 testB 的 testA 产物。**
+- 跑完必做：`outputs/` 下 `ls | grep -i testB` 应为空；伪造的 `data/processed/manifest_testB.jsonl` 必须删。
