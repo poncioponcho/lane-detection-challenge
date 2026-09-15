@@ -19,6 +19,7 @@ KNOWN_MODELS = {
     # resolution. Registered 2026-09-13 alongside run_training.CONFIGS.
     "clrnet_r50_hires",
     "clrnet_r50_cut400",
+    "clrnet_r50_segmask_binary",
     "clrnet_r50_vat",
     "clrernet_r50",
     "adnet_r34",
