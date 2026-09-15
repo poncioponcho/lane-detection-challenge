@@ -160,9 +160,11 @@ build_cons () {  # build_cons <dst> <k>
     --supports-json /tmp/testB_supports_$DAY.json | tail -2
 }
 
-echo "=== shot 3: consensus at >=57% agreement + span80 ==="
+echo "=== shot 3: consensus at >=56% agreement + span80 (best measured EV) ==="
 if [ "$M_SUP" -ge 4 ]; then
-  build_cons "$BUILD/cons" "$K4"
+  # K5 (56%), not K4: the union shot is built on top of this tree, and the
+  # 56% point prices highest (+0.036pp vs +0.027pp on the measured ladder).
+  build_cons "$BUILD/cons" "$K5"
   $PY scripts/filter_short_lanes.py --src "$BUILD/cons" --base "$B" \
     --dst "$BUILD/cons_f80" --min-span 80
   pack shot3_consensus "$BUILD/cons_f80"
@@ -178,13 +180,13 @@ $PY scripts/build_union_pair_20260915.py \
   --a "$BUILD/swa4_trim" --b "$BUILD/shot3_consensus_trim" --dst "$BUILD/uni"
 pack shot2_uni_swa4_cons "$BUILD/uni"
 
-echo "=== shot 4: consensus at >=71% agreement (testA-shaped) or margin hedge (train-shaped) ==="
+echo "=== shot 4: consensus at >=44% agreement (testA-shaped) or margin hedge (train-shaped) ==="
 # 2026-09-16 改注：原为 conf0.55。夜间用校准后的印证率→真线率拟合给它定了价：
 # conf55 删掉的 69 条线 corr=0.333 → r_est=0.384 > 盈亏线 0.3675 → **估计 -0.039pp**（此前按 r≈0.30
 # 估成 +0.16pp 是错的）。已知/疑似为负的不该占 max 名额，换成同曲线上更纯的一点：7 树 k=5(71%)。
 if [ "$M" = "0" ]; then
   if [ "$M_SUP" -ge 4 ]; then
-    build_cons "$BUILD/cons_k5" "$K5"
+    build_cons "$BUILD/cons_k5" "$K4"
     $PY scripts/filter_short_lanes.py --src "$BUILD/cons_k5" --base "$B" \
       --dst "$BUILD/cons_k5_f80" --min-span 80
     pack shot4_cons_k5 "$BUILD/cons_k5_f80"
@@ -235,12 +237,12 @@ print(n)")
   echo "  $(pwd)/$z   lanes=$l"
 done
 echo
-echo "Shot order: 1 base54 -> 2 union(swa4,consensus) -> 3 consensus 57% -> 4 cons 71%/hedge -> 5 cons 86% -> 6 adaptive"
+echo "Shot order: 1 base54 -> 2 union(swa4, cons 56%) -> 3 cons 56% -> 4 cons 44%/hedge -> 5 cons 67% -> 6 adaptive"
 echo "Suggested notes (<=50 chars):"
 echo "  1: 54ep conf0.50 trim$M"
 echo "  2: swa4 union consensus trim$M"
-echo "  3: consensus 57pct span80 trim$M"
-echo "  4: $([ "$M" = "0" ] && echo "consensus 71pct span80 trim0" || echo '54ep conf0.50 trim0 hedge')"
-echo "  5: consensus 86pct span80 trim$M"
+echo "  3: consensus 56pct span80 trim$M"
+echo "  4: $([ "$M" = "0" ] && echo "consensus 44pct span80 trim0" || echo '54ep conf0.50 trim0 hedge')"
+echo "  5: consensus 67pct span80 trim$M"
 echo
 echo "REMINDER: if any shot printed SKIPPED, do not submit a placeholder -- fix or drop the slot."
