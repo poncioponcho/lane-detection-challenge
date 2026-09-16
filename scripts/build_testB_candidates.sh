@@ -29,8 +29,12 @@ fi
   cp "$OUT/data_processed/manifest_testB.list.txt" "/tmp/testB_list_$DAY.txt"
 ls -d "$OUT"/testB_*
 
-B=$OUT/testB_base54/testB/predictions
-[ -d "$B" ] || { echo "base tree missing at $B"; exit 1; }
+# Which tree plays the floor. Defaults to conf=0.50, which is what the A-board
+# 0.73574 incumbent used and the only operating point with a measured anchor.
+# Override to spend the low-confidence sweep:  BASE_TAG=base54_cNN bash ... <tgz>
+BASE_TAG=${BASE_TAG:-base54}
+B=$OUT/testB_${BASE_TAG}/testB/predictions
+[ -d "$B" ] || { echo "base tree missing at $B (BASE_TAG=$BASE_TAG)"; exit 1; }
 [ -f "$MANIFEST" ] || { echo "missing $MANIFEST -- transfer it with the bundle"; exit 1; }
 NLINES=$(wc -l < "$MANIFEST")
 echo "manifest present: $MANIFEST ($NLINES rows)"
