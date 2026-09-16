@@ -111,4 +111,7 @@ testA：θ = 0.3675，P+G = 5819.8，u = 2/(P+G) = 3.4365e-4。
 ## 10. 端到端演练（防临门一脚才炸）
 
 - `build_testB_candidates.sh` 在 9/16 前从未真跑过。演练抓到两类静默失败：① 支撑树缺失 → 共识输出 `files=0`，后续 filter→pack 全失败**却不中断**（白扔 3 发）；② 门槛用 ceil → 少一棵树时 4/6=67% → 共识一条线不加。现均已加守卫。
-- **演练方法**：`scripts/build_dryrun_bundle_20260916.py` 用 testA 树拼假 testB bundle → 复制脚本到 /tmp 并把 OUT/zip/manifest **全部成对重定向**（`--out-zip` 和 `--zip_path` 必须成对，否则出现假 PRECHECK FAILED）到 `/tmp/_DRYRUN_OUT_*`。
+- **演练 = 一键**：`scripts/make_dryrun_sandbox.py [DIR]` 自动克隆 `build_testB_candidates.sh` 并把 OUT/zip/manifest/**list/supports.json 全部成对重定向到 `/tmp/_DRYRUN_OUT_*`，**0 处泄漏才返回 0**；然后 `build_dryrun_bundle_20260916.py` 拼假 bundle → `bash /tmp/_DRYRUN_candidates_<date>.sh <bundle>` → 跑完必双查 `data/processed/manifest_testB.jsonl` 与 `outputs/submit_testB_*.zip` 均不存在。
+- 🔴 **演练 harness 自身的 bug（9/16 23:20 抓到并修）**：`build_dryrun_bundle_20260916.py` 原用 `tar czf x.tgz -C /tmp <dirname>` → 归档带外层目录 → 解压后树沉一级 → 报 "base tree missing" + "supports missing" 的**假失败**，会掩盖真实回归。已改 `-C <OUT> .`（与真实 bundle 同构，见 §9）。
+- **9/16 23:20 全链路演练通过**（10 min）：5 注 PRECHECK **全 OK**；`f<450=0` → M=0；7 树下 k=3/4/5 → 加 **45 / 14 / 0** 条，**逐位复现 §2.1 阶梯表**（44/14/0）→ 阶梯表与脚本实现互相印证。
+- ⚠️ **演练暴露的真实风险：支撑树掉到 7 棵时第 5 注必废**。K6=round(0.67m)：m=9→6/9=67%（加 5 条）、m=8→5/8=62%、**m=7→5/7=71% > 70% 死区 → 加 0 条**。cut400/s101_54ep 任一推理失败即触发。脚本已告警，但**看到 "adds NO lanes" 就别交，改用第 6 注或只交前 4 注**。

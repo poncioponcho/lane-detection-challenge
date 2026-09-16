@@ -83,9 +83,15 @@ def main() -> None:
         "".join("/" + r["image_path"] + "\n" for r in recs), encoding="utf-8")
     print(f"  manifest rows={len(recs)} (real testB expects >=1000)")
 
+    # Match the REAL bundle layout: `tar czf x.tgz .` from inside the staged dir
+    # (see memory section 9). Packing the directory *name* instead gives the
+    # archive a dryrun_bundle_20260916/ prefix, so build_testB_candidates.sh
+    # unpacks every tree one level too deep and reports "support trees: missing"
+    # + "base tree missing" -- a false failure that hides real regressions.
+    # Found 2026-09-16 23:20 while re-running the dry run ahead of the B board.
     tgz = Path("/tmp/dryrun_bundle_20260916.tgz")
     import subprocess
-    subprocess.run(["tar", "czf", str(tgz), "-C", "/tmp", "dryrun_bundle_20260916"], check=True)
+    subprocess.run(["tar", "czf", str(tgz), "-C", str(OUT), "."], check=True)
     print(f"\nbundle: {tgz}  ({tgz.stat().st_size} bytes)")
     print("REMINDER: contents are testA. Quarantine every product; never submit.")
 
