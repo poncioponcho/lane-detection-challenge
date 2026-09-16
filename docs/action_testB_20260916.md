@@ -190,7 +190,7 @@ bash scripts/build_testB_candidates.sh <下载回来的 testB_bundle.tgz>
 
 ---
 
-## 5.1 solution.zip 复现包（v3，已按出包代码重冻并补全权重）
+## 5.1 solution.zip 复现包（**v4**，已按出包代码重冻 + 补全权重 + 修正权重来源）
 
 两处不一致，所以重冻：① v1 冻结于 `442dfe0`，但出包代码已到 `8bf26d0`；
 ② v2 漏了 `swa4_54ep.pth`（该文件不叫 `model_best.pth`，冻结循环只认三个名字，静默漏掉），
@@ -198,13 +198,13 @@ bash scripts/build_testB_candidates.sh <下载回来的 testB_bundle.tgz>
 
 | 项 | 值 |
 |---|---|
-| 路径（实例） | `/hy-tmp/solution_freeze_20260916_v3.tgz` |
-| **字节数** | **2,852,441,763** |
-| **SHA-256** | **`65757010005108a80c10dbfc1c06ef2cfc875817ce9112655aa2ff52f0e057e9`** |
+| 路径（实例） | `/hy-tmp/solution_freeze_20260916_v4.tgz` |
+| **字节数** | **2,852,444,297** |
+| **SHA-256** | **`629a03b063b3a34cc52f8f0b2956643b709257bc4e988444e035ca0d58be6179`** |
 | 代码 HEAD | `8bf26d0ebc0b824a36526a9a371d3580529f3ce3` |
-| 内容 | `code/`（git archive）+ `configs/unlanedet/` + `weights/`（**12 个**，含 `s101_54ep` 与 `swa4`）+ `packaging/` + `requirements_instance.txt` |
+| 内容 | `code/`（git archive）+ `configs/unlanedet/` + `weights/`（**12 个，全部取自各 run 的 `run_evidence.json → selected_best_checkpoint.path`**）+ `packaging/` + `requirements_instance.txt` |
 
-v1（`b97cffd2…`）与 v2（`869251a8…`）均已作废，未从它们出过任何提交。
+v1/v2/v3 均已作废（未从它们出过任何提交）。**v4 与本地 `outputs/weights_backup/` 的 11 个权重 sha256 逐位一致。**
 
 ## 6. 提交纪律（不变）
 
