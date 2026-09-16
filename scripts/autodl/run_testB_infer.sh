@@ -51,6 +51,12 @@ while read -r run conf tag; do
 done <<'LIST'
 all71_seed42_clrnet_r50_54ep            0.50 base54
 all71_seed42_clrnet_r50_54ep            0.55 base54_c55
+# Alternative floor, kept on purpose (see action_testB_20260916.md section 7):
+# the OOF sweep peaks at conf 0.35-0.40 and is worth only ~+0.37pp over 0.50,
+# which fails the pre-registered +1pp gate, so 0.50 stays the floor by default.
+# The pass costs ~1 min of GPU and buys the option to switch with BASE_TAG=
+# base54_c35 at packing time, with no re-run needed once testB is on the box.
+all71_seed42_clrnet_r50_54ep            0.35 base54_c35
 all71_seed42_clrnet_r50_36ep            0.50 seed42
 all71_seed101_clrnet_r50_36ep           0.50 seed101
 all71_seed202_clrnet_r50_36ep           0.50 seed202
