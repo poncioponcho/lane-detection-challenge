@@ -190,20 +190,21 @@ bash scripts/build_testB_candidates.sh <下载回来的 testB_bundle.tgz>
 
 ---
 
-## 5.1 solution.zip 复现包（v2，已按出包代码重冻）
+## 5.1 solution.zip 复现包（v3，已按出包代码重冻并补全权重）
 
-v1 是在 `442dfe0` 冻结的，但出包代码后来改到 `8bf26d0`，且新增了会用到的 `s101_54ep` 权重 ——
-按官方"字节完全一致"的要求，这是不一致的，所以重冻了 v2：
+两处不一致，所以重冻：① v1 冻结于 `442dfe0`，但出包代码已到 `8bf26d0`；
+② v2 漏了 `swa4_54ep.pth`（该文件不叫 `model_best.pth`，冻结循环只认三个名字，静默漏掉），
+而注 2 要用它。v3 已补全，**12 个权重文件**。
 
 | 项 | 值 |
 |---|---|
-| 路径（实例） | `/hy-tmp/solution_freeze_20260916_v2.tgz` |
-| **字节数** | **2,761,901,698** |
-| **SHA-256** | **`869251a8acb1a04398ef5318b701301673bfb5015d3e78e1a5e054535dde613d`** |
+| 路径（实例） | `/hy-tmp/solution_freeze_20260916_v3.tgz` |
+| **字节数** | **2,852,441,763** |
+| **SHA-256** | **`65757010005108a80c10dbfc1c06ef2cfc875817ce9112655aa2ff52f0e057e9`** |
 | 代码 HEAD | `8bf26d0ebc0b824a36526a9a371d3580529f3ce3` |
-| 内容 | `code/`（git archive）+ `configs/unlanedet/` + `weights/`（**11 个**，含 `s101_54ep`）+ `packaging/`（推理与打包脚本 + 本清单）+ `requirements_instance.txt` |
+| 内容 | `code/`（git archive）+ `configs/unlanedet/` + `weights/`（**12 个**，含 `s101_54ep` 与 `swa4`）+ `packaging/` + `requirements_instance.txt` |
 
-v1（`b97cffd2…`，2,495,124,936 字节）已被取代，仅作存档。
+v1（`b97cffd2…`）与 v2（`869251a8…`）均已作废，未从它们出过任何提交。
 
 ## 6. 提交纪律（不变）
 
