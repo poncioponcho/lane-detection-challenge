@@ -76,10 +76,32 @@ def derive_list(lane_root: Path, list_path: Path, exclude: set[str],
             f"{[c.name for c in clips]}. Refusing to guess -- pass "
             "--expected-clips 0 to override after checking by hand."
         )
+    # `Path.glob("*.jpg")` matches dot-prefixed AppleDouble sidecars, which shell
+    # glob deliberately hides. Unzipping a zip made on macOS drops a `._<name>.jpg`
+    # next to every real frame, and since every raced frame name ends in .jpg they
+    # sail through the filter: on the 9/17 instance this inflated all 80 existing
+    # clip dirs from 100 to 200 "frames". `ls <clip> | wc -l` will not show it --
+    # use python to count.
     images = sorted(
-        (p for c in clips for p in c.glob("*.jpg")),
+        (p for c in clips for p in c.glob("*.jpg") if not p.name.startswith("._")),
         key=lambda p: (p.parent.name, p.stem),
     )
+    # Second line of defence: testB is not in VERIFIED_100_FRAME_SPLITS, so the
+    # manifest builder will not police the frame count for us. Check that every
+    # clip agrees, which catches any contamination variant that survives the
+    # name filter. Deliberately does NOT hard-assert 100 frames -- asserting would
+    # turn a recoverable surprise into a dead stop.
+    per_clip = Counter(p.parent.name for p in images)
+    distinct = sorted(set(per_clip.values()))
+    if len(distinct) != 1:
+        raise SystemExit(
+            f"clips disagree on frame count {distinct}: "
+            f"{sorted(per_clip.items(), key=lambda kv: kv[1])[:5]}"
+        )
+    n_per = distinct[0]
+    print(f"frames per clip: {n_per} (x{len(clips)} clips = {len(images)} rows)")
+    if n_per != 100:
+        print(f"  !! WARNING: expected 100 frames per clip for testB, got {n_per}.")
     list_path.parent.mkdir(parents=True, exist_ok=True)
     list_path.write_text(
         "".join(f"JPEGImages/{p.parent.name}/{p.name}\n" for p in images),
