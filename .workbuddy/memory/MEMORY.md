@@ -37,8 +37,12 @@
 
 - 生产实例 `i2b0715374400501416`（3090-24G 包天）。**SSH 串随实例重建而变，每次开机从控制台重取**；2026-09-16 09:00 实测 `root@i-1.gpushare.com:59725` + `~/.ssh/lane_id`（BatchMode）**仍可用**。
 - **代码同步 = git bundle**：本地 `git bundle create /tmp/hl.bundle <实例HEAD>..HEAD` → scp → 实例 `mv` 原子替换 → `git fetch && git merge --ff-only`。实例 `origin` 指向陈旧 bundle，勿据此判断同步状态。
-- **发车三守卫**（HEAD 一变就重跑）：`probe_weights.py` → `smoke_dataloader_and_loss.py` → 新模型名登记进 `run_training.CONFIGS` + `WEIGHT_BASE_MODEL` + `validate_run.KNOWN_MODELS`（三处）。
-- `infer_testA.py` evidence 的 `selected_best_checkpoint` 须含 `path` + `sha256`。吞吐：36ep ≈ 2h，54ep ≈ 3.75h。
+- **发车三守卫**（HEAD 一变就重跑，全在 `scripts/autodl/`，**不是** `scripts/`）：`probe_weights.py` → `smoke_dataloader_and_loss.py` → 新模型名登记进 `run_training.CONFIGS` + `WEIGHT_BASE_MODEL` + `validate_run.KNOWN_MODELS`（三处）。
+  - ⚠ `probe_weights.py` 是**开训练前**的权重兼容性/适配探测器（下载 release asset 并对齐 head shape），**不是**"已训好的 run-dir 能不能推理"的健康检查。两者别混。
+  - 🚀 **已训好的 run-dir 要做 smoke**就用：`scripts/autodl/infer_testA.py --run-dir <R/run> --split testA --manifest <迷你manifest> --conf-threshold <c> --output-dir /tmp/smoke_<tag>`。它**只读** `run_evidence.json`、evidence 只写 `--output-dir`，且**强制校验 sha256(checkpoint)==run_evidence.sha256**（第 139–141 行）→ 顺带验权重完整性。迷你 manifest 放 /tmp（勿放项目树，会触发 `assert_tracked_worktree_clean`）。5 张图 × 11 树 ≈ 6 min。
+  - **2026-09-16 23:55 实测**：这条 smoke 路线零污染（跑完 `find $R -maxdepth 2 -newermt "-20 minutes"` 必须为空）。
+- `infer_testA.py` evidence 的 `selected_best_checkpoint` 须含 `path` + `sha256`。evidence **不记耗时**（无 started_at 类字段），要估时间只能实测。
+- ⏱ **别把训练时长当推理时长**：36ep ≈ 2h、54ep ≈ 3.75h 是**训练**吞吐。**推理**快两个数量级——2026-09-16 实测 54ep 单次全量 900 张 = **42 s**（≈21 img/s，含 ~11 s CUDA/加载固定开销）→ **12 次推理约 8–12 min**，远短于 runbook 注释的"约 25 min"。据此 testB 图 **9/17 16:00 前到位即够**（推理 + 回传 + 本地建包 ≈ 30 min）。
 - **🚫 "多模型一致性当伪真值"失效**：9 树 ≥7/9 伪真值下 incumbent 命中率 92.7% vs 真实率 80.3%（召回 1.154 > 1）。**任何"用共识当 GT"的定价/筛选都不要用**，可读的只有相对印证率。
 
 ## 4. 盈亏线经济学（θ = F1/2）
