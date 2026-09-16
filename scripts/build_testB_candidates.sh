@@ -87,6 +87,26 @@ pack () {  # pack <name> <srcdir>
     && echo "  $n: OK" || echo "  $n: PRECHECK FAILED"
 }
 
+# Same as pack() but with an explicit trim margin, for shots that deliberately
+# disagree with the global decision.
+pack_m () {  # pack_m <name> <srcdir> <margin>
+  n=$1; s=$2; m=$3
+  if [ ! -d "$s" ] || [ -z "$(find "$s" -name '*.lines.txt' -print -quit 2>/dev/null)" ]; then
+    echo "  $n: SKIPPED (source tree empty or missing: $s)"
+    return 1
+  fi
+  $PY scripts/apply_bottom_trim_testA.py --src "$s" --dst "$BUILD/${n}_trim" --margin "$m" >/dev/null
+  $PY src/submit/prepare_submit.py --raw-pred-dir "$BUILD/${n}_trim" \
+    --canonical-dir "$BUILD/${n}_canon" \
+    --out-zip "outputs/submit_testB_${n}.zip" \
+    --manifest "$MANIFEST" \
+    --report "outputs/reports/prepare_submit_testB_${n}.json" >/dev/null
+  $PY src/eval/official_oracle/check_submission.py \
+    --zip_path "outputs/submit_testB_${n}.zip" \
+    --list_path /tmp/testB_list_$DAY.txt >/dev/null 2>&1 \
+    && echo "  $n: OK" || echo "  $n: PRECHECK FAILED"
+}
+
 count_lanes () {  # count_lanes <tree>
   find "$1" -name '*.lines.txt' -print0 2>/dev/null \
     | xargs -0 cat 2>/dev/null | grep -cve '^[[:space:]]*$'
@@ -232,6 +252,33 @@ else
   echo "  shot5: SKIPPED (only $M_SUP support trees)"
 fi
 
+echo "=== shot 6: geometry hedge -- deliberately trim with the OTHER margin ==="
+# Why this shot exists even when the f<450 statistic says not to trim.
+#
+# The two candidate geometries are wildly asymmetric (runbook section 4):
+#   train-shaped testB -> margin 40 beats margin 0 by up to +2.25pp (OOF)
+#   testA-shaped testB -> margin 40 costs only 0.069pp, because with every lane
+#                         starting near y=564 the cut lands past y=719 and the
+#                         rule degenerates into a no-op.
+# The 3% gate optimises EXPECTED value for a single submission. But the B board
+# takes the MAX over 6 shots, and expectation is the wrong objective there: this
+# is the last-ranked shot, so the 0.069pp it can lose costs essentially nothing,
+# while it removes the one remaining multi-pp way to be wrong -- misreading testB
+# geometry and leaving +2.25pp unclaimed. Buy the option every time.
+if [ "$M" = "0" ]; then
+  # Prefer carrying the CONSENSUS tree here, not the bare base: if the repair
+  # lands, this shot collects both effects (added lanes + trimmed overshoot).
+  # If it does not, it degrades into a copy of shot4 -- the acknowledged cost
+  # of buying the option.
+  if [ "$M_SUP" -ge 4 ] && [ -d "$BUILD/cons_k5_f80" ]; then
+    pack_m shot6_cons_k5_m40 "$BUILD/cons_k5_f80" 40
+  else
+    pack_m shot6_margin40 "$B" 40
+  fi
+else
+  echo "  shot6: not needed (M=$M already; shot4 carries the margin-0 hedge)"
+fi
+
 echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
 for z in outputs/submit_testB_*.zip; do
@@ -253,5 +300,6 @@ echo "  2: swa4 union consensus trim$M"
 echo "  3: consensus 56pct span80 trim$M"
 echo "  4: $([ "$M" = "0" ] && echo "consensus 44pct span80 trim0" || echo '54ep conf0.50 trim0 hedge')"
 echo "  5: consensus 67pct span80 trim$M"
+echo "  6: $([ "$M" = "0" ] && echo 'cons 44pct span80 trim40 (hedge)' || echo 'unused, shot4 is the margin-0 hedge')"
 echo
 echo "REMINDER: if any shot printed SKIPPED, do not submit a placeholder -- fix or drop the slot."

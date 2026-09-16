@@ -46,13 +46,14 @@ def build(dry: str) -> Path:
         ("OUT=outputs/testB_${DAY}", f"OUT={dry}/testB", 1),
         ("MANIFEST=data/processed/manifest_testB.jsonl",
          f"MANIFEST={dry}/manifest_testB.jsonl", 1),
-        # pack(): --out-zip and --zip_path MUST move together
+        # pack(): --out-zip and --zip_path MUST move together. Matched twice
+        # because pack_m() repeats the same three strings.
         ('--out-zip "outputs/submit_testB_${n}.zip"',
-         f'--out-zip "{dry}/outputs/submit_testB_${{n}}.zip"', 1),
+         f'--out-zip "{dry}/outputs/submit_testB_${{n}}.zip"', 2),
         ('--zip_path "outputs/submit_testB_${n}.zip"',
-         f'--zip_path "{dry}/outputs/submit_testB_${{n}}.zip"', 1),
+         f'--zip_path "{dry}/outputs/submit_testB_${{n}}.zip"', 2),
         ('--report "outputs/reports/prepare_submit_testB_${n}.json"',
-         f'--report "{dry}/outputs/reports/prepare_submit_testB_${{n}}.json"', 1),
+         f'--report "{dry}/outputs/reports/prepare_submit_testB_${{n}}.json"', 2),
         # shot4 margin-0 hedge branch
         ('--out-zip "outputs/submit_testB_shot4_margin0.zip"',
          f'--out-zip "{dry}/outputs/submit_testB_shot4_margin0.zip"', 1),
