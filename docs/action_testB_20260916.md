@@ -271,3 +271,32 @@ v1/v2/v3 均已作废（未从它们出过任何提交）。**v4 与本地 `outp
 - 一律**交包 + 备注，由你手动提交**；我绝不自动交，也不反复开浏览器。
 - 每注交前都过 `prepare_submit.py` + 官方 `check_submission.py`。
 - ⚠️ 本地有个 `_DRYRUN_20260915_testA_content_DO_NOT_SUBMIT/` 目录，内容是 **testA**、名字像 testB，**禁止提交**。
+
+## 7. 低置信阈值扫描（**先注册判据，后看结果**）
+
+### 7.1 为什么重新查这条轴
+2026-09-06 的 `lvo_conf_checkpoint_scan_20260906_probability` 已经测过 0.40–0.60，
+结论是**单调下降**：conf 越低 F1 越高，且 **0.40 还没见底**（0.50 比 0.40 低 0.417pp）。
+但 incumbent 一直在 conf=0.50 跑，而 MEMORY §7 一直记着「降 conf 已封死（低置信带真线率 23%）」——
+那条 **23% 是印证率换算的估计值**，不是 Oracle 实测，两者直接冲突。
+再加一个动机：导出候选有 **78620 条**，conf=0.50 只留下 20852 条，**还有 3.8 倍候选被丢掉**。
+
+### 7.2 为什么这次是零成本
+`src/integrations/unlanedet_hardlane.py:685` 明确要求 "export eval must use
+conf_threshold=0.0 for offline threshold scans"，且这批导出确实用了 export=0.00。
+→ **`scan_lvo_conf_checkpoints.py` 是纯粹的本地重筛选**，低阈值扫描不需要重新推理。
+
+### 7.3 预先写死的放行判据（三条全过才允许换地板）
+> 写在这里是为了防止看结果后再编理由。判据沿用项目既有的候选三门禁（MEMORY §0）。
+
+1. 全局 ΔF1 **≥ +1pp** vs conf=0.50
+2. paired video bootstrap CI **下界 > 0**
+3. **≥ 5/8** video 正向
+
+不满足 → **地板保持 conf=0.50**（它有 testA 实测 0.73574 作锚，低阈值版本没有）。
+即使满足，也只是替换 shot1 的地板，不额外占用提交额度。
+
+### 7.4 已知的主要风险
+- OOF 是 **train 型几何**（MEMORY §1），低阈值结论与 trim 一样依赖 testB 也是 train 型。
+- 8 个 video 的 paired bootstrap CI 半宽约 ±0.5pp，**小差异不可判定**。
+- 这批导出是 **36ep LVO** 模型，不是 54ep incumbent；迁移是方向性的，不是逐位可复现的。
