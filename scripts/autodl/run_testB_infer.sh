@@ -51,11 +51,14 @@ while read -r run conf tag; do
 done <<'LIST'
 all71_seed42_clrnet_r50_54ep            0.50 base54
 all71_seed42_clrnet_r50_54ep            0.55 base54_c55
-# Alternative floor, kept on purpose (see action_testB_20260916.md section 7):
-# the OOF sweep peaks at conf 0.35-0.40 and is worth only ~+0.37pp over 0.50,
-# which fails the pre-registered +1pp gate, so 0.50 stays the floor by default.
-# The pass costs ~1 min of GPU and buys the option to switch with BASE_TAG=
-# base54_c35 at packing time, with no re-run needed once testB is on the box.
+# Why this alternative floor exists (see action_testB_20260916.md section 7):
+# On the 36ep LVO OOF, conf 0.40 beat 0.50 by +0.417pp, so this tree was added
+# to keep that option open. It was then cross-checked on an INDEPENDENT model
+# (15ep LVO clsweight3, same OOF protocol and GT) and the effect vanished:
+# +0.001pp. So the +0.417pp is model-specific noise, not a general law -- do
+# NOT expect it on the 54ep incumbent. The pass is kept only because it costs
+# ~1 min of GPU and BASE_TAG=base54_c35 can switch the floor without a re-run;
+# there is no measured reason to prefer it. Default stays conf 0.50.
 all71_seed42_clrnet_r50_54ep            0.35 base54_c35
 all71_seed42_clrnet_r50_36ep            0.50 seed42
 all71_seed101_clrnet_r50_36ep           0.50 seed101
