@@ -293,7 +293,15 @@ print(n)")
   echo "  $(pwd)/$z   lanes=$l"
 done
 echo
-echo "Shot order: 1 base54 -> 2 union(swa4, cons 56%) -> 3 cons 56% -> 4 cons 44%/hedge -> 5 cons 67% -> 6 adaptive"
+echo "Shot order: 1 base54 -> 2 union(swa4, cons 56%) -> 3 cons 56% -> 4 cons 44%/hedge -> 5 cons 67% -> 6 geometry hedge"
+echo
+# Official rule section 4: "every team may submit at most 3 times PER DAY".
+# The B board spans 9/16 and 9/17, and the daily quota does not roll over --
+# 9/16 went unused because the images never arrived. So budget for 3, not 6.
+echo "!! QUOTA: official rule says 3 submissions PER DAY, non-cumulative."
+echo "!! 9/16's 3 were never spent and did NOT roll over -> assume only 3 today."
+echo "!! If the platform shows 3 left, submit ONLY: shot1, shot3, shot6 (in that order)."
+echo "!! See docs/action_testB_20260916.md section 2.4 for the 6-shot fallback."
 echo "Suggested notes (<=50 chars):"
 echo "  1: 54ep conf0.50 trim$M"
 echo "  2: swa4 union consensus trim$M"
