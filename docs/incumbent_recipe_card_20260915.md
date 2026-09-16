@@ -44,7 +44,7 @@
 git checkout incumbent-0.73574          # 代码
 # 权重（二选一，两者等价）：
 #   /hy-tmp/lane-outputs/runs/all71_seed42_clrnet_r50_54ep/model_best.pth  （sha256 见上）
-#   或 outputs/submit_testA_a2_54ep_best.zip 内的权重
+#   或 outputs/weights_backup/incumbent_54ep_model_best.pth                 （本地备份）
 bash scripts/autodl/run_testB_infer.sh <lane_root>   # 推理（含 base54 这一项）
 bash scripts/build_testB_candidates.sh <bundle.tgz>  # 自动含 shot1 = 本配方 + trim(M)
 ```
