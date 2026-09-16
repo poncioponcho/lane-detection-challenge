@@ -24,6 +24,8 @@
 ## 2. 环境坑（本机 + 实例）
 - **BSD grep 对中文 + `\|` 静默零命中** → 中文检索必须用内置 Grep 工具。
 - 🔴 **AppleDouble `._*` vs Python glob（9/17 抓到，差点毁掉 B 榜）**：实例 **80/80 clip 目录**都带 100 个 `._<frame>.jpg`（Mac 打的 zip 解压产物）。**`ls *.jpg` 不看点文件**（历次帧数检查都显示"正常 100"），而 **`Path.glob("*.jpg")` 会匹配它们** → `derive_list` 把 1000 帧算成 2000。叠加 `src/data/manifest.py:18` 的 `VERIFIED_100_FRAME_SPLITS={train,testA}`（**不含 testB**，帧数校验不管）→ 完全隐形。已修（过滤 `._` + 「所有 clip 帧数一致」守卫，故意不硬断言 100）。**教训：数文件一律用 Python，别用 ls。**
+- ⚠ 该 bug 的后果是**整包无效**而非扣分：`official_rules.md` §3.1 明写「缺失/**多余**/路径错误 → **整包无效**」。多出来的垃圾 `.lines.txt` 会让整个 submit.zip 作废。
+- ✅ 与官方 §2 互证：画布 **1366×720**（与实例实测一致）、线宽 30px 无抗锯齿、IoU>0.5 才算 TP，且 FP **明确含"重复预测"** → 印证「查单树内部重复线」方向正确（虽实测 0 对）。
 - **git bundle 的 ref 名默认是 `HEAD`**（不是分支名）→ 实例侧必须 `git fetch <bundle> HEAD:refs/heads/tmp && git merge --ff-only refs/heads/tmp`；用分支名报 `couldn't find remote ref`。
 - **实例没有 `origin` remote**（9/17 实测），分支名也与本地不同 → 只能走 bundle；**判断同步状态看 `rev-parse HEAD`**。
 - **`pkill -f`/`pgrep -f` 会匹配自身 shell** → 自杀（exit 137）。用 `ps -eo pid,comm`。本机**没有 `timeout` 命令**。
@@ -99,7 +101,7 @@ testA：θ=0.3675，P+G=5819.8，u=2/(P+G)=3.4365e-4。删/加 n 条、真线率
 - **实例可用独立支撑树 = 9 棵**：s42/s101/s202/s303 36ep、clrernet36、cut400、hires、occlude_36ep、s101_54ep。swa*/soup* 是 base 派生，**不算独立票**。本地 `clrernet_36ep` 残缺（158/900），别当基线。
 - **union 优于单发**：A 侧原样保留（继承位移收益），B 侧叠增量 → dropped=0。
 - **SWA 依据**：54ep s42 val 峰值 iter 24863 → 0.89565（final 0.89429），incumbent 用的就是 model_best；沿同轨迹平均 → 同 basin。
-- **solution.zip 已冻结 v2**：`/hy-tmp/solution_freeze_20260916_v2.tgz`，**2,761,901,698 bytes**，sha256 `869251a8acb1a04398ef5318b701301673bfb5015d3e78e1a5e054535dde613d`，HEAD `8bf26d0`，权重 11 个。v1（`b97cffd2…`）已作废。**出包代码一变就要重冻**——9/17 00:30 改了 `build_testB_candidates.sh`（加第 6 注）已触发此规则，**尚未重冻，待用户决定**。
+- **solution.zip 已冻结 v2**：`/hy-tmp/solution_freeze_20260916_v2.tgz`，**2,761,901,698 bytes**，sha256 `869251a8acb1a04398ef5318b701301673bfb5015d3e78e1a5e054535dde613d`，HEAD `8bf26d0`，权重 11 个。v1（`b97cffd2…`）已作废。~~出包代码一变就要重冻~~ → **已证伪（9/17 01:35 回到原文核对）**：`docs/official_rules.md` §3.2 原文是「**B 榜发布前冻结**」+「测试集 B 结束后，**前三名**上传字节一致的压缩包」。即冻结时点是 **9/16 00:00 之前**（已过），赛后上传只约束 Top3。规则里**没有**"代码一变就重冻"的要求——那是把"冻结"误读成"持续同步"。→ **9/17 改 `build_testB_candidates.sh` 不需要重冻**。（若最终进 Top3 再按赛后要求另议。）
 - bundle 必须 `tar czf x.tgz .`（无外层目录）。`build_testB_manifest.py` 严禁 glob 全量 JPEGImages（已修 = 补集 + `--expect-clips 10` 校验，≠10 clip 会拒绝运行，是设计行为）。
 - 所有新候选都无法离线打分 → 排序依据是机制强度 + 相对印证率。
 - ⚠️ `_DRYRUN_20260915_testA_content_DO_NOT_SUBMIT/`、`/tmp/_dryrun_quarantine_20260916`、`/tmp/_DRYRUN_OUT_*` 里的 zip 内容是 **testA，禁止提交**（名字可能像 testB）。跑完演练必查 `outputs/submit_testB_*.zip` 不存在。
