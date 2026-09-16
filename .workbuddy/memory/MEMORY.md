@@ -94,6 +94,7 @@ testA：θ=0.3675，P+G=5819.8，u=2/(P+G)=3.4365e-4。删/加 n 条、真线率
 
 ## 9. B 榜作战（`docs/runbook_testB.md` / `docs/action_testB_20260916.md`）
 - **🔴 唯一阻塞项：testB 图像未上传实例**。`JPEGImages` 恒 **97 项**（71 训练 + 9 testA + 17 `_hflip`）。需用户从赛事平台下载 10 clip/1000 张 → scp → 解压进 JPEGImages（期望 107）。**未到位前不建 manifest、不推理。**（9/17 01:12 第 12 次确认仍是 97）
+- **⭐ 实例常驻到位触发器（9/17 01:59 部署，pid 25862）**：`scripts/autodl/watch_testB_and_run.sh` 每 60 s 数 `JPEGImages`（排除 `_hflip`，基线 **80**），>80 且 45 s 稳定 → **自动跑 `run_testB_infer.sh`**。失败重试 3 次后仍每 300 s 复跑到 16:30 截止；锁 `/hy-tmp/testB_watch.lock`、日志 `/hy-tmp/testB_watch.log`。→ **图一上传推理就开跑，不依赖轮询撞上。** 轮询到时**先看 `/hy-tmp/testB_bundle.tgz` 是否已在**，在则跳过推理。
 - **执行 = 两条命令**：实例 `scripts/autodl/run_testB_infer.sh`（11 次推理 → 打印 `f<450` → 打 tgz）；本地 `bash scripts/build_testB_candidates.sh <tgz>`（自动定 margin → 建 6 注 → 逐个官方预检）。
 - **六注终版**：地板 / **cons 9 树 56%（+24 线，+0.036pp ⭐）** / uni(swa4, cons56%) / cons 44%（+42 线） / cons 67%（+5 线） / **几何对冲**。加线=0 的注别交（已内置告警）。
 - ⭐ **第 6 注 = 押「另一个 margin」**（唯一还剩多 pp 的手段）：train 型下 trim40 值 **+2.25pp**，testA 型只亏 **0.069pp**（cut=752>719 退化为空操作）。脚本 `f<450>3%` 是**单发期望最优**，但**取 max 时期望是错的目标函数**（额度若真只有 3 发，则每发更珍贵、但"最后一发承担损失"的逻辑不变，结论反而更强）；它真正对冲的是**阈值模型可能错了**（二元模型 3% 正确；比例模型盈亏点实为 **0.3%**）。实现用 `pack_m` + `cons_k5_f80 trim40`，不是裸 base。
