@@ -25,6 +25,9 @@
 ## 2. 环境坑（本机 + 实例）
 
 - **BSD grep 对中文 + `\|` 静默零命中** → 中文检索必须用内置 Grep 工具。
+- 🔴 **AppleDouble `._*` vs Python glob（9/17 抓到，差点毁掉 B 榜）**：实例 **80/80 clip 目录**都带 100 个 `._<frame>.jpg` 垃圾（Mac 打的 zip 解压产物）。**shell `ls *.jpg` 不看点文件**（所以历次帧数检查都显示"正常 100"），而 **`Path.glob("*.jpg")` 会匹配它们** → `derive_list` 把 1000 帧算成 2000。叠加 `VERIFIED_100_FRAME_SPLITS = {train,testA}`（**不含 testB**，故帧数校验不管）→ 完全隐形。教训：**数文件一律用 Python，别用 ls**。已修（过滤 `._` + 增加「所有 clip 帧数一致」守卫，故意不硬断言 100）。
+- **git bundle 的 ref 名默认是 `HEAD`**：`git bundle create /tmp/x.bundle <old>..HEAD` 出来的 ref 叫 HEAD，**不是分支名** → 实例侧必须 `git fetch <bundle> HEAD:refs/heads/tmp && git merge --ff-only refs/heads/tmp`；用分支名会报 `couldn't find remote ref`。
+- **实例没有 `origin` remote**（2026-09-17 实测 `git config --get remote.origin.url` 为空），且分支名与本地不同（`risk-on-res960x384-screen` vs `exp/occlusion-aug`）→ 只能走 bundle；**不要据此判断同步状态，看 `rev-parse HEAD`**。
 - **`pkill -f`/`pgrep -f` 会匹配自身 shell** → 自杀（exit 137）。用 `ps -eo pid,comm`。
 - 本机**没有 `timeout` 命令**。
 - **长命令被沙箱 SIGTERM**：>2min 用 `run_in_background`；远端 `setsid nohup ... & disown`。`scp -r` 目录易被杀 → 远端先 `tar czf` 再传单文件。
