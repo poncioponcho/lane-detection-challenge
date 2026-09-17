@@ -284,6 +284,43 @@ else
 fi
 
 echo
+echo "=== shot 7: union(consensus 56%, s101_54ep) -- the pre-registered extra shot ==="
+# docs/action_testB_20260916.md section 8.5 pre-registered exactly this action
+# for the case "a new submission window appears, OR the platform grants more
+# than 3 slots". The 2026-09-17 schedule correction satisfies both: the window
+# is 9/17 00:00 - 9/18 17:00, which is 3 + 3 = 6 shots.
+#
+# Why s101_54ep and not a 36ep support: section 8.2 measured that the weaker the
+# support the lower the true-lane rate of the lanes it contributes (r=0.440 for a
+# strong support vs the fitted 0.333-0.352 the old table assumed). s101_54ep is a
+# fully independent 54ep run (different seed, same recipe as the incumbent), and
+# it is the only support that shares the incumbent's schedule length.
+#
+# This is a genuinely different mechanism from shot2/shot3: those add lanes that
+# many correlated trees AGREE on; this adds lanes one independent model produced
+# and the floor does not explain. For a max-over-shots objective that diversity
+# is worth more than another 5-lane consensus rung (shot5).
+if [ -d "$OUT/testB_s101_54ep/testB/predictions" ] && [ -d "$BUILD/cons_f80" ]; then
+  $PY scripts/build_union_pair_20260915.py \
+    --a "$BUILD/cons_f80" --b "$OUT/testB_s101_54ep/testB/predictions" \
+    --dst "$BUILD/uni_s101"
+  pack shot7_uni_cons_s101 "$BUILD/uni_s101"
+  ADD_UNI=$(count_lanes "$BUILD/uni_s101")
+  ADD_UNI=$(( ADD_UNI - BASE_LANES ))
+  echo "  shot7_uni_cons_s101: added vs floor = $ADD_UNI lanes"
+  # Scale reference: on the A board and on OOF, single-model union deltas landed
+  # at 96-119 lanes over the whole set. An order-of-magnitude jump would mean
+  # s101_54ep is far noisier on testB than anywhere we measured, so flag it and
+  # let a human decide instead of silently spending a slot on it.
+  if [ "$ADD_UNI" -gt 300 ]; then
+    echo "  !! shot7 adds $ADD_UNI lanes, far above the 96-119 measured range."
+    echo "  !! Do NOT spend a slot until this is looked at."
+  fi
+else
+  echo "  shot7: SKIPPED (needs both testB_s101_54ep and the consensus tree)"
+fi
+
+echo
 echo "=== READY (hand these to the user; submission needs explicit sign-off) ==="
 for z in outputs/submit_testB_*.zip; do
   l=$($PY -c "
@@ -297,21 +334,30 @@ print(n)")
   echo "  $(pwd)/$z   lanes=$l"
 done
 echo
-echo "Shot order: 1 base54 -> 2 union(swa4, cons 56%) -> 3 cons 56% -> 4 cons 44%/hedge -> 5 cons 67% -> 6 geometry hedge"
+echo "Shot order: 1 base54 -> 2 union(swa4, cons 56%) -> 3 cons 56% -> 4 cons 44%/hedge -> 5 cons 67% -> 6 geometry hedge -> 7 union(cons 56%, s101_54ep)"
+echo "7 shots exist for 6 slots -> the weakest (shot5, cons 67%: +5 lanes) is the one to drop."
 echo
 # Official rule section 4: "every team may submit at most 3 times PER DAY".
-# The B board spans 9/16 and 9/17, and the daily quota does not roll over --
-# 9/16 went unused because the images never arrived. So budget for 3, not 6.
+# 2026-09-17 08:20 correction: the schedule was pushed back by one day by the
+# organisers -- the B board is 9/17 00:00 - 9/18 17:00 (verified against the
+# live topic page twice, and consistent with testB not existing on 9/16).
+# So the window spans two natural days -> 3 + 3 = 6 submissions, take the max.
 echo "!! QUOTA: official rule says 3 submissions PER DAY, non-cumulative."
-echo "!! 9/16's 3 were never spent and did NOT roll over -> assume only 3 today."
-echo "!! If the platform shows 3 left, submit ONLY: shot1, shot3, shot6 (in that order)."
-echo "!! See docs/action_testB_20260916.md section 2.4 for the 6-shot fallback."
+echo "!! Window is 9/17 00:00 - 9/18 17:00 (BJ) -> 3 shots today + 3 tomorrow = 6."
+echo "!! VERIFY the remaining count on the platform BEFORE using a slot:"
+echo "!!   shows 6 or more -> submit all of: shot1 shot2 shot3 / shot4 shot5 shot6"
+echo "!!   shows 3          -> this calendar day only: shot1, shot3, shot6"
+echo "!! (M=40 means shot6 prints 'not needed'; then the 3rd slot goes to shot4.)"
+echo "!! See docs/action_testB_20260916.md section 2.4 for the priority table."
 echo "Suggested notes (<=50 chars):"
 echo "  1: 54ep conf0.50 trim$M"
 echo "  2: swa4 union consensus trim$M"
 echo "  3: consensus 56pct span80 trim$M"
 echo "  4: $([ "$M" = "0" ] && echo "consensus 44pct span80 trim0" || echo '54ep conf0.50 trim0 hedge')"
 echo "  5: consensus 67pct span80 trim$M"
-echo "  6: $([ "$M" = "0" ] && echo 'cons 44pct span80 trim40 (hedge)' || echo 'unused, shot4 is the margin-0 hedge')"
+# 2026-09-17: the note read "cons 44pct" but shot6 is built from cons_k5_f80,
+# i.e. the 56% consensus tree (script line ~277). Fixed.
+echo "  6: $([ "$M" = "0" ] && echo 'cons 56pct span80 trim40 (hedge)' || echo 'unused, shot4 is the margin-0 hedge')"
+echo "  7: union cons56 + s101_54ep trim$M"
 echo
 echo "REMINDER: if any shot printed SKIPPED, do not submit a placeholder -- fix or drop the slot."

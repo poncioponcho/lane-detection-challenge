@@ -22,7 +22,11 @@ IMG=$HARDLANE_DATA_ROOT/JPEGImages
 LOG=/hy-tmp/testB_watch.log
 LOCK=/hy-tmp/testB_watch.lock
 BUNDLE=/hy-tmp/testB_bundle.tgz
-DEADLINE=202609171630      # Beijing time; stop waiting after this
+# Beijing time; stop waiting after this.
+# 2026-09-17 08:30 correction: the official page states the B-board window is
+# 9/17 00:00 - 9/18 17:00 (41 h), NOT 9/16 - 9/17 17:00. The old value
+# (202609171630) would have made this watcher give up with 25 h of window left.
+DEADLINE=202609181700
 
 count_clips () { ls "$IMG" 2>/dev/null | grep -v _hflip | wc -l | tr -d ' '; }
 
