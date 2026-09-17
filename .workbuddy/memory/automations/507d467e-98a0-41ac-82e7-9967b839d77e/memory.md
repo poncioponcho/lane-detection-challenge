@@ -63,3 +63,10 @@
 - 新建用户级技能 `~/.workbuddy/skills/oof-lever-replication-gate/`（先写死判据 → 找零成本测量方式 → 换第二个模型复验）。
 - 提交：`24f1763`、`d2b97b9`。
 - 下次执行要点不变：先看 `/hy-tmp/testB_bundle.tgz` 是否在；**不要再重推 conf 阈值这条轴**。
+
+## 2026-09-17 08:04（第 9 次轮询）
+- 结果：**BLOCKED**（第 16 次确认 80 / 总数 97）。SSH 串与 hostname 未变（第 7 次同实例）。幂等守卫通过。
+- 触发器 pid 25862 存活 6h。⚠️ 记一条防误判：`testB_watch.log` 只在 start/TRIGGER/数量变化时落行，**日志久无更新 ≠ 进程死**，存活判定要用 `ps -eo pid,etime,args | grep watch_testB`。
+- 本轮顺带完成 MEMORY.md 压缩重写（23.3KB→13.5KB，注入被截断必须先瘦身），修掉两个 §10 的重复编号。
+- 剩余窗口 8h56m；临界点 16:00 前图必须到位。
+- 下次执行要点不变：先看 `/hy-tmp/testB_bundle.tgz`；不要重推 conf 阈值轴（已证伪关闭）。

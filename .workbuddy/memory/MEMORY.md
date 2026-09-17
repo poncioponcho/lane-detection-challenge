@@ -36,7 +36,12 @@
 - **发车三守卫**（HEAD 一变就重跑，全在 `scripts/autodl/`）：`probe_weights.py` → `smoke_dataloader_and_loss.py` → 新模型名登记进 `run_training.CONFIGS` + `WEIGHT_BASE_MODEL` + `validate_run.KNOWN_MODELS`（三处）。⚠ `probe_weights.py` 是**开训练前**的权重兼容探测器，不是"已训好 run-dir 能否推理"的体检。
 - 🚀 **已训好 run-dir 做 smoke**：`scripts/autodl/infer_testA.py --run-dir <R/run> --split testA --manifest <迷你manifest> --conf-threshold <c> --output-dir /tmp/smoke_<tag>`（**强制校验 sha256(checkpoint)==run_evidence.sha256**）。迷你 manifest 放 /tmp（放项目树触发 `assert_tracked_worktree_clean`）。evidence 的 `selected_best_checkpoint` 须含 `path`+`sha256`；evidence **不记耗时**。
 - ⏱ **别把训练时长当推理时长**：54ep≈3.75h 是**训练**；**推理** 900 张 = **42 s**；testB 全链（11 树推理+回传+建包）≈ **20–30 min**。
-- **🚫 "多模型一致性当伪真值"失效**：9 树 ≥7/9 伪真值下 incumbent 命中率 92.7% vs 真实 80.3%（召回 1.154>1）。**任何"用共识当 GT"的定价/筛选都不要用。**
+- 🚫 **"多模型一致性当伪真值"失效**：9 树 ≥7/9 伪真值下 incumbent 命中率 92.7% vs 真实 80.3%（召回 1.154>1）。**任何"用共识当 GT"的定价/筛选都不要用。**
+- 🔴 **干净工作树守卫会静默废掉整轮（9/17 实测）**：`infer_testA.py` / `run_training.py` / `evaluate_selected.py` 都调 `assert_tracked_worktree_clean`（`run_training.py:186`，判据 = `git status --short --untracked-files=no` 非空即 `SystemExit`）。**未跟踪文件不拦，但"已跟踪未提交"必拦**。9/17 实例上 `scripts/autodl/run_testB_infer.sh` 是 scp 部署的 `M` 文件 → **13 次推理全部被拒**，而脚本不检查退出码、仍 `exit 0`，守望遂把 20KB 空 bundle 当成功。→ **铁律：凡 scp 部署的已跟踪文件，必须走「本地提交 → bundle → 实例 merge」使其与 HEAD 一致**；任何批量推理脚本都必须**逐产物计数并显式 exit 非 0**。
+- ⚠ **heredoc 里的 `#` 注释是数据不是注释**：`while read -r a b c; do … done <<'LIST'` 会读入每一行，包括说明行 → 9/17 日志出现 `conf Why` / `conf On` 等 argparse 报错。注释一律放 heredoc 外面。
+- 🔴 **坐标越界：官方是 clamp 不是拒绝（9/17 实测，曾废掉整轮建包）**：官方 `score.py:65-67` 栅格化前 `np.clip(x,0,1365)`/`np.clip(y,0,719)`；官方 `check_submission.py` **完全不校验坐标范围**（只查 UTF-8/偶数个值/有限数/去重后≥2点/≤64线/≤2048点/**文件集合精确匹配**）。testB **13 棵树全部**把 3–21 条线放在 `x∈(1365,1366]`（**最多越界 1.0px**，y 从不超 719）。我们的 `export_lines.assert_valid_coords` / `verify_submit.py` 曾比官方都严 → 已改为 **1.0px 有界容差 + clamp，超容差仍抛错**（`clamp_to_canvas`，commit `d31eb99`）。A 榜 x 最大只到 1362.1 故从未暴露。
+- ⚠ **`pack()` 把 prepare_submit 输出重定向到 `/dev/null`** → 建包失败**静默**（表现为 canon 只写出 204/1000、无 zip、无 report）。**建包步骤必须查退出码**（推理段已有 `exit 3` 校验，建包段仍待补）。
+- ⚠ **跨实例传大文件先 `split -b 30m`**：单次 scp 240MB 在 ~2min 处被沙箱 SIGTERM 截断（`run_in_background` + 关沙箱组合**不生效**）。实测 ~400KB/s，单块 1:18。
 
 ## 4. 盈亏线经济学（θ = F1/2）
 testA：θ=0.3675，u=2/(P+G)=3.4365e-4。`ΔF1 = u·n·(θ−r)`（删）/ `u·n·(r−θ)`（加）。单条：删 +0.0126pp｜加 +0.0217pp｜修复 +0.0344pp。→ 删线要求真线率 **<36.75%**，加线 **>36.75%**。
@@ -60,6 +65,7 @@ testA：θ=0.3675，u=2/(P+G)=3.4365e-4。`ΔF1 = u·n·(θ−r)`（删）/ `u·
 轴形：0.35–0.50 极平高原；**悬崖在 0.25 以下** → 硬下限 0.25。边际真线率：0.15 带 r≈0.20｜[0.25,0.35) r≈0.35｜[0.40,0.50) r≈0.49。✅ 环境漂移实测 = 0 → 旧表可并表。零成本选项 `BASE_TAG=base54_c35`（**已无实测理由偏好**）。测试集无 score sidecar → 改阈值必须重跑推理。
 
 ## 9. trim（唯一正迁移轴）
+- 🔴🔴 **testB 实测是 train 型几何（9/17）**：`f<450 = 0.8492`（84.9%）、top 中位数 **424.0**、base54 共 1910 条线 → **判定 M = 40**。此前 A 榜全程 `f<450≈0` 使这条杠杆一直是空操作；**testB 上它第一次真正生效**，即 §9 记录的 +2.25pp 上界来自「就是这个情形」。⚠ 该曲线在 conf≈0.345 测的，incumbent 是 conf=0.50，**名义空间未经该点验证**。
 - **原图实测 1366×720**。「近端被推到 y=719」= 底边最后一行。机理：CLRNet 把近端一律推到 y=719，GT 远端起始时 bottom 只到 396–615 → 过冲稀释 30px 描边 IoU。规则 `bottom = gt_bottom_for_top(top) + margin`。
 - **全局 margin 曲线（OOF）**：0→0.797224｜20→0.811045｜**40→0.819699**｜60→0.817685（40 比 0 高 **+2.25pp**）。⚠ 该曲线在 **conf≈0.345** 测的（基线 P=22248），**不是 0.50** → 名义上行空间未经 conf=0.50 验证。
 - **testA 型几何上 margin 是空操作**（起点 ≈564 → gt_bottom(564)+40=752>719）→ 只有 margin 0 有效（+0.069pp）。**⭐ 不对称 = 最大杠杆**：margin 40 下界 −0.069pp / 上界 +2.25pp。
@@ -68,7 +74,10 @@ testA：θ=0.3675，u=2/(P+G)=3.4365e-4。`ΔF1 = u·n·(θ−r)`（删）/ `u·
 
 ## 10. B 榜作战（`docs/runbook_testB.md` / `docs/action_testB_20260916.md`）
 - **窗口 9/17 00:00 – 9/18 17:00（§0），6 发取 max。**
-- **执行 = 两条命令**：实例 `scripts/autodl/run_testB_infer.sh`（11 树推理 → 打印 `f<450` → 打 `/hy-tmp/testB_bundle.tgz`）；本地 `bash scripts/build_testB_candidates.sh <tgz>`（自动定 margin → 建 7 注 → 逐个官方预检）。
+- ✅ **数据已到位（9/17 08:29）**：本地 `data/raw/dataset/测试集B.zip`（240,471,948 B，sha256 `69114a30…44d5`），实例 `/hy-tmp/datasets/HardLane/Lane/JPEGImages/` 已含 10 个 testB clip（90 = 80 + 10）。官方清单已放 `<lane_root>/data/testB.txt`（1000 行，`--official-list` 必须用它，顺序≠目录推导序）。**样例包 `B榜提交样例.zip` 里的官方 `check_submission.py` / `score.py` 与本地逐字节一致。**
+- ✅ **六注已建成（9/17 09:25，12m41s）**：`outputs/submit_testB_shot{1_base54,2_uni_swa4_cons,3_consensus,4_margin0,5_cons_k6,7_uni_cons_s101}.zip`，**全部通过官方 `check_submission.py` + 本地 `verify_submit`**，1000 文件 / 根 `submit/`。线数 1910/2150/2099/1910/2030/2174（相对地板加线 0/+181/+189/0/+120/+264）。已置 `outputs/state_testB_done.marker`。**测试集加线量比 A 榜大一个量级**（A 榜 56% 门仅 +24、67% 门 +5）→ 共识族本就是小杠杆（r≈0.378 仅略高于盈亏线），**主导项仍是 margin 的 +2.25pp**。
+- 📌 **建议交接**：今日交 `shot1`（保底）/ `shot4`（**trim0 对照——与 shot1 线数完全相同、只差 margin，是测 +2.25pp 杠杆的干净实验**）/ `shot3`（加线方向最强）；明天按读数交余下三注。交前先看平台剩余额度。
+- **执行 = 两条命令**：实例 `scripts/autodl/run_testB_infer.sh`（13 棵树推理 → 逐树校验 1000 文件 → 打印 `f<450` → 打 `/hy-tmp/testB_bundle.tgz`，正常约 9 MB）；本地 `bash scripts/build_testB_candidates.sh <tgz>`（自动定 margin → 建 6 注 → 逐个官方预检，约 13 min）。
 - **实例常驻到位触发器**：`scripts/autodl/watch_testB_and_run.sh`（setsid，锁 `/hy-tmp/testB_watch.lock`，日志 `/hy-tmp/testB_watch.log`）。每 60 s 数 clips（基线 80 = 71 train + 9 testA），>80 且 45 s 稳定 → 自动跑推理。**DEADLINE 已随窗口改为 `202609181700`**（旧值 202609171630 会白扔 25h）。**日志只在 start/TRIGGER/变化时打印，久无新行 ≠ 已死**；判存活用 `ps -eo pid,etime,args | grep "[w]atch_testB"`。
 
 - **注单（文件名 = 唯一权威，勿用中间编号；§2.2 与 §2.4 曾编号错位，9/17 已修）**：
