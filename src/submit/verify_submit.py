@@ -55,8 +55,16 @@ def validate_line(s: str) -> Optional[str]:
     if len(cleaned) < 2:
         return "fewer than 2 points after consecutive-deduplication"
     x, y = vals[0::2], vals[1::2]
-    if (x.min() < 0 or x.max() > CANVAS_W - 1 or
-            y.min() < 0 or y.max() > CANVAS_H - 1):
+    # 2026-09-17: bound this the way the organisers do. The shipped score.py
+    # clips x to [0, CANVAS_W-1] before rasterising and the shipped
+    # check_submission.py validates no bounds at all, so a point on the right
+    # border (x == CANVAS_W exactly) is a legal, trivially-clamped submission
+    # rather than a defect. testB put 3-21 lanes per tree into (1365, 1366].
+    # A bounded 1 px tolerance accepts that border effect while still flagging
+    # anything genuinely outside the image.
+    TOL = 1.0
+    if (x.min() < -TOL or x.max() > CANVAS_W - 1 + TOL or
+            y.min() < -TOL or y.max() > CANVAS_H - 1 + TOL):
         return f"out of bounds x[{x.min():.1f},{x.max():.1f}] y[{y.min():.1f},{y.max():.1f}]"
     if float(vals.max()) < 2.0:
         return "coords look normalized (all < 2px)"

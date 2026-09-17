@@ -67,11 +67,43 @@ def test_export_validation():
     ("100.0 700.0 100.0 700.0", "after consecutive-deduplication"),
     ("1,2 3,4 5,6 7,8", "non-numeric"),
     ("100 700 200 500", "not 1-decimal"),
-    ("100.0 700.0 1366.0 500.0", "out of bounds"),
-    ("100.0 700.0 200.0 720.0", "out of bounds"),
+    # 2026-09-17: these two used to be 1366.0 / 720.0 and were expected to fail.
+    # They are NOT failures under the organisers' contract: score.py clips x to
+    # [0,1365] and y to [0,719] before rasterising, and check_submission.py
+    # validates no bounds at all, so a point sitting exactly on the border is a
+    # legal submission that the scorer trivially clamps. testB genuinely
+    # produces x in (1365, 1366] on 3-21 lanes per tree. The bound is now a 1 px
+    # tolerance, so the cases below are moved genuinely past it.
+    ("100.0 700.0 1367.0 500.0", "out of bounds"),
+    ("100.0 700.0 200.0 721.0", "out of bounds"),
 ])
-def test_verify_line_matches_official_strict_failures(line, error):
+def test_verify_line_rejects_only_genuinely_out_of_canvas(line, error):
     assert error in validate_line(line)
+
+
+@pytest.mark.parametrize("line", [
+    # exactly on the right border: the real testB case
+    "100.0 700.0 1366.0 500.0",
+    "100.0 700.0 1365.9 500.0",
+    # exactly on the bottom border
+    "100.0 700.0 200.0 720.0",
+])
+def test_verify_line_accepts_canvas_border_effect(line):
+    assert validate_line(line) is None
+
+
+def test_export_clamps_border_effect_instead_of_raising():
+    """A ≤1 px overshoot must be snapped onto the canvas, not rejected.
+
+    Regression guard for 2026-09-17: rejecting it aborted the whole testB
+    packaging step, and pack() hides prepare_submit's output, so it failed
+    silently into a zero-lane zip.
+    """
+    assert lane_to_line([[10.0, 20.0], [1366.0, 400.0]]) == "10.0 20.0 1365.0 400.0"
+    assert lane_to_line([[10.0, 20.0], [1365.9, 400.0]]) == "10.0 20.0 1365.0 400.0"
+    # far outside is still a hard error, not a silent clamp
+    with pytest.raises(ValueError, match="out of bounds"):
+        lane_to_line([[10.0, 20.0], [1400.0, 400.0]])
 
 
 def test_verify_rejects_lane_and_point_resource_overflow(tmp_path):

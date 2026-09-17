@@ -19,6 +19,53 @@ import numpy as np
 from common.types import CANVAS_H, CANVAS_W
 
 
+def clamp_to_canvas(arr: np.ndarray,
+                    w: int = CANVAS_W, h: int = CANVAS_H,
+                    tolerance: float = 1.0) -> np.ndarray:
+    """Snap coordinates that sit on the canvas border back onto the canvas.
+
+    Why this exists (2026-09-17): the organisers' own pipeline CLAMPS, it does
+    not reject. ``src/eval/official_oracle/score.py`` is byte-identical to the
+    shipped ``score.py`` and does, before rasterising::
+
+        lane[:, 0] = np.clip(lane[:, 0], 0, IMG_SHAPE[1] - 1)   # x -> [0,1365]
+        lane[:, 1] = np.clip(lane[:, 1], 0, IMG_SHAPE[0] - 1)   # y -> [0, 719]
+
+    and the shipped ``check_submission.py`` validates no coordinate bounds at
+    all (UTF-8, even token count, finiteness, >=2 distinct points, <=64 lanes,
+    <=2048 points, exact file set). The rules only promise that out-of-image
+    points "will be truncated to the boundary".
+
+    This module used to RAISE on any out-of-canvas point -- stricter than both
+    official components. On testB every one of the 13 prediction trees puts 3
+    to 21 lanes at x in (1365, 1366], i.e. at most exactly 1.0 px past the
+    last valid column (the right image border); a strict guard aborted the
+    whole packaging step, and because ``pack()`` sends prepare_submit's output
+    to /dev/null it failed silently into a zero-lane zip.
+
+    A bounded tolerance keeps the guard useful: a point a fraction of a pixel
+    past the border is a boundary effect that the official scorer clamps away
+    with identical geometry, whereas a point far outside means a real decoding
+    bug and must still fail loudly.
+    """
+    a = np.asarray(arr, dtype=np.float64).reshape(-1, 2)
+    if not np.isfinite(a).all():
+        raise ValueError("lane contains NaN/Inf")
+    lo_ok = (a[:, 0].min() >= -tolerance) and (a[:, 1].min() >= -tolerance)
+    hi_ok = (a[:, 0].max() <= w - 1 + tolerance) and (a[:, 1].max() <= h - 1 + tolerance)
+    if not (lo_ok and hi_ok):
+        raise ValueError(
+            f"coord out of bounds [{a[:, 0].min():.1f},{a[:, 0].max():.1f}]x"
+            f"[{a[:, 1].min():.1f},{a[:, 1].max():.1f}] (canvas "
+            f"[0,{w - 1}]x[0,{h - 1}], tolerance {tolerance}px) -- this far "
+            "outside means a real bug, not a border effect"
+        )
+    out = a.copy()
+    out[:, 0] = np.clip(out[:, 0], 0, w - 1)
+    out[:, 1] = np.clip(out[:, 1], 0, h - 1)
+    return out
+
+
 def assert_valid_coords(arr: np.ndarray,
                         w: int = CANVAS_W, h: int = CANVAS_H) -> None:
     """Hard-validate a lane point array; raises ValueError on any violation."""
@@ -44,7 +91,7 @@ def lane_to_line(points, ndigits: int = 1) -> str:
     official parser removes consecutive duplicates and rejects a lane with
     fewer than two remaining points, so this guard must run after formatting.
     """
-    arr = np.asarray(points, dtype=np.float64).reshape(-1, 2)
+    arr = clamp_to_canvas(points)
     assert_valid_coords(arr)
     tokens = [f"{value:.{ndigits}f}" for value in arr.reshape(-1)]
     serialized = np.asarray(tokens, dtype=np.float64).reshape(-1, 2)
