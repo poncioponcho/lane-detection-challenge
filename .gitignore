@@ -1,4 +1,6 @@
-# 数据与产物（10GB 级，不入库）——只放行小型人工标注事实源
+# ──────────────────────────────────────────────────────────────────────
+# Data & artifacts (10GB+, never commit) — allow small curated sources
+# ──────────────────────────────────────────────────────────────────────
 /data/*
 !/data/processed/
 /data/processed/*
@@ -7,10 +9,44 @@
 !/data/processed/manifest_val_v1_seed42.jsonl
 /outputs/
 
-# Python
+# ──────────────────────────────────────────────────────────────────────
+# AI agent internal scaffolding (memory, identity, session state)
+# ──────────────────────────────────────────────────────────────────────
+.workbuddy/
+.openclaw/
+.openclaw-attachments/
+.opencode/
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+TASKS.md
+overview.md
+
+# ──────────────────────────────────────────────────────────────────────
+# IDE & tooling configs (local machine specific)
+# ──────────────────────────────────────────────────────────────────────
+config/
+.pytest_cache/
+
+# ──────────────────────────────────────────────────────────────────────
+# Python build artifacts
+# ──────────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+.eggs/
+*.egg-info/
+build/
+dist/
 
-# macOS
+# ──────────────────────────────────────────────────────────────────────
+# Test / OS noise
+# ──────────────────────────────────────────────────────────────────────
 .DS_Store
+*.swp
+*.swo
+*~
