@@ -1,0 +1,9 @@
+# ──────────────────────────────────────────────────────────────────────
+# Oracle evaluation environment (Python 3.12, frozen official pins)
+# Must be in its own venv — incompatible with the training env.
+# Install: python3.12 -m venv ~/venvs/lane-oracle && pip install -r this
+# ──────────────────────────────────────────────────────────────────────
+
+numpy==2.1.3
+scipy==1.15.3
+opencv-python==4.12.0.88

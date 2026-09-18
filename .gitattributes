@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────────────────
+# Line ending normalization — prevent CRLF/LF drift between macOS/Linux
+# ──────────────────────────────────────────────────────────────────────
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.patch text eol=lf
+
+# Binary files — leave untouched
+*.png binary
+*.jpg binary
+*.zip binary
+*.tgz binary
+*.gz binary
+*.pth binary
+*.pt binary
+*.so binary
+*.pyc binary

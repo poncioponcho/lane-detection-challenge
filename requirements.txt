@@ -1,0 +1,26 @@
+# ──────────────────────────────────────────────────────────────────────
+# Training / development environment (Python 3.10, AutoDL GPU / local CPU)
+# Versions are pinned for reproducibility per configs/default.yaml
+# ──────────────────────────────────────────────────────────────────────
+
+numpy==1.26.4
+scipy==1.11.4
+opencv-python-headless==4.9.0.88
+Pillow==10.4.0
+PyYAML==6.0.1
+tqdm==4.66.4
+click==8.1.7
+dataclasses-json==0.6.7
+
+# Testing
+pytest==8.3.3
+pytest-cov==5.0.0
+
+# ──────────────────────────────────────────────────────────────────────
+# PyTorch — install separately with the CUDA wheel for your platform
+# GPU (AutoDL 4090, CUDA 11.8):
+#   pip install torch==2.1.2+cu118 torchvision==0.16.2+cu118 \
+#       --index-url https://download.pytorch.org/whl/cu118
+# CPU (local contract tests only):
+#   pip install torch==2.1.2 torchvision==0.16.2
+# ──────────────────────────────────────────────────────────────────────
